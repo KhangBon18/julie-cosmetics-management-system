@@ -23,9 +23,18 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       if (error.response.status === 401) {
-        localStorage.removeItem('token');
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
+        const url = error.config?.url || '';
+        const path = window.location.pathname;
+
+        // Don't redirect for customer auth API calls or when on shop/auth pages
+        const isCustomerAuth = url.includes('/customer-auth/');
+        const isOnShopAuth = path.startsWith('/shop/auth');
+        const isOnLogin = path.startsWith('/admin/login');
+
+        if (!isCustomerAuth && !isOnShopAuth && !isOnLogin) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('userType');
+          window.location.href = '/admin/login';
         }
       }
       throw error.response.data;

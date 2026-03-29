@@ -8,7 +8,7 @@ export default function TopHeader({ title }) {
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setShowDropdown(false); };
-    document.addEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handler, { passive: true });
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
@@ -22,19 +22,28 @@ export default function TopHeader({ title }) {
         <h2>{title}</h2>
       </div>
       <div className="top-header-right">
-        <div className="user-menu" ref={ref} onClick={() => setShowDropdown(!showDropdown)}>
-          <div className="user-avatar">{initials}</div>
-          <div>
-            <div className="user-info-name">{user?.full_name || user?.username}</div>
-            <div className="user-info-role">{roleLabels[user?.role] || user?.role}</div>
-          </div>
-          {showDropdown && (
-            <div className="user-dropdown">
-              <button onClick={logout} className="danger">🚪 Đăng xuất</button>
+        <div className="user-menu" ref={ref}>
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            aria-expanded={showDropdown}
+            aria-haspopup="true"
+            aria-label="Menu người dùng"
+            style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', padding: '6px 12px' }}
+          >
+            <div className="user-avatar" aria-hidden="true">{initials}</div>
+            <div>
+              <div className="user-info-name">{user?.full_name || user?.username}</div>
+              <div className="user-info-role">{roleLabels[user?.role] || user?.role}</div>
             </div>
-          )}
+          </button>
+          {showDropdown ? (
+            <div className="user-dropdown" role="menu">
+              <button onClick={logout} className="danger" role="menuitem">🚪 Đăng xuất</button>
+            </div>
+          ) : null}
         </div>
       </div>
     </header>
   );
 }
+

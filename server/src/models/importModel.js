@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { logInventoryMovement } = require('../utils/inventoryLogger');
 
 const Import = {
   findAll: async ({ page = 1, limit = 10, supplier_id }) => {
@@ -71,8 +72,29 @@ const Import = {
 
       const receiptId = receiptResult.insertId;
 
+      // Validate tất cả product_id tồn tại
+      for (const item of items) {
+        const [pRows] = await connection.query(
+          'SELECT product_id, product_name FROM products WHERE product_id = ?', [item.product_id]
+        );
+        if (!pRows.length) {
+          throw Object.assign(new Error(`Sản phẩm ID ${item.product_id} không tồn tại`), { status: 400 });
+        }
+      }
+
       // Insert chi tiết (triggers sẽ tự cập nhật tồn kho)
       for (const item of items) {
+        // Log inventory movement BEFORE trigger fires
+        await logInventoryMovement(connection, {
+          productId: item.product_id,
+          movementType: 'import',
+          quantity: item.quantity,
+          referenceType: 'import_receipt',
+          referenceId: receiptId,
+          unitCost: item.unit_price,
+          createdBy: created_by
+        });
+
         await connection.query(
           'INSERT INTO import_receipt_items (receipt_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)',
           [receiptId, item.product_id, item.quantity, item.unit_price]
@@ -90,8 +112,18 @@ const Import = {
   },
 
   delete: async (id) => {
-    const [result] = await pool.query('DELETE FROM import_receipts WHERE receipt_id = ?', [id]);
-    return result.affectedRows;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.query('DELETE FROM import_receipts WHERE receipt_id = ?', [id]);
+      await connection.commit();
+      return result.affectedRows;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 };
 

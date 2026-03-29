@@ -1,22 +1,22 @@
 import { useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { FiTrash2, FiMinus, FiPlus, FiArrowLeft, FiShoppingBag } from 'react-icons/fi';
+import { FiMinus, FiPlus, FiTrash2, FiArrowRight, FiShield, FiTruck, FiRefreshCw, FiShoppingBag } from 'react-icons/fi';
 import { CartContext } from '../../context/CartContext';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, cartTotal, clearCart } = useContext(CartContext);
+  const { cart, removeFromCart, updateQuantity, cartTotal } = useContext(CartContext);
 
-  if (!cart.length) {
+  if (cart.length === 0) {
     return (
       <div className="shop-container">
-        <div className="empty-state" style={{ padding: '80px 20px' }}>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>🛒</div>
-          <h3 style={{ fontSize: 20, marginBottom: 8 }}>Giỏ hàng trống</h3>
-          <p style={{ marginBottom: 24 }}>Hãy thêm sản phẩm yêu thích vào giỏ hàng</p>
-          <Link to="/shop" className="btn btn-primary" style={{ display: 'inline-flex', gap: 8 }}>
-            <FiArrowLeft /> Tiếp tục mua sắm
+        <div className="cart-empty">
+          <div className="cart-empty-icon"><FiShoppingBag /></div>
+          <h2>Giỏ hàng trống</h2>
+          <p>Bạn chưa có sản phẩm nào trong giỏ hàng. Hãy khám phá những sản phẩm tuyệt vời của chúng tôi!</p>
+          <Link to="/shop/products" className="btn-section">
+            Tiếp tục mua sắm <FiArrowRight />
           </Link>
         </div>
       </div>
@@ -24,33 +24,43 @@ export default function CartPage() {
   }
 
   return (
-    <div className="shop-container cart-page">
-      <Link to="/shop" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#64748b', marginBottom: 24, fontSize: 14 }}>
-        <FiArrowLeft /> Tiếp tục mua sắm
-      </Link>
-
-      <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 32 }}>
-        <FiShoppingBag style={{ verticalAlign: 'middle' }} /> Giỏ hàng ({cart.length} sản phẩm)
+    <div className="shop-container">
+      <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 700, color: 'var(--shop-text-dark)', marginBottom: 8 }}>
+        Giỏ hàng
       </h1>
+      <p style={{ color: 'var(--shop-text-muted)', fontSize: 14, marginBottom: 24 }}>
+        {cart.length} sản phẩm
+      </p>
 
       <div className="cart-layout">
         <div className="cart-items">
           {cart.map(item => (
-            <div className="cart-item" key={item.product_id}>
+            <div key={item.product_id} className="cart-item">
               <div className="cart-item-image">
-                <img src={item.image_url} alt={item.product_name} onError={e => { e.target.src = 'https://via.placeholder.com/80x80.png?text=SP'; }} />
+                <img src={item.image_url} alt={item.product_name}
+                  onError={e => { e.target.src = 'https://via.placeholder.com/100x100.png?text=No+Image'; }} />
               </div>
               <div className="cart-item-info">
-                <h4>{item.product_name}</h4>
-                <span className="cart-item-brand">{item.brand_name}</span>
+                <div className="cart-item-brand">{item.brand_name || 'Julie Cosmetics'}</div>
+                <div className="cart-item-name">
+                  <Link to={`/shop/product/${item.product_id}`}>{item.product_name}</Link>
+                </div>
+                <div className="cart-item-price">{fmt(item.sell_price)}đ</div>
+                <div className="cart-item-actions">
+                  <div className="qty-selector" style={{ transform: 'scale(0.85)', transformOrigin: 'left' }}>
+                    <button onClick={() => updateQuantity(item.product_id, item.quantity - 1)}><FiMinus /></button>
+                    <input type="number" value={item.quantity}
+                      onChange={e => updateQuantity(item.product_id, parseInt(e.target.value) || 1)} />
+                    <button onClick={() => updateQuantity(item.product_id, item.quantity + 1)}><FiPlus /></button>
+                  </div>
+                  <button className="cart-item-remove" onClick={() => removeFromCart(item.product_id)}>
+                    <FiTrash2 size={13} /> Xóa
+                  </button>
+                </div>
               </div>
-              <div className="qty-selector" style={{ transform: 'scale(0.85)' }}>
-                <button onClick={() => updateQuantity(item.product_id, item.quantity - 1)}><FiMinus /></button>
-                <input value={item.quantity} readOnly />
-                <button onClick={() => updateQuantity(item.product_id, item.quantity + 1)}><FiPlus /></button>
+              <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 16, color: 'var(--shop-primary-dark)', whiteSpace: 'nowrap' }}>
+                {fmt(item.sell_price * item.quantity)}đ
               </div>
-              <div className="cart-item-price">{fmt(item.sell_price * item.quantity)}đ</div>
-              <button className="cart-item-remove" onClick={() => removeFromCart(item.product_id)}><FiTrash2 /></button>
             </div>
           ))}
         </div>
@@ -58,25 +68,33 @@ export default function CartPage() {
         <div className="cart-summary">
           <h3>Tóm tắt đơn hàng</h3>
           <div className="cart-summary-row">
-            <span>Tạm tính</span>
+            <span>Tạm tính ({cart.reduce((s, i) => s + i.quantity, 0)} sản phẩm)</span>
             <span>{fmt(cartTotal)}đ</span>
           </div>
           <div className="cart-summary-row">
             <span>Vận chuyển</span>
-            <span style={{ color: cartTotal >= 500000 ? '#059669' : undefined }}>
-              {cartTotal >= 500000 ? 'Miễn phí' : `${fmt(30000)}đ`}
+            <span style={{ color: cartTotal >= 500000 ? 'var(--shop-success)' : 'inherit' }}>
+              {cartTotal >= 500000 ? 'Miễn phí' : '30.000đ'}
             </span>
           </div>
-          <div className="cart-summary-row total">
+          <div className="cart-summary-row cart-summary-total">
             <span>Tổng cộng</span>
             <span>{fmt(cartTotal + (cartTotal >= 500000 ? 0 : 30000))}đ</span>
           </div>
-          <button className="btn-checkout" onClick={() => { alert('Chức năng thanh toán đang phát triển! Vui lòng liên hệ cửa hàng để đặt hàng.'); }}>
-            Tiến hành thanh toán
-          </button>
-          <button className="btn btn-outline" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} onClick={clearCart}>
-            Xóa giỏ hàng
-          </button>
+          {cartTotal < 500000 && (
+            <p style={{ fontSize: 12, color: 'var(--shop-primary)', marginTop: 8 }}>
+              Mua thêm {fmt(500000 - cartTotal)}đ để được miễn phí vận chuyển!
+            </p>
+          )}
+          <Link to="/shop/checkout" className="btn-checkout">
+            Thanh toán <FiArrowRight />
+          </Link>
+
+          <div className="cart-trust">
+            <div className="cart-trust-item"><FiShield size={14} /> sản phẩm chính hãng 100%</div>
+            <div className="cart-trust-item"><FiTruck size={14} /> giao hàng nhanh toàn quốc</div>
+            <div className="cart-trust-item"><FiRefreshCw size={14} /> đổi trả miễn phí trong 7 ngày</div>
+          </div>
         </div>
       </div>
     </div>

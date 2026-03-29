@@ -33,19 +33,14 @@ INSERT INTO employee_positions (employee_id, position_id, effective_date, end_da
 
 -- ── USERS ─────────────────────────────────────────────────────
 -- Password hash cho 'admin123', 'manager123', 'staff123', 'warehouse123'
--- Đây là bcrypt hash (rounds=10) — khi chạy thật, gen bằng bcrypt.hash()
--- Các hash này đúng với password tương ứng
+-- Các hash được generate bởi bcryptjs (rounds=10) — ĐÃ VERIFY ĐÚNG
 INSERT INTO users (username, password_hash, role, employee_id, is_active) VALUES
-('admin',        '$2b$10$rOzJqM9kL2mN8pQ3vR5sXuE4wY6zA1bC7dF0gH2iJ3kL4mN5oP6qR', 'admin',     NULL, TRUE),
-('manager01',    '$2b$10$sP0tQ1uR2vS3wT4xU5yV6zA7bB8cC9dD0eE1fF2gG3hH4iI5jJ6kK', 'manager',   1,    TRUE),
-('staff01',      '$2b$10$tQ1uR2vS3wT4xU5yV6zA7bB8cC9dD0eE1fF2gG3hH4iI5jJ6kK7lL', 'staff',     2,    TRUE),
-('staff02',      '$2b$10$uR2vS3wT4xU5yV6zA7bB8cC9dD0eE1fF2gG3hH4iI5jJ6kK7lL8mM', 'staff',     3,    TRUE),
-('warehouse01',  '$2b$10$vS3wT4xU5yV6zA7bB8cC9dD0eE1fF2gG3hH4iI5jJ6kK7lL8mM9nN', 'warehouse', 4,    TRUE),
-('staff03',      '$2b$10$wT4xU5yV6zA7bB8cC9dD0eE1fF2gG3hH4iI5jJ6kK7lL8mM9nN0oO', 'staff',     5,    TRUE);
-
--- NOTE: Trong code Node.js, sử dụng bcrypt để hash password thực tế:
--- const hash = await bcrypt.hash('admin123', 10);
--- Cập nhật lại các hash ở trên sau khi chạy lần đầu
+('admin',        '$2a$10$rxik/AurZ4RtBxuwB6K2eOKxhuOzU1oT/qNqymIykEoSvPD3Wx2jC', 'admin',     NULL, TRUE),
+('manager01',    '$2a$10$C1ZWe0OszlFZd7GUK2m1ae6bn9F4Ox7LA.R.YnHs3RLGrPsErnU3C', 'manager',   1,    TRUE),
+('staff01',      '$2a$10$102u8BDnzPvddN.TErjNNe89gtGZGCaZqyUrh20XPNaTsQyVvhf62', 'staff',     2,    TRUE),
+('staff02',      '$2a$10$XdTW7K.YPLrzY5H16hYaaO8HPLWUNxC5PWmZv4iviw6T4CoF71OE6', 'staff',     3,    TRUE),
+('warehouse01',  '$2a$10$R99s632OA5DWlSdzJIckkOyJ3kWjbLUAmY9mymYCcqu.oz4WltdI2', 'warehouse', 4,    TRUE),
+('staff03',      '$2a$10$jvO2ApKOX/5dUxPLT6YrLOAMwURCLCFmYJ3YfAJrpJAf694JQ7jXi', 'staff',     5,    TRUE);
 
 -- ── BRANDS ────────────────────────────────────────────────────
 INSERT INTO brands (brand_name, origin_country, description) VALUES

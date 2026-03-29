@@ -1,4 +1,5 @@
 const Salary = require('../models/salaryModel');
+const { calculateSalary, calculateAllSalaries } = require('../utils/salaryCalculation');
 
 const salaryController = {
   getAll: async (req, res, next) => {
@@ -32,7 +33,56 @@ const salaryController = {
       await Salary.delete(req.params.id);
       res.json({ message: 'Xóa bảng lương thành công' });
     } catch (error) { next(error); }
+  },
+
+  // POST /api/salaries/calculate — Tính lương cho 1 NV
+  calculate: async (req, res, next) => {
+    try {
+      const { employee_id, month, year } = req.body;
+      if (!employee_id || !month || !year) {
+        return res.status(400).json({ message: 'Vui lòng cung cấp employee_id, month, year' });
+      }
+      const result = await calculateSalary(employee_id, month, year);
+      res.json(result);
+    } catch (error) { next(error); }
+  },
+
+  // POST /api/salaries/generate — Tính lương tất cả NV và lưu vào DB
+  generateAll: async (req, res, next) => {
+    try {
+      const { month, year, bonus_map } = req.body; // bonus_map: { employee_id: bonus_amount }
+      if (!month || !year) {
+        return res.status(400).json({ message: 'Vui lòng cung cấp month và year' });
+      }
+
+      const salaries = await calculateAllSalaries(month, year);
+      let created = 0;
+      let skipped = 0;
+
+      for (const s of salaries) {
+        try {
+          // Áp dụng bonus nếu có
+          const bonus = (bonus_map && bonus_map[s.employee_id]) || 0;
+          s.bonus = bonus;
+          s.net_salary = s.gross_salary + bonus - s.deductions;
+
+          await Salary.create({ ...s, generated_by: req.user.user_id });
+          created++;
+        } catch (err) {
+          // Duplicate (already exists for this month/year/employee)
+          skipped++;
+        }
+      }
+
+      res.json({
+        message: `Đã tạo ${created} bảng lương, bỏ qua ${skipped} (đã tồn tại)`,
+        created,
+        skipped,
+        total: salaries.length
+      });
+    } catch (error) { next(error); }
   }
 };
 
 module.exports = salaryController;
+

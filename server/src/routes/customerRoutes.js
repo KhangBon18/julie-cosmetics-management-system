@@ -1,13 +1,14 @@
 const router = require('express').Router();
 const customerController = require('../controllers/customerController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, managerUp } = require('../middleware/authMiddleware');
+const { validateCustomer } = require('../middleware/validationMiddleware');
 
 router.use(protect);
 router.get('/', customerController.getAll);
 router.get('/phone/:phone', customerController.findByPhone);
 router.get('/:id', customerController.getById);
-router.post('/', customerController.create);
-router.put('/:id', customerController.update);
-router.delete('/:id', customerController.delete);
+router.post('/', validateCustomer, customerController.create);
+router.put('/:id', managerUp, validateCustomer, customerController.update);
+router.delete('/:id', managerUp, customerController.delete);
 
 module.exports = router;

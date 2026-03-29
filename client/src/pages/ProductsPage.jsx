@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle } from 'react-icons/fi';
 import { productService, brandService, categoryService } from '../services/dataService';
+import { downloadCSV } from '../services/exportService';
 import { toast } from 'react-toastify';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
@@ -10,22 +11,35 @@ export default function ProductsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [sort, setSort] = useState('');
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const limit = 10;
 
-  useEffect(() => { loadProducts(); }, [page, search]);
+  useEffect(() => { loadProducts(); }, [page, search, filterBrand, filterCategory, sort]);
   useEffect(() => {
-    brandService.getAll().then(setBrands).catch(() => {});
-    categoryService.getAll().then(setCategories).catch(() => {});
+    // async-parallel: load independent data in parallel
+    Promise.all([
+      brandService.getAll().catch(() => []),
+      categoryService.getAll().catch(() => [])
+    ]).then(([b, c]) => { setBrands(b); setCategories(c); });
   }, []);
 
   const loadProducts = async () => {
     try {
-      const data = await productService.getAll({ page, limit, search: search || undefined });
+      const data = await productService.getAll({
+        page, limit,
+        search: search || undefined,
+        brand_id: filterBrand || undefined,
+        category_id: filterCategory || undefined,
+        sort: sort || undefined
+      });
       setProducts(data.products || []);
       setTotal(data.total || 0);
     } catch (err) { toast.error(err.message); }
@@ -43,25 +57,51 @@ export default function ProductsPage() {
     } catch (err) { toast.error(err.message); }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Xóa sản phẩm này?')) return;
-    try { await productService.delete(id); toast.success('Đã xóa'); loadProducts(); } catch (err) { toast.error(err.message); }
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try { await productService.delete(deleteTarget.product_id); toast.success('Đã xóa'); loadProducts(); } catch (err) { toast.error(err.message); }
+    finally { setDeleteTarget(null); }
   };
 
   return (
     <div>
       <div className="page-header">
         <div><h1>Sản phẩm</h1><p>{total} sản phẩm trong hệ thống</p></div>
-        <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm sản phẩm</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-outline" onClick={() => downloadCSV('/reports/export-products', 'san-pham.csv').then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
+            📥 Xuất CSV
+          </button>
+          <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm sản phẩm</button>
+        </div>
       </div>
 
       <div className="card">
         <div className="card-body">
-          <div className="toolbar">
+          <div className="toolbar" style={{ flexWrap: 'wrap', gap: 8 }}>
             <div className="search-input">
               <FiSearch className="search-icon" />
-              <input placeholder="Tìm sản phẩm..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+              <input placeholder="Tìm sản phẩm…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} aria-label="Tìm kiếm sản phẩm" />
             </div>
+            <select className="form-control" style={{ width: 150 }} value={filterBrand} onChange={e => { setFilterBrand(e.target.value); setPage(1); }}>
+              <option value="">Tất cả thương hiệu</option>
+              {brands.map(b => <option key={b.brand_id} value={b.brand_id}>{b.brand_name}</option>)}
+            </select>
+            <select className="form-control" style={{ width: 150 }} value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setPage(1); }}>
+              <option value="">Tất cả danh mục</option>
+              {categories.map(c => <option key={c.category_id} value={c.category_id}>{c.category_name}</option>)}
+            </select>
+            <select className="form-control" style={{ width: 140 }} value={sort} onChange={e => setSort(e.target.value)}>
+              <option value="">Mới nhất</option>
+              <option value="name">Tên A-Z</option>
+              <option value="price_asc">Giá tăng dần</option>
+              <option value="price_desc">Giá giảm dần</option>
+              <option value="stock_asc">Tồn kho thấp</option>
+            </select>
+            {(search || filterBrand || filterCategory || sort) ? (
+              <button className="btn btn-outline" style={{ fontSize: 12 }} onClick={() => { setSearch(''); setFilterBrand(''); setFilterCategory(''); setSort(''); setPage(1); }}>
+                ✕ Xóa bộ lọc
+              </button>
+            ) : null}
           </div>
         </div>
         <div className="table-container">
@@ -78,47 +118,62 @@ export default function ProductsPage() {
                   <td>{fmt(p.import_price)}đ</td>
                   <td style={{ fontWeight: 600 }}>{fmt(p.sell_price)}đ</td>
                   <td><span className={`badge ${p.stock_quantity <= 10 ? 'badge-danger' : 'badge-success'}`}>{p.stock_quantity}</span></td>
-                  <td><button className="btn btn-sm btn-outline" onClick={() => openEdit(p)}><FiEdit2 /></button> <button className="btn btn-sm btn-danger" onClick={() => handleDelete(p.product_id)}><FiTrash2 /></button></td>
+                  <td><button className="btn btn-sm btn-outline" onClick={() => openEdit(p)} aria-label="Sửa sản phẩm"><FiEdit2 aria-hidden="true" /></button> <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(p)} aria-label="Xóa sản phẩm"><FiTrash2 aria-hidden="true" /></button></td>
                 </tr>
               ))}
-              {!products.length && <tr><td colSpan={7} className="empty-state">Không có sản phẩm</td></tr>}
+              {products.length === 0 ? <tr><td colSpan={7} className="empty-state">Không có sản phẩm</td></tr> : null}
             </tbody>
           </table>
         </div>
-        {total > limit && (
-          <div className="pagination">
+        {total > limit ? (
+          <nav className="pagination" aria-label="Phân trang">
             <div className="pagination-info">Trang {page} / {Math.ceil(total / limit)}</div>
             <div className="pagination-buttons">
               <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Trước</button>
               <button disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(p => p + 1)}>Sau</button>
             </div>
-          </div>
-        )}
+          </nav>
+        ) : null}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h3>{editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</h3><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+      {showModal ? (
+        <div className="modal-overlay" onClick={() => setShowModal(false)} role="dialog" aria-modal="true" aria-label={editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ overscrollBehavior: 'contain' }}>
+            <div className="modal-header"><h3>{editing ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</h3><button className="modal-close" onClick={() => setShowModal(false)} aria-label="Đóng">×</button></div>
             <div className="modal-body">
               <form onSubmit={handleSave}>
-                <div className="form-group"><label>Tên sản phẩm *</label><input className="form-control" required value={form.product_name || ''} onChange={e => setForm({...form, product_name: e.target.value})} /></div>
+                <div className="form-group"><label htmlFor="prd-name">Tên sản phẩm *</label><input id="prd-name" className="form-control" required value={form.product_name || ''} onChange={e => setForm({...form, product_name: e.target.value})} autoComplete="off" /></div>
                 <div className="form-row">
-                  <div className="form-group"><label>Thương hiệu *</label><select className="form-control" required value={form.brand_id || ''} onChange={e => setForm({...form, brand_id: e.target.value})}><option value="">Chọn...</option>{brands.map(b => <option key={b.brand_id} value={b.brand_id}>{b.brand_name}</option>)}</select></div>
-                  <div className="form-group"><label>Danh mục *</label><select className="form-control" required value={form.category_id || ''} onChange={e => setForm({...form, category_id: e.target.value})}><option value="">Chọn...</option>{categories.map(c => <option key={c.category_id} value={c.category_id}>{c.category_name}</option>)}</select></div>
+                  <div className="form-group"><label htmlFor="prd-brand">Thương hiệu *</label><select id="prd-brand" className="form-control" required value={form.brand_id || ''} onChange={e => setForm({...form, brand_id: e.target.value})}><option value="">Chọn…</option>{brands.map(b => <option key={b.brand_id} value={b.brand_id}>{b.brand_name}</option>)}</select></div>
+                  <div className="form-group"><label htmlFor="prd-cat">Danh mục *</label><select id="prd-cat" className="form-control" required value={form.category_id || ''} onChange={e => setForm({...form, category_id: e.target.value})}><option value="">Chọn…</option>{categories.map(c => <option key={c.category_id} value={c.category_id}>{c.category_name}</option>)}</select></div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label>Giá nhập</label><input className="form-control" type="number" value={form.import_price || ''} onChange={e => setForm({...form, import_price: e.target.value})} /></div>
-                  <div className="form-group"><label>Giá bán *</label><input className="form-control" type="number" required value={form.sell_price || ''} onChange={e => setForm({...form, sell_price: e.target.value})} /></div>
+                  <div className="form-group"><label htmlFor="prd-import">Giá nhập</label><input id="prd-import" className="form-control" type="number" inputMode="numeric" value={form.import_price || ''} onChange={e => setForm({...form, import_price: e.target.value})} autoComplete="off" /></div>
+                  <div className="form-group"><label htmlFor="prd-sell">Giá bán *</label><input id="prd-sell" className="form-control" type="number" inputMode="numeric" required value={form.sell_price || ''} onChange={e => setForm({...form, sell_price: e.target.value})} autoComplete="off" /></div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label>Tồn kho</label><input className="form-control" type="number" value={form.stock_quantity || ''} onChange={e => setForm({...form, stock_quantity: e.target.value})} /></div>
-                  <div className="form-group"><label>Dung tích</label><input className="form-control" placeholder="VD: 50ml, 30g" value={form.volume || ''} onChange={e => setForm({...form, volume: e.target.value})} /></div>
+                  <div className="form-group"><label htmlFor="prd-stock">Tồn kho</label><input id="prd-stock" className="form-control" type="number" inputMode="numeric" value={form.stock_quantity || ''} onChange={e => setForm({...form, stock_quantity: e.target.value})} autoComplete="off" /></div>
+                  <div className="form-group"><label htmlFor="prd-volume">Dung tích</label><input id="prd-volume" className="form-control" placeholder="VD: 50ml, 30g…" value={form.volume || ''} onChange={e => setForm({...form, volume: e.target.value})} autoComplete="off" /></div>
                 </div>
-                <div className="form-group"><label>Loại da</label><input className="form-control" placeholder="VD: Da dầu, Mọi loại da" value={form.skin_type || ''} onChange={e => setForm({...form, skin_type: e.target.value})} /></div>
-                <div className="form-group"><label>Mô tả</label><textarea className="form-control" rows={3} value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})} /></div>
+                <div className="form-group"><label htmlFor="prd-skin">Loại da</label><input id="prd-skin" className="form-control" placeholder="VD: Da dầu, Mọi loại da…" value={form.skin_type || ''} onChange={e => setForm({...form, skin_type: e.target.value})} autoComplete="off" /></div>
+                <div className="form-group"><label htmlFor="prd-desc">Mô tả</label><textarea id="prd-desc" className="form-control" rows={3} value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})} /></div>
                 <div className="form-actions"><button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Hủy</button><button type="submit" className="btn btn-primary">{editing ? 'Cập nhật' : 'Thêm mới'}</button></div>
               </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Delete Confirm Dialog */}
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="modal confirm-dialog" onClick={e => e.stopPropagation()}>
+            <div className="confirm-dialog-icon"><FiAlertTriangle /></div>
+            <h3 className="confirm-dialog-title">Xác nhận xóa</h3>
+            <p className="confirm-dialog-message">Bạn có chắc chắn muốn xóa sản phẩm "{deleteTarget.product_name}"? Hành động này không thể hoàn tác.</p>
+            <div className="confirm-dialog-actions">
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>Hủy</button>
+              <button className="btn btn-danger" onClick={confirmDelete}>Xóa</button>
             </div>
           </div>
         </div>

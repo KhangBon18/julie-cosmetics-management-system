@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle } from 'react-icons/fi';
 import { employeeService, positionService } from '../services/dataService';
 import { toast } from 'react-toastify';
 
@@ -11,6 +11,7 @@ export default function EmployeesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const limit = 10;
 
   useEffect(() => { loadEmployees(); }, [page]);
@@ -36,9 +37,10 @@ export default function EmployeesPage() {
     } catch (err) { toast.error(err.message); }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Xóa nhân viên này?')) return;
-    try { await employeeService.delete(id); toast.success('Đã xóa'); loadEmployees(); } catch (err) { toast.error(err.message); }
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try { await employeeService.delete(deleteTarget.employee_id); toast.success('Đã xóa'); loadEmployees(); } catch (err) { toast.error(err.message); }
+    finally { setDeleteTarget(null); }
   };
 
   const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
@@ -63,7 +65,7 @@ export default function EmployeesPage() {
                   <td>{e.position_name || '—'}</td>
                   <td>{fmt(e.base_salary)}đ</td>
                   <td><span className={`badge ${e.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{e.status === 'active' ? 'Đang làm' : 'Nghỉ việc'}</span></td>
-                  <td><button className="btn btn-sm btn-outline" onClick={() => openEdit(e)}><FiEdit2 /></button> <button className="btn btn-sm btn-danger" onClick={() => handleDelete(e.employee_id)}><FiTrash2 /></button></td>
+                  <td><button className="btn btn-sm btn-outline" onClick={() => openEdit(e)}><FiEdit2 /></button> <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(e)}><FiTrash2 /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -94,6 +96,20 @@ export default function EmployeesPage() {
                 {editing && <div className="form-group"><label>Trạng thái</label><select className="form-control" value={form.status||'active'} onChange={e => setForm({...form, status: e.target.value})}><option value="active">Đang làm</option><option value="inactive">Nghỉ việc</option></select></div>}
                 <div className="form-actions"><button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Hủy</button><button type="submit" className="btn btn-primary">{editing ? 'Cập nhật' : 'Thêm mới'}</button></div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="modal confirm-dialog" onClick={e => e.stopPropagation()}>
+            <div className="confirm-dialog-icon"><FiAlertTriangle /></div>
+            <h3 className="confirm-dialog-title">Xác nhận xóa</h3>
+            <p className="confirm-dialog-message">Bạn có chắc chắn muốn xóa nhân viên "{deleteTarget.full_name}"? Hành động này không thể hoàn tác.</p>
+            <div className="confirm-dialog-actions">
+              <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>Hủy</button>
+              <button className="btn btn-danger" onClick={confirmDelete}>Xóa</button>
             </div>
           </div>
         </div>

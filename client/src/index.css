@@ -35,8 +35,9 @@
   --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
 
-  /* Transitions */
-  --transition: all 0.2s ease;
+  /* Transitions — never use 'all', list explicit properties */
+  --transition-speed: 0.2s;
+  --transition-ease: ease;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -54,8 +55,28 @@ body {
 a { text-decoration: none; color: inherit; }
 ul, ol { list-style: none; }
 img { max-width: 100%; display: block; }
-button { cursor: pointer; font-family: inherit; }
+button { cursor: pointer; font-family: inherit; touch-action: manipulation; }
 input, select, textarea { font-family: inherit; font-size: inherit; }
+
+/* ─── ACCESSIBILITY: Focus-visible ─── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ─── REDUCED MOTION ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -94,7 +115,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  transition: var(--transition);
+  transition: transform var(--transition-speed) var(--transition-ease), background-color var(--transition-speed) var(--transition-ease);
 }
 
 .sidebar-brand {
@@ -156,7 +177,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   color: var(--text-sidebar);
   font-size: 13px;
   font-weight: 500;
-  transition: var(--transition);
+  transition: background-color var(--transition-speed) var(--transition-ease), color var(--transition-speed) var(--transition-ease);
   margin-bottom: 2px;
 }
 
@@ -216,7 +237,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   padding: 6px 12px;
   border-radius: var(--border-radius);
   cursor: pointer;
-  transition: var(--transition);
+  transition: background-color var(--transition-speed) var(--transition-ease);
   position: relative;
 }
 
@@ -268,7 +289,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   border-radius: 6px;
   font-size: 13px;
   color: var(--text-primary);
-  transition: var(--transition);
+  transition: background-color var(--transition-speed) var(--transition-ease);
 }
 
 .user-dropdown button:hover {
@@ -288,6 +309,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .page-header h1 {
   font-size: 24px;
   font-weight: 700;
+  text-wrap: balance;
 }
 
 .page-header p {
@@ -335,7 +357,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  transition: var(--transition);
+  transition: box-shadow var(--transition-speed) var(--transition-ease), transform var(--transition-speed) var(--transition-ease);
 }
 
 .stat-card:hover {
@@ -371,6 +393,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .stat-content .stat-value {
   font-size: 24px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-content .stat-change {
@@ -408,6 +431,11 @@ table tbody td {
   font-size: 13px;
   border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+table tbody {
+  content-visibility: auto;
 }
 
 table tbody tr:hover {
@@ -447,7 +475,7 @@ table tbody tr:last-child td {
   font-size: 13px;
   font-weight: 600;
   border: 1px solid transparent;
-  transition: var(--transition);
+  transition: background-color var(--transition-speed) var(--transition-ease), box-shadow var(--transition-speed) var(--transition-ease);
   white-space: nowrap;
 }
 
@@ -497,8 +525,7 @@ table tbody tr:last-child td {
   font-size: 13px;
   color: var(--text-primary);
   background: var(--bg-card);
-  transition: var(--transition);
-  outline: none;
+  transition: border-color var(--transition-speed) var(--transition-ease), box-shadow var(--transition-speed) var(--transition-ease);
 }
 
 .form-control:focus {
@@ -594,8 +621,7 @@ select.form-control { appearance: none; cursor: pointer; }
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: 13px;
-  outline: none;
-  transition: var(--transition);
+  transition: border-color var(--transition-speed) var(--transition-ease), box-shadow var(--transition-speed) var(--transition-ease);
 }
 
 .search-input input:focus {
@@ -637,7 +663,7 @@ select.form-control { appearance: none; cursor: pointer; }
   background: var(--bg-card);
   border-radius: 6px;
   font-size: 13px;
-  transition: var(--transition);
+  transition: background-color var(--transition-speed) var(--transition-ease);
 }
 
 .pagination-buttons button:hover:not(:disabled) { background: var(--bg-body); }
@@ -805,6 +831,96 @@ select.form-control { appearance: none; cursor: pointer; }
   font-size: 13px !important;
   border-radius: var(--border-radius) !important;
 }
+
+/* ─── CRUD SEARCH BAR ─── */
+.crud-search-bar {
+  position: relative;
+  margin-bottom: 16px;
+  max-width: 400px;
+}
+
+.crud-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.crud-search-input {
+  width: 100%;
+  padding: 9px 36px 9px 38px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 13px;
+  background: var(--bg-card);
+  transition: border-color var(--transition-speed) var(--transition-ease), box-shadow var(--transition-speed) var(--transition-ease);
+  outline: none;
+}
+
+.crud-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.crud-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.crud-search-clear:hover { color: var(--text-primary); }
+
+/* ─── CONFIRM DIALOG ─── */
+.confirm-dialog {
+  text-align: center;
+  padding: 32px;
+  max-width: 400px;
+}
+
+.confirm-dialog-icon {
+  width: 56px;
+  height: 56px;
+  background: rgba(239,68,68,0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: var(--danger);
+  font-size: 24px;
+}
+
+.confirm-dialog-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.confirm-dialog-message {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.confirm-dialog-actions .btn { min-width: 100px; justify-content: center; }
 
 /* ─── RESPONSIVE ─── */
 @media (max-width: 768px) {

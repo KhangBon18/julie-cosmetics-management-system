@@ -5,14 +5,15 @@ const Employee = {
     let query = `SELECT e.*, p.position_name, p.position_id
                  FROM employees e
                  LEFT JOIN employee_positions ep ON e.employee_id = ep.employee_id AND ep.end_date IS NULL
-                 LEFT JOIN positions p ON ep.position_id = p.position_id`;
-    let countQuery = 'SELECT COUNT(*) as total FROM employees';
+                 LEFT JOIN positions p ON ep.position_id = p.position_id
+                 WHERE e.deleted_at IS NULL`;
+    let countQuery = 'SELECT COUNT(*) as total FROM employees WHERE deleted_at IS NULL';
     const params = [];
     const countParams = [];
 
     if (status) {
-      query += ' WHERE e.status = ?';
-      countQuery += ' WHERE status = ?';
+      query += ' AND e.status = ?';
+      countQuery += ' AND status = ?';
       params.push(status);
       countParams.push(status);
     }
@@ -33,7 +34,7 @@ const Employee = {
        FROM employees e
        LEFT JOIN employee_positions ep ON e.employee_id = ep.employee_id AND ep.end_date IS NULL
        LEFT JOIN positions p ON ep.position_id = p.position_id
-       WHERE e.employee_id = ?`,
+       WHERE e.employee_id = ? AND e.deleted_at IS NULL`,
       [id]
     );
     return rows[0];
@@ -60,8 +61,27 @@ const Employee = {
   },
 
   delete: async (id) => {
-    const [result] = await pool.query('DELETE FROM employees WHERE employee_id = ?', [id]);
-    return result.affectedRows;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      // Soft delete employee
+      await connection.query(
+        'UPDATE employees SET deleted_at = NOW(), status = ? WHERE employee_id = ? AND deleted_at IS NULL',
+        ['inactive', id]
+      );
+      // Also deactivate linked user account
+      await connection.query(
+        'UPDATE users SET is_active = 0, deleted_at = NOW() WHERE employee_id = ? AND deleted_at IS NULL',
+        [id]
+      );
+      await connection.commit();
+      return 1;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 
   // Lịch sử chức vụ

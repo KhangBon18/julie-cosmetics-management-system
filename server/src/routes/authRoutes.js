@@ -1,9 +1,12 @@
 const router = require('express').Router();
 const authController = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const { validateLogin, validateChangePassword } = require('../middleware/validationMiddleware');
 
-router.post('/login', authController.login);
+router.post('/login', validateLogin, authController.login);
+router.post('/refresh', authController.refresh);
+router.post('/logout', protect, authController.logout);
 router.get('/profile', protect, authController.getProfile);
-router.put('/change-password', protect, authController.changePassword);
+router.put('/change-password', protect, validateChangePassword, authController.changePassword);
 
 module.exports = router;

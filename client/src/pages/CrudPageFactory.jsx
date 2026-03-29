@@ -1,23 +1,78 @@
-import { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { useState, useEffect, useCallback } from 'react';
+import { FiPlus, FiEdit2, FiTrash2, FiChevronLeft, FiChevronRight, FiSearch, FiAlertTriangle, FiX } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 
-// Generic CRUD page factory to avoid repeating boilerplate
+// ─── Confirm Dialog Component ───
+function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
+  if (!open) return null;
+  return (
+    <div className="modal-overlay" onClick={onCancel} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="modal confirm-dialog" onClick={e => e.stopPropagation()}>
+        <div className="confirm-dialog-icon"><FiAlertTriangle /></div>
+        <h3 className="confirm-dialog-title">{title || 'Xác nhận'}</h3>
+        <p className="confirm-dialog-message">{message}</p>
+        <div className="confirm-dialog-actions">
+          <button className="btn btn-outline" onClick={onCancel}>Hủy</button>
+          <button className="btn btn-danger" onClick={onConfirm}>Xóa</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Generic CRUD page factory with pagination, search, and confirm dialog
 export function createCrudPage({ title, service, idField, columns, formFields, nameField }) {
   return function CrudPage() {
     const [items, setItems] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState('');
+    const [searchInput, setSearchInput] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState(null);
     const [form, setForm] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const limit = 10;
 
-    useEffect(() => { loadData(); }, []);
+    // Debounce search
+    useEffect(() => {
+      const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 350);
+      return () => clearTimeout(t);
+    }, [searchInput]);
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
+      setLoading(true);
       try {
-        const data = await service.getAll();
-        setItems(Array.isArray(data) ? data : (data.items || data[Object.keys(data)[0]] || []));
+        const data = await service.getAll({ page, limit, search });
+        if (Array.isArray(data)) {
+          // Client-side filter for models that return flat arrays
+          let filtered = data;
+          if (search && nameField) {
+            const q = search.toLowerCase();
+            filtered = data.filter(item => {
+              return columns.some(col => {
+                const val = item[col.key];
+                return val && String(val).toLowerCase().includes(q);
+              });
+            });
+          }
+          setTotal(filtered.length);
+          // Client-side pagination for flat arrays
+          const start = (page - 1) * limit;
+          setItems(filtered.slice(start, start + limit));
+        } else {
+          const key = Object.keys(data).find(k => Array.isArray(data[k]));
+          setItems(key ? data[key] : []);
+          setTotal(data.total || (key ? data[key].length : 0));
+        }
       } catch (err) { toast.error(err.message); }
-    };
+      finally { setLoading(false); }
+    }, [page, search]);
+
+    useEffect(() => { loadData(); }, [loadData]);
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
 
     const openCreate = () => {
       setEditing(null);
@@ -42,9 +97,18 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
       } catch (err) { toast.error(err.message); }
     };
 
-    const handleDelete = async (id) => {
-      if (!confirm('Xác nhận xóa?')) return;
-      try { await service.delete(id); toast.success('Đã xóa'); loadData(); } catch (err) { toast.error(err.message); }
+    const requestDelete = (item) => {
+      setDeleteTarget(item);
+    };
+
+    const confirmDelete = async () => {
+      if (!deleteTarget) return;
+      try {
+        await service.delete(deleteTarget[idField]);
+        toast.success('Đã xóa');
+        loadData();
+      } catch (err) { toast.error(err.message); }
+      finally { setDeleteTarget(null); }
     };
 
     const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
@@ -52,49 +116,88 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
     return (
       <div>
         <div className="page-header">
-          <div><h1>{title}</h1><p>{items.length} mục</p></div>
+          <div><h1>{title}</h1><p>{total} mục</p></div>
           <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm mới</button>
         </div>
-        <div className="card">
-          <div className="table-container">
-            <table>
-              <thead><tr>{columns.map(col => <th key={col.key}>{col.label}</th>)}<th>Thao tác</th></tr></thead>
-              <tbody>
-                {items.map(item => (
-                  <tr key={item[idField]}>
-                    {columns.map(col => <td key={col.key}>{col.render ? col.render(item[col.key], item, fmt) : item[col.key]}</td>)}
-                    <td>
-                      <button className="btn btn-sm btn-outline" onClick={() => openEdit(item)}><FiEdit2 /></button>{' '}
-                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(item[idField])}><FiTrash2 /></button>
-                    </td>
-                  </tr>
-                ))}
-                {!items.length && <tr><td colSpan={columns.length + 1} style={{textAlign:'center',padding:40,color:'#94a3b8'}}>Chưa có dữ liệu</td></tr>}
-              </tbody>
-            </table>
-          </div>
+
+        {/* Search bar */}
+        <div className="crud-search-bar">
+          <FiSearch className="crud-search-icon" />
+          <input
+            type="text"
+            placeholder={`Tìm kiếm ${title.toLowerCase()}...`}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            className="crud-search-input"
+          />
+          {searchInput && (
+            <button className="crud-search-clear" onClick={() => { setSearchInput(''); setSearch(''); }}>
+              <FiX />
+            </button>
+          )}
         </div>
-        {showModal && (
-          <div className="modal-overlay" onClick={() => setShowModal(false)}>
-            <div className="modal" onClick={e => e.stopPropagation()}>
-              <div className="modal-header"><h3>{editing ? 'Chỉnh sửa' : 'Thêm mới'}</h3><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+
+        <div className="card">
+          {loading ? (
+            <div style={{textAlign:'center', padding: 40, color: '#94a3b8'}}>Đang tải...</div>
+          ) : (
+            <div className="table-container">
+              <table>
+                <thead><tr>{columns.map(col => <th key={col.key}>{col.label}</th>)}<th>Thao tác</th></tr></thead>
+                <tbody>
+                  {items.map(item => (
+                    <tr key={item[idField]}>
+                      {columns.map(col => <td key={col.key}>{col.render ? col.render(item[col.key], item, fmt) : item[col.key]}</td>)}
+                      <td>
+                        <button className="btn btn-sm btn-outline" onClick={() => openEdit(item)} aria-label="Sửa"><FiEdit2 aria-hidden="true" /></button>{' '}
+                        <button className="btn btn-sm btn-danger" onClick={() => requestDelete(item)} aria-label="Xóa"><FiTrash2 aria-hidden="true" /></button>
+                      </td>
+                    </tr>
+                  ))}
+                  {items.length === 0 ? <tr><td colSpan={columns.length + 1} style={{textAlign:'center',padding:40,color:'#94a3b8'}}>{search ? 'Không tìm thấy kết quả' : 'Chưa có dữ liệu'}</td></tr> : null}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:12,padding:'16px 0'}}>
+              <button className="btn btn-sm btn-outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+                <FiChevronLeft /> Trước
+              </button>
+              <span style={{fontSize:14,color:'#64748b'}}>Trang {page} / {totalPages}</span>
+              <button className="btn btn-sm btn-outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                Sau <FiChevronRight />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Create/Edit Modal */}
+        {showModal ? (
+          <div className="modal-overlay" onClick={() => setShowModal(false)} role="dialog" aria-modal="true" aria-label={editing ? 'Chỉnh sửa' : 'Thêm mới'}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ overscrollBehavior: 'contain' }}>
+              <div className="modal-header"><h3>{editing ? 'Chỉnh sửa' : 'Thêm mới'}</h3><button className="modal-close" onClick={() => setShowModal(false)} aria-label="Đóng">×</button></div>
               <div className="modal-body">
                 <form onSubmit={handleSave}>
-                  {formFields.map(f => (
-                    <div className="form-group" key={f.name}>
-                      <label>{f.label}{f.required && ' *'}</label>
-                      {f.type === 'select' ? (
-                        <select className="form-control" required={f.required} value={form[f.name]||''} onChange={e => setForm({...form, [f.name]: e.target.value})}>
-                          <option value="">Chọn...</option>
-                          {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
-                      ) : f.type === 'textarea' ? (
-                        <textarea className="form-control" rows={3} value={form[f.name]||''} onChange={e => setForm({...form, [f.name]: e.target.value})} />
-                      ) : (
-                        <input className="form-control" type={f.type||'text'} required={f.required} value={form[f.name]||''} onChange={e => setForm({...form, [f.name]: e.target.value})} />
-                      )}
-                    </div>
-                  ))}
+                  {formFields.map(f => {
+                    const fieldId = `crud-${f.name}`;
+                    return (
+                      <div className="form-group" key={f.name}>
+                        <label htmlFor={fieldId}>{f.label}{f.required ? ' *' : ''}</label>
+                        {f.type === 'select' ? (
+                          <select id={fieldId} className="form-control" required={f.required} value={form[f.name]||''} onChange={e => setForm({...form, [f.name]: e.target.value})}>
+                            <option value="">Chọn…</option>
+                            {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        ) : f.type === 'textarea' ? (
+                          <textarea id={fieldId} className="form-control" rows={3} value={form[f.name]||''} onChange={e => setForm({...form, [f.name]: e.target.value})} />
+                        ) : (
+                          <input id={fieldId} className="form-control" type={f.type||'text'} inputMode={f.type === 'number' ? 'numeric' : undefined} required={f.required} value={form[f.name]||''} onChange={e => setForm({...form, [f.name]: e.target.value})} autoComplete="off" />
+                        )}
+                      </div>
+                    );
+                  })}
                   <div className="form-actions">
                     <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Hủy</button>
                     <button type="submit" className="btn btn-primary">{editing ? 'Cập nhật' : 'Thêm mới'}</button>
@@ -103,7 +206,16 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
               </div>
             </div>
           </div>
-        )}
+        ) : null}
+
+        {/* Delete Confirm Dialog */}
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title="Xác nhận xóa"
+          message={deleteTarget ? `Bạn có chắc chắn muốn xóa "${deleteTarget[nameField || columns[0]?.key] || 'mục này'}"? Hành động này không thể hoàn tác.` : ''}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       </div>
     );
   };

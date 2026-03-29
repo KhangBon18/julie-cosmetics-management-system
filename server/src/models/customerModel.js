@@ -2,8 +2,8 @@ const { pool } = require('../config/db');
 
 const Customer = {
   findAll: async ({ page = 1, limit = 10, search, membership_tier }) => {
-    let query = 'SELECT * FROM customers WHERE 1=1';
-    let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE 1=1';
+    let query = 'SELECT * FROM customers WHERE deleted_at IS NULL';
+    let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE deleted_at IS NULL';
     const params = [];
     const countParams = [];
 
@@ -32,7 +32,7 @@ const Customer = {
   },
 
   findById: async (id) => {
-    const [rows] = await pool.query('SELECT * FROM customers WHERE customer_id = ?', [id]);
+    const [rows] = await pool.query('SELECT * FROM customers WHERE customer_id = ? AND deleted_at IS NULL', [id]);
     return rows[0];
   },
 
@@ -60,7 +60,10 @@ const Customer = {
   },
 
   delete: async (id) => {
-    const [result] = await pool.query('DELETE FROM customers WHERE customer_id = ?', [id]);
+    const [result] = await pool.query(
+      'UPDATE customers SET deleted_at = NOW() WHERE customer_id = ? AND deleted_at IS NULL',
+      [id]
+    );
     return result.affectedRows;
   }
 };

@@ -3,7 +3,7 @@ const { pool } = require('../config/db');
 const User = {
   // Tìm user theo username
   findByUsername: async (username) => {
-    const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
+    const [rows] = await pool.query('SELECT * FROM users WHERE username = ? AND deleted_at IS NULL', [username]);
     return rows[0];
   },
 
@@ -14,7 +14,7 @@ const User = {
               e.full_name, e.email, e.phone
        FROM users u
        LEFT JOIN employees e ON u.employee_id = e.employee_id
-       WHERE u.user_id = ?`,
+       WHERE u.user_id = ? AND u.deleted_at IS NULL`,
       [id]
     );
     return rows[0];
@@ -62,16 +62,20 @@ const User = {
               e.full_name, e.email
        FROM users u
        LEFT JOIN employees e ON u.employee_id = e.employee_id
+       WHERE u.deleted_at IS NULL
        ORDER BY u.created_at DESC LIMIT ? OFFSET ?`,
       [limit, offset]
     );
-    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM users');
+    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM users WHERE deleted_at IS NULL');
     return { users: rows, total: countResult[0].total };
   },
 
   // Xóa user
   delete: async (id) => {
-    const [result] = await pool.query('DELETE FROM users WHERE user_id = ?', [id]);
+    const [result] = await pool.query(
+      'UPDATE users SET deleted_at = NOW(), is_active = 0 WHERE user_id = ? AND deleted_at IS NULL',
+      [id]
+    );
     return result.affectedRows;
   },
 

@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
-const { testConnection } = require('./src/config/db');
+const { testConnection, pool } = require('./src/config/db');
 const errorHandler = require('./src/middleware/errorHandler');
 
 // Import routes
@@ -22,17 +24,50 @@ const customerRoutes = require('./src/routes/customerRoutes');
 const invoiceRoutes = require('./src/routes/invoiceRoutes');
 const reviewRoutes = require('./src/routes/reviewRoutes');
 const publicRoutes = require('./src/routes/publicRoutes');
+const staffRoutes = require('./src/routes/staffRoutes');
+const reportRoutes = require('./src/routes/reportRoutes');
+const roleRoutes = require('./src/routes/roleRoutes');
+const settingRoutes = require('./src/routes/settingRoutes');
+const promotionRoutes = require('./src/routes/promotionRoutes');
+const notificationRoutes = require('./src/routes/notificationRoutes');
+const paymentRoutes = require('./src/routes/paymentRoutes');
+const shippingRoutes = require('./src/routes/shippingRoutes');
+const returnRoutes = require('./src/routes/returnRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middleware
+// Security middleware
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// CORS — hỗ trợ nhiều origins từ env (comma-separated)
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174').split(',').map(s => s.trim());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+    else cb(new Error('CORS not allowed'));
+  },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting cho auth routes (chống brute force)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 20, // tối đa 20 requests / 15 phút
+  message: { message: 'Quá nhiều yêu cầu đăng nhập, vui lòng thử lại sau 15 phút' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Rate limiting toàn cục
+const globalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 phút
+  max: 200, // 200 requests / phút
+  message: { message: 'Quá nhiều yêu cầu, vui lòng thử lại sau' }
+});
+app.use('/api', globalLimiter);
 
 // Static files - uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -41,7 +76,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/public', publicRoutes);
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/customer-auth', authLimiter, require('./src/routes/customerAuthRoutes'));
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -55,10 +91,25 @@ app.use('/api/imports', importRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/settings', settingRoutes);
+app.use('/api/promotions', promotionRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/shipping', shippingRoutes);
+app.use('/api/returns', returnRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Julie Cosmetics API is running' });
+// Health check (kiểm tra cả DB connection)
+app.get('/api/health', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    connection.release();
+    res.json({ status: 'OK', database: 'connected', message: 'Julie Cosmetics API is running' });
+  } catch {
+    res.status(503).json({ status: 'ERROR', database: 'disconnected', message: 'Database connection failed' });
+  }
 });
 
 // Error handling middleware

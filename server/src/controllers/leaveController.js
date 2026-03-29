@@ -12,6 +12,13 @@ const leaveController = {
     try {
       const item = await Leave.findById(req.params.id);
       if (!item) return res.status(404).json({ message: 'Không tìm thấy đơn nghỉ phép' });
+
+      // IDOR protection: staff chỉ xem được đơn của mình
+      const role = req.user.role;
+      if (role !== 'admin' && role !== 'manager' && item.employee_id !== req.user.employee_id) {
+        return res.status(403).json({ message: 'Không có quyền xem đơn nghỉ phép này' });
+      }
+
       res.json(item);
     } catch (error) { next(error); }
   },

@@ -1,21 +1,32 @@
 const { pool } = require('../config/db');
 
 const Product = {
-  findAll: async ({ page = 1, limit = 12, category_id, brand_id, search, sort }) => {
-    let query = `SELECT p.*, c.category_name, b.brand_name
+  findAll: async ({ page = 1, limit = 12, category_id, brand_id, search, sort, min_price, max_price, is_public = false }) => {
+    let query = `SELECT p.*, c.category_name, b.brand_name,
+                        pc.category_name as parent_category_name, pc.category_id as parent_category_id
                  FROM products p
                  LEFT JOIN categories c ON p.category_id = c.category_id
+                 LEFT JOIN categories pc ON c.parent_id = pc.category_id
                  LEFT JOIN brands b ON p.brand_id = b.brand_id
-                 WHERE 1=1`;
-    let countQuery = 'SELECT COUNT(*) as total FROM products p WHERE 1=1';
+                 WHERE p.deleted_at IS NULL`;
+    let countQuery = `SELECT COUNT(*) as total FROM products p
+                      LEFT JOIN categories c ON p.category_id = c.category_id
+                      WHERE p.deleted_at IS NULL`;
     const params = [];
     const countParams = [];
 
+    // Public queries only show active products
+    if (is_public) {
+      query += ' AND p.is_active = 1';
+      countQuery += ' AND p.is_active = 1';
+    }
+
+    // Category filter: if parent category, include all children
     if (category_id) {
-      query += ' AND p.category_id = ?';
-      countQuery += ' AND p.category_id = ?';
-      params.push(category_id);
-      countParams.push(category_id);
+      query += ' AND (p.category_id = ? OR c.parent_id = ?)';
+      countQuery += ' AND (p.category_id = ? OR c.parent_id = ?)';
+      params.push(category_id, category_id);
+      countParams.push(category_id, category_id);
     }
 
     if (brand_id) {
@@ -26,10 +37,24 @@ const Product = {
     }
 
     if (search) {
-      query += ' AND (p.product_name LIKE ? OR p.description LIKE ?)';
+      query += ' AND (p.product_name LIKE ? OR p.description LIKE ? OR b.brand_name LIKE ?)';
       countQuery += ' AND (p.product_name LIKE ? OR p.description LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
       countParams.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (min_price !== undefined) {
+      query += ' AND p.sell_price >= ?';
+      countQuery += ' AND p.sell_price >= ?';
+      params.push(min_price);
+      countParams.push(min_price);
+    }
+
+    if (max_price !== undefined) {
+      query += ' AND p.sell_price <= ?';
+      countQuery += ' AND p.sell_price <= ?';
+      params.push(max_price);
+      countParams.push(max_price);
     }
 
     switch (sort) {
@@ -57,9 +82,11 @@ const Product = {
 
   findById: async (id) => {
     const [rows] = await pool.query(
-      `SELECT p.*, c.category_name, b.brand_name
+      `SELECT p.*, c.category_name, b.brand_name,
+              pc.category_name as parent_category_name, pc.category_id as parent_category_id
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.category_id
+       LEFT JOIN categories pc ON c.parent_id = pc.category_id
        LEFT JOIN brands b ON p.brand_id = b.brand_id
        WHERE p.product_id = ?`,
       [id]
@@ -78,21 +105,23 @@ const Product = {
   },
 
   update: async (id, data) => {
-    const { product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, stock_quantity, image_url, is_active } = data;
+    const { product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, image_url, is_active } = data;
     const [result] = await pool.query(
-      `UPDATE products SET product_name = ?, brand_id = ?, category_id = ?, description = ?, skin_type = ?, volume = ?, import_price = ?, sell_price = ?, stock_quantity = ?, image_url = ?, is_active = ?
+      `UPDATE products SET product_name = ?, brand_id = ?, category_id = ?, description = ?, skin_type = ?, volume = ?, import_price = ?, sell_price = ?, image_url = ?, is_active = ?
        WHERE product_id = ?`,
-      [product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, stock_quantity, image_url, is_active, id]
+      [product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, image_url, is_active, id]
     );
     return result.affectedRows;
   },
 
   delete: async (id) => {
-    const [result] = await pool.query('DELETE FROM products WHERE product_id = ?', [id]);
+    const [result] = await pool.query(
+      'UPDATE products SET deleted_at = NOW(), is_active = 0 WHERE product_id = ? AND deleted_at IS NULL',
+      [id]
+    );
     return result.affectedRows;
   },
 
-  // Lấy sản phẩm tồn kho thấp
   getLowStock: async (threshold = 10) => {
     const [rows] = await pool.query(
       `SELECT p.*, c.category_name, b.brand_name

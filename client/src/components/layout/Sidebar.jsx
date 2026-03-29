@@ -39,6 +39,7 @@ const navSections = [
   {
     title: 'Hệ thống',
     items: [
+      { path: '/admin/reports', icon: FiClipboard, label: 'Báo cáo', roles: ['admin', 'manager'] },
       { path: '/admin/users', icon: FiSettings, label: 'Tài khoản', roles: ['admin'] }
     ]
   }
@@ -49,9 +50,9 @@ export default function Sidebar() {
   const location = useLocation();
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Thanh điều hướng chính">
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">💄</div>
+        <div className="sidebar-brand-icon" aria-hidden="true">💄</div>
         <div className="sidebar-brand-text">
           Julie Cosmetics
           <span>Hệ thống quản lý</span>
@@ -75,7 +76,7 @@ export default function Sidebar() {
                   end={item.path === '/admin'}
                   className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
                 >
-                  <span className="sidebar-link-icon"><item.icon /></span>
+                  <span className="sidebar-link-icon" aria-hidden="true"><item.icon /></span>
                   {item.label}
                 </NavLink>
               ))}

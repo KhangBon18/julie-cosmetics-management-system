@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
+const { pool } = require('../config/db');
 
 const userController = {
   // GET /api/users
@@ -61,7 +62,27 @@ const userController = {
   toggleActive: async (req, res, next) => {
     try {
       const { is_active } = req.body;
-      await User.toggleActive(req.params.id, is_active);
+      const targetId = parseInt(req.params.id);
+
+      // Prevent admin from deactivating themselves
+      if (!is_active && targetId === req.user.user_id) {
+        return res.status(400).json({ message: 'Không thể khóa tài khoản của chính bạn' });
+      }
+
+      // Prevent deactivating the last active admin
+      if (!is_active) {
+        const target = await User.findById(targetId);
+        if (target && target.role === 'admin') {
+          const [rows] = await pool.query(
+            'SELECT COUNT(*) as cnt FROM users WHERE role = "admin" AND is_active = 1 AND user_id != ?', [targetId]
+          );
+          if (rows[0].cnt === 0) {
+            return res.status(400).json({ message: 'Không thể khóa admin cuối cùng. Hệ thống cần ít nhất 1 admin hoạt động.' });
+          }
+        }
+      }
+
+      await User.toggleActive(targetId, is_active);
       res.json({ message: is_active ? 'Đã kích hoạt tài khoản' : 'Đã khóa tài khoản' });
     } catch (error) { next(error); }
   },
@@ -69,7 +90,14 @@ const userController = {
   // DELETE /api/users/:id
   delete: async (req, res, next) => {
     try {
-      await User.delete(req.params.id);
+      const targetId = parseInt(req.params.id);
+
+      // Prevent admin from deleting themselves
+      if (targetId === req.user.user_id) {
+        return res.status(400).json({ message: 'Không thể xóa tài khoản của chính bạn' });
+      }
+
+      await User.delete(targetId);
       res.json({ message: 'Xóa tài khoản thành công' });
     } catch (error) { next(error); }
   }
