@@ -36,11 +36,15 @@ const Product = {
       countParams.push(brand_id);
     }
 
-    if (search) {
-      query += ' AND (p.product_name LIKE ? OR p.description LIKE ? OR b.brand_name LIKE ?)';
-      countQuery += ' AND (p.product_name LIKE ? OR p.description LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-      countParams.push(`%${search}%`, `%${search}%`);
+    if (search && search.trim()) {
+      const cleanSearch = search.trim();
+      // Chuyển đổi chuỗi thành các token bắt buộc cho BOOLEAN MODE: "+word1* +word2*"
+      const searchTerms = cleanSearch.split(/\s+/).map(term => `+${term}*`).join(' ');
+
+      query += ' AND (MATCH(p.product_name, p.description) AGAINST(? IN BOOLEAN MODE) OR b.brand_name LIKE ?)';
+      countQuery += ' AND (MATCH(p.product_name, p.description) AGAINST(? IN BOOLEAN MODE))';
+      params.push(searchTerms, `%${cleanSearch}%`);
+      countParams.push(searchTerms);
     }
 
     if (min_price !== undefined) {

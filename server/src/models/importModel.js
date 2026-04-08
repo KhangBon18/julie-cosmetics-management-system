@@ -115,7 +115,11 @@ const Import = {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      const [result] = await connection.query('DELETE FROM import_receipts WHERE receipt_id = ?', [id]);
+      // Bảo vệ dữ liệu: Update status = 'cancelled' thay vì DELETE cứng
+      const [result] = await connection.query(
+        "UPDATE import_receipts SET status = 'cancelled' WHERE receipt_id = ? AND status != 'cancelled'",
+        [id]
+      );
       await connection.commit();
       return result.affectedRows;
     } catch (error) {

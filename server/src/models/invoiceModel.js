@@ -77,6 +77,9 @@ const Invoice = {
         throw Object.assign(new Error('Hóa đơn phải có ít nhất 1 sản phẩm'), { status: 400 });
       }
 
+      // Sắp xếp items theo product_id để tránh MySQL Deadlock
+      items.sort((a, b) => a.product_id - b.product_id);
+
       // Kiểm tra tồn kho trước khi tạo (SELECT ... FOR UPDATE để lock rows)
       for (const item of items) {
         const [rows] = await connection.query(
@@ -232,7 +235,11 @@ const Invoice = {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
-      const [result] = await connection.query('DELETE FROM invoices WHERE invoice_id = ?', [id]);
+      // Chuyển sang Soft Cancel thay vì Hard Delete để giữ vết kiểm toán (Audit Trail)
+      const [result] = await connection.query(
+        "UPDATE invoices SET status = 'cancelled' WHERE invoice_id = ? AND status NOT IN ('cancelled', 'refunded')",
+        [id]
+      );
       await connection.commit();
       return result.affectedRows;
     } catch (error) {
