@@ -28,3 +28,9 @@ server/uploads/*
 # Gemini
 .gemini/
 .agents/
+
+# Documentation & Assets
+*.docx
+*.rtf
+*.zip
+*.pdf

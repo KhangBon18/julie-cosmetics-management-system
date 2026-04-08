@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: julie_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-julie_cosmetics}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  # Node.js Express Backend
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: julie_server
+    restart: always
+    ports:
+      - "${PORT:-5001}:${PORT:-5001}"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      DB_NAME: ${DB_NAME:-julie_cosmetics}
+      JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      NODE_ENV: production
+    depends_on:
+      - mysql
+
+  # React Vite Frontend (optional, usually build and serve via Nginx for prod)
+  # Uncomment the client section if you want full docker dev
+  # client:
+  #   build:
+  #     context: ./client
+  #   container_name: julie_client
+  #   ports:
+  #     - "5173:80"
+  #   depends_on:
+  #     - server
+
+volumes:
+  mysql_data:
