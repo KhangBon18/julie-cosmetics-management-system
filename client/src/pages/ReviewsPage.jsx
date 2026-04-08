@@ -2,10 +2,16 @@ import { useState, useEffect } from 'react';
 import { FiEye, FiEyeOff, FiTrash2, FiAlertTriangle } from 'react-icons/fi';
 import { reviewService } from '../services/dataService';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const { canUpdate, canDelete } = usePermission();
+  const _canUpdate = canUpdate('reviews');
+  const _canDelete = canDelete('reviews');
+
   useEffect(() => { loadData(); }, []);
   const loadData = async () => { try { const d = await reviewService.getAll({ limit: 50 }); setReviews(d.reviews||[]); } catch(e){toast.error(e.message);} };
   const toggle = async (id, v) => { try { await reviewService.toggleVisibility(id, !v); toast.success(v?'Đã ẩn':'Đã hiện'); loadData(); } catch(e){toast.error(e.message);} };
@@ -20,7 +26,8 @@ export default function ReviewsPage() {
       <div className="page-header"><div><h1>Đánh giá sản phẩm</h1><p>{reviews.length} đánh giá</p></div></div>
       <div className="card"><div className="table-container">
         <table>
-          <thead><tr><th>Sản phẩm</th><th>Khách hàng</th><th>⭐</th><th>Nội dung</th><th>Hiển thị</th><th>Thao tác</th></tr></thead>
+          <thead><tr><th>Sản phẩm</th><th>Khách hàng</th><th>⭐</th><th>Nội dung</th><th>Hiển thị</th>
+          {(_canUpdate || _canDelete) && <th>Thao tác</th>}</tr></thead>
           <tbody>
             {reviews.map(r => (
               <tr key={r.review_id}>
@@ -29,7 +36,12 @@ export default function ReviewsPage() {
                 <td>{'⭐'.repeat(r.rating)}</td>
                 <td style={{maxWidth:250}}>{r.comment||'—'}</td>
                 <td><span className={`badge ${r.is_visible?'badge-success':'badge-danger'}`}>{r.is_visible?'Hiện':'Ẩn'}</span></td>
-                <td><button className="btn btn-sm btn-outline" onClick={()=>toggle(r.review_id,r.is_visible)}>{r.is_visible?<FiEyeOff/>:<FiEye/>}</button>{' '}<button className="btn btn-sm btn-danger" onClick={()=>setDeleteTarget(r)}><FiTrash2/></button></td>
+                {(_canUpdate || _canDelete) && (
+                  <td>
+                    {_canUpdate && <button className="btn btn-sm btn-outline" onClick={()=>toggle(r.review_id,r.is_visible)}>{r.is_visible?<FiEyeOff/>:<FiEye/>}</button>}{' '}
+                    {_canDelete && <button className="btn btn-sm btn-danger" onClick={()=>setDeleteTarget(r)}><FiTrash2/></button>}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

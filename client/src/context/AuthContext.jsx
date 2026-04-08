@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
         setUser({ ...userData, role: 'customer' });
       } else {
         const userData = await authService.getProfile();
+        // Profile response now includes permissions array
         setUser(userData);
       }
     } catch {
@@ -39,6 +40,7 @@ export const AuthProvider = ({ children }) => {
     const data = await authService.login({ username, password });
     localStorage.setItem('token', data.token);
     localStorage.setItem('userType', 'staff');
+    // data.user now includes permissions array
     setUser(data.user);
     return data;
   };
@@ -67,8 +69,17 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  /**
+   * Reload user data (e.g. after permission changes).
+   * Also called when admin changes a user's role.
+   */
+  const refreshUser = async () => {
+    const userType = localStorage.getItem('userType') || 'staff';
+    await loadUser(userType);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, customerLogin, customerRegister, logout, loadUser }}>
+    <AuthContext.Provider value={{ user, loading, login, customerLogin, customerRegister, logout, loadUser, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

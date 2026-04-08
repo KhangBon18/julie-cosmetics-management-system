@@ -3,6 +3,7 @@ import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle } from 'react-icon
 import { customerService } from '../services/dataService';
 import { downloadCSV } from '../services/exportService';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 const tierBadge = { gold: 'badge-gold', silver: 'badge-silver', standard: 'badge-secondary' };
@@ -18,6 +19,12 @@ export default function CustomersPage() {
   const [form, setForm] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const limit = 10;
+
+  const { canCreate, canUpdate, canDelete, canExport } = usePermission();
+  const _canCreate = canCreate('customers');
+  const _canUpdate = canUpdate('customers');
+  const _canDelete = canDelete('customers');
+  const _canExport = canExport('customers');
 
   useEffect(() => { loadData(); }, [page, search]);
 
@@ -51,10 +58,14 @@ export default function CustomersPage() {
       <div className="page-header">
         <div><h1>Khách hàng</h1><p>{total} khách hàng thành viên</p></div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline" onClick={() => downloadCSV('/reports/export-customers', 'khach-hang.csv').then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
-            📥 Xuất CSV
-          </button>
-          <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm khách hàng</button>
+          {_canExport && (
+            <button className="btn btn-outline" onClick={() => downloadCSV('/reports/export-customers', 'khach-hang.csv').then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
+              📥 Xuất CSV
+            </button>
+          )}
+          {_canCreate && (
+            <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm khách hàng</button>
+          )}
         </div>
       </div>
       <div className="card">
@@ -63,7 +74,8 @@ export default function CustomersPage() {
         </div>
         <div className="table-container">
           <table>
-            <thead><tr><th>Khách hàng</th><th>SĐT</th><th>Email</th><th>Hạng</th><th>Điểm</th><th>Tổng chi</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>Khách hàng</th><th>SĐT</th><th>Email</th><th>Hạng</th><th>Điểm</th><th>Tổng chi</th>
+            {(_canUpdate || _canDelete) && <th>Thao tác</th>}</tr></thead>
             <tbody>
               {customers.map(c => (
                 <tr key={c.customer_id}>
@@ -73,7 +85,12 @@ export default function CustomersPage() {
                   <td><span className={`badge ${tierBadge[c.membership_tier]}`}>{tierLabel[c.membership_tier]}</span></td>
                   <td>{c.total_points}</td>
                   <td>{fmt(c.total_spent)}đ</td>
-                  <td><button className="btn btn-sm btn-outline" onClick={() => openEdit(c)}><FiEdit2 /></button> <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(c)}><FiTrash2 /></button></td>
+                  {(_canUpdate || _canDelete) && (
+                    <td>
+                      {_canUpdate && <button className="btn btn-sm btn-outline" onClick={() => openEdit(c)}><FiEdit2 /></button>}{' '}
+                      {_canDelete && <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(c)}><FiTrash2 /></button>}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

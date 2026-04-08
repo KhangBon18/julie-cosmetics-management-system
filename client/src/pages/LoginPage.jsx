@@ -11,8 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   if (user) {
-    const target = (user.role === 'admin' || user.role === 'manager') ? '/admin' : '/staff';
-    return <Navigate to={target} replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -21,9 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await login(username, password);
-      const role = data.user?.role;
-      const target = (role === 'admin' || role === 'manager') ? '/admin' : '/staff';
-      navigate(target, { replace: true });
+      navigate('/admin', { replace: true });
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại');
     } finally {

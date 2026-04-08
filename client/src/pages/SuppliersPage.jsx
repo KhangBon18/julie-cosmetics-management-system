@@ -5,6 +5,7 @@ export default createCrudPage({
   title: 'Nhà cung cấp',
   service: supplierService,
   idField: 'supplier_id',
+  moduleKey: 'suppliers',
   columns: [
     { key: 'supplier_name', label: 'Nhà cung cấp', render: (v) => <span style={{fontWeight:600}}>{v}</span> },
     { key: 'contact_person', label: 'Người liên hệ' },

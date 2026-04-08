@@ -7,6 +7,7 @@ export default createCrudPage({
   title: 'Thương hiệu',
   service: brandService,
   idField: 'brand_id',
+  moduleKey: 'brands',
   columns: [
     { key: 'brand_name', label: 'Thương hiệu', render: (v) => <span style={{fontWeight:600}}>{v}</span> },
     { key: 'origin_country', label: 'Xuất xứ' },

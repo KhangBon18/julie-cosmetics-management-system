@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { importService, supplierService, productService } from '../services/dataService';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -20,6 +21,9 @@ export default function ImportsPage() {
   const [importItems, setImportItems] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const { canCreate } = usePermission();
+  const _canCreate = canCreate('imports');
 
   useEffect(() => { loadData(); }, [page]);
   const loadData = async () => {
@@ -116,9 +120,11 @@ export default function ImportsPage() {
     <div>
       <div className="page-header">
         <div><h1>Phiếu nhập kho</h1><p>{total} phiếu nhập</p></div>
-        <button className="btn btn-primary" onClick={() => showForm ? resetForm() : openForm()}>
-          {showForm ? '✕ Đóng' : '+ Tạo phiếu nhập'}
-        </button>
+        {_canCreate && (
+          <button className="btn btn-primary" onClick={() => showForm ? resetForm() : openForm()}>
+            {showForm ? '✕ Đóng' : '+ Tạo phiếu nhập'}
+          </button>
+        )}
       </div>
 
       {/* ═══ FORM NHẬP KHO ═══ */}

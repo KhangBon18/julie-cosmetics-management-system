@@ -3,6 +3,7 @@ import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle } from 'react-icon
 import { productService, brandService, categoryService } from '../services/dataService';
 import { downloadCSV } from '../services/exportService';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -21,6 +22,12 @@ export default function ProductsPage() {
   const [form, setForm] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const limit = 10;
+  
+  const { canCreate, canUpdate, canDelete, canExport } = usePermission();
+  const _canCreate = canCreate('products');
+  const _canUpdate = canUpdate('products');
+  const _canDelete = canDelete('products');
+  const _canExport = canExport('products');
 
   useEffect(() => { loadProducts(); }, [page, search, filterBrand, filterCategory, sort]);
   useEffect(() => {
@@ -68,10 +75,14 @@ export default function ProductsPage() {
       <div className="page-header">
         <div><h1>Sản phẩm</h1><p>{total} sản phẩm trong hệ thống</p></div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline" onClick={() => downloadCSV('/reports/export-products', 'san-pham.csv').then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
-            📥 Xuất CSV
-          </button>
-          <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm sản phẩm</button>
+          {_canExport && (
+            <button className="btn btn-outline" onClick={() => downloadCSV('/reports/export-products', 'san-pham.csv').then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
+              📥 Xuất CSV
+            </button>
+          )}
+          {_canCreate && (
+            <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm sản phẩm</button>
+          )}
         </div>
       </div>
 
@@ -107,7 +118,8 @@ export default function ProductsPage() {
         <div className="table-container">
           <table>
             <thead>
-              <tr><th>Sản phẩm</th><th>Thương hiệu</th><th>Danh mục</th><th>Giá nhập</th><th>Giá bán</th><th>Tồn kho</th><th>Thao tác</th></tr>
+              <tr><th>Sản phẩm</th><th>Thương hiệu</th><th>Danh mục</th><th>Giá nhập</th><th>Giá bán</th><th>Tồn kho</th>
+              {(_canUpdate || _canDelete) && <th>Thao tác</th>}</tr>
             </thead>
             <tbody>
               {products.map(p => (
@@ -118,7 +130,12 @@ export default function ProductsPage() {
                   <td>{fmt(p.import_price)}đ</td>
                   <td style={{ fontWeight: 600 }}>{fmt(p.sell_price)}đ</td>
                   <td><span className={`badge ${p.stock_quantity <= 10 ? 'badge-danger' : 'badge-success'}`}>{p.stock_quantity}</span></td>
-                  <td><button className="btn btn-sm btn-outline" onClick={() => openEdit(p)} aria-label="Sửa sản phẩm"><FiEdit2 aria-hidden="true" /></button> <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(p)} aria-label="Xóa sản phẩm"><FiTrash2 aria-hidden="true" /></button></td>
+                  {(_canUpdate || _canDelete) && (
+                    <td>
+                      {_canUpdate && <button className="btn btn-sm btn-outline" onClick={() => openEdit(p)} aria-label="Sửa sản phẩm"><FiEdit2 aria-hidden="true" /></button>}{' '}
+                      {_canDelete && <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(p)} aria-label="Xóa sản phẩm"><FiTrash2 aria-hidden="true" /></button>}
+                    </td>
+                  )}
                 </tr>
               ))}
               {products.length === 0 ? <tr><td colSpan={7} className="empty-state">Không có sản phẩm</td></tr> : null}

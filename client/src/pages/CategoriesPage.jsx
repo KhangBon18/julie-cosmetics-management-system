@@ -5,6 +5,7 @@ export default createCrudPage({
   title: 'Danh mục sản phẩm',
   service: categoryService,
   idField: 'category_id',
+  moduleKey: 'categories',
   columns: [
     { key: 'category_name', label: 'Danh mục', render: (v) => <span style={{fontWeight:600}}>{v}</span> },
     { key: 'product_count', label: 'Sản phẩm', render: (v) => <span className="badge badge-info">{v || 0}</span> },

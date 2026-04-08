@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { salaryService } from '../services/dataService';
 import { toast } from 'react-toastify';
 import api from '../services/api';
+import usePermission from '../hooks/usePermission';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -14,6 +15,10 @@ export default function SalariesPage() {
   const [genMonth, setGenMonth] = useState(new Date().getMonth() + 1);
   const [genYear, setGenYear] = useState(2026);
   const [showGenerate, setShowGenerate] = useState(false);
+
+  const { canCreate, canExport } = usePermission();
+  const _canCreate = canCreate('salaries');
+  const _canExport = canExport('salaries');
 
   useEffect(() => { loadData(); }, [month, year]);
 
@@ -84,10 +89,12 @@ export default function SalariesPage() {
       <div className="page-header">
         <div><h1>Bảng lương</h1><p>{total} bản ghi</p></div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-primary" onClick={() => setShowGenerate(!showGenerate)}>
-            {showGenerate ? '✕ Đóng' : '⚡ Tính lương tự động'}
-          </button>
-          {salaries.length > 0 && (
+          {_canCreate && (
+            <button className="btn btn-primary" onClick={() => setShowGenerate(!showGenerate)}>
+              {showGenerate ? '✕ Đóng' : '⚡ Tính lương tự động'}
+            </button>
+          )}
+          {(_canExport && salaries.length > 0) && (
             <button className="btn btn-outline" onClick={handlePrintAll}>🖨️ In bảng lương</button>
           )}
         </div>

@@ -50,7 +50,7 @@ export default function ShopLayout() {
       <header className="shop-header">
         <div className="shop-header-inner">
           <Link to="/shop" className="shop-logo">
-            <div className="shop-logo-icon">💄</div>
+            <img src="/julie-logo.png" alt="Julie Cosmetics" className="shop-logo-img" />
             <div className="shop-logo-text">
               Julie Cosmetics
               <span>Premium Beauty</span>

@@ -1,16 +1,22 @@
 import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { FiShoppingCart, FiArrowRight, FiShield, FiTruck, FiRefreshCw, FiHeadphones } from 'react-icons/fi';
+import { motion } from 'framer-motion';
 import publicService from '../../services/publicService';
 import { CartContext } from '../../context/CartContext';
 import { toast } from 'react-toastify';
 
-const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
-
-const CATEGORY_ICONS = {
-  'Nước hoa': '🌸', 'Chăm sóc da': '✨', 'Trang điểm': '💄',
-  'Chăm sóc tóc': '💇', 'Chăm sóc cơ thể': '🧴', 'Dụng cụ': '🪞'
+const fadeUpVar = {
+  hidden: { opacity: 0, y: 40 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
 };
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+};
+
+const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
 function StarRating({ rating, count }) {
   const full = Math.floor(rating);
@@ -34,7 +40,7 @@ function ProductCard({ product, addToCart }) {
   const isBestseller = product.total_sold > 5;
 
   return (
-    <div className="product-card">
+    <motion.div variants={fadeUpVar} className="product-card">
       <div className="product-card-image">
         <img src={product.image_url} alt={product.product_name}
           onError={e => { e.target.src = 'https://via.placeholder.com/400x400.png?text=Julie'; }} />
@@ -60,7 +66,7 @@ function ProductCard({ product, addToCart }) {
         {product.avg_rating > 0 && <StarRating rating={Number(product.avg_rating)} count={product.review_count || 0} />}
         <div className="product-card-price">{fmt(product.sell_price)}đ</div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -107,26 +113,49 @@ export default function StorefrontHome() {
   return (
     <div>
       {/* ═══ HERO ═══ */}
-      <section className="hero-section">
-        <div className="hero-content animate-in">
-          <span className="hero-badge">✦ Mỹ phẩm chính hãng</span>
+      <section className="hero-section" style={{
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.7)), url('/hero-banner.png')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}>
+        <motion.div 
+          className="hero-content"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+        >
+          <motion.span 
+            className="hero-badge"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            ✦ Mỹ phẩm chính hãng
+          </motion.span>
           <h1 className="hero-title">Khám Phá Vẻ Đẹp Đích Thực</h1>
           <p className="hero-subtitle">
             Hơn 100 thương hiệu mỹ phẩm cao cấp thế giới. Cam kết 100% chính hãng, giao hàng nhanh, đổi trả dễ dàng.
           </p>
-          <div className="hero-actions">
+          <motion.div className="hero-actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}>
             <Link to="/shop/products" className="btn-hero btn-hero-primary">
               Mua sắm ngay <FiArrowRight />
             </Link>
             <Link to="/shop/products?sort=price_asc" className="btn-hero btn-hero-outline">
               Giá tốt nhất
             </Link>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* ═══ SERVICE STRIP ═══ */}
-      <div className="service-strip">
+      <motion.div 
+        className="service-strip"
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-50px" }}
+        transition={{ duration: 0.6 }}
+      >
         <div className="service-strip-inner">
           <div className="service-item">
             <div className="service-icon"><FiShield /></div>
@@ -145,7 +174,7 @@ export default function StorefrontHome() {
             <div className="service-text"><h5>Hỗ trợ 24/7</h5><p>Tư vấn mọi lúc mọi nơi</p></div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* ═══ FEATURED CATEGORIES ═══ */}
       {categories.length > 0 && (
@@ -155,15 +184,24 @@ export default function StorefrontHome() {
               <span className="section-badge">Khám phá</span>
               <h2 className="section-title">Danh Mục Sản Phẩm</h2>
             </div>
-            <div className="category-grid">
+            <motion.div 
+              className="category-grid"
+              variants={staggerContainer}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+            >
               {categories.slice(0, 8).map(cat => (
-                <Link key={cat.category_id} to={`/shop/products?category=${cat.category_id}`} className="category-card">
-                  <div className="category-card-icon">{CATEGORY_ICONS[cat.category_name] || '🎁'}</div>
-                  <div className="category-card-name">{cat.category_name}</div>
-                  <div className="category-card-count">{cat.product_count || ''} sản phẩm</div>
-                </Link>
+                <motion.div key={cat.category_id} variants={fadeUpVar}>
+                  <Link to={`/shop/products?category=${cat.category_id}`} className="category-card-premium">
+                    <div className="cat-premium-content">
+                      <h3 className="cat-premium-name">{cat.category_name}</h3>
+                      <span className="cat-premium-count">Khám phá {cat.product_count || 0} sản phẩm</span>
+                    </div>
+                  </Link>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
       )}
@@ -177,9 +215,15 @@ export default function StorefrontHome() {
             <p className="section-subtitle">Những sản phẩm được khách hàng tin dùng và yêu thích nhất</p>
           </div>
           {loading ? <SkeletonGrid count={4} /> : (
-            <div className="product-grid">
+            <motion.div 
+              className="product-grid"
+              variants={staggerContainer}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+            >
               {featured.slice(0, 8).map(p => <ProductCard key={p.product_id} product={p} addToCart={addToCart} />)}
-            </div>
+            </motion.div>
           )}
           <div className="section-cta">
             <Link to="/shop/products" className="btn-section">Xem tất cả sản phẩm <FiArrowRight /></Link>
@@ -197,9 +241,15 @@ export default function StorefrontHome() {
               <p className="section-subtitle">Sản phẩm vừa cập nhật, chưa bao giờ dễ dàng trải nghiệm đến thế</p>
             </div>
             {loading ? <SkeletonGrid count={4} /> : (
-              <div className="product-grid">
+              <motion.div 
+                className="product-grid"
+                variants={staggerContainer}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-100px" }}
+              >
                 {newArrivals.slice(0, 8).map(p => <ProductCard key={p.product_id} product={p} addToCart={addToCart} />)}
-              </div>
+              </motion.div>
             )}
           </div>
         </section>
@@ -213,14 +263,22 @@ export default function StorefrontHome() {
               <span className="section-badge">Thương hiệu</span>
               <h2 className="section-title">Thương Hiệu Nổi Bật</h2>
             </div>
-            <div className="brand-grid">
+            <motion.div 
+              className="brand-grid"
+              variants={staggerContainer}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+            >
               {brands.slice(0, 16).map(b => (
-                <Link key={b.brand_id} to={`/shop/products?brand=${b.brand_id}`} className="brand-pill">
-                  {b.brand_name}
-                  {b.product_count > 0 && <span className="brand-pill-count">{b.product_count}</span>}
-                </Link>
+                <motion.div key={b.brand_id} variants={fadeUpVar}>
+                  <Link to={`/shop/products?brand=${b.brand_id}`} className="brand-pill">
+                    {b.brand_name}
+                    {b.product_count > 0 && <span className="brand-pill-count">{b.product_count}</span>}
+                  </Link>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
       )}

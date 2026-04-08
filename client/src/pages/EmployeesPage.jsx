@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle } from 'react-icons/fi';
 import { employeeService, positionService } from '../services/dataService';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState([]);
@@ -13,6 +14,11 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
   const limit = 10;
+
+  const { canCreate, canUpdate, canDelete } = usePermission();
+  const _canCreate = canCreate('employees');
+  const _canUpdate = canUpdate('employees');
+  const _canDelete = canDelete('employees');
 
   useEffect(() => { loadEmployees(); }, [page]);
   useEffect(() => { positionService.getAll().then(setPositions).catch(() => {}); }, []);
@@ -49,13 +55,16 @@ export default function EmployeesPage() {
     <div>
       <div className="page-header">
         <div><h1>Nhân viên</h1><p>{total} nhân viên</p></div>
-        <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm nhân viên</button>
+        {_canCreate && (
+          <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm nhân viên</button>
+        )}
       </div>
 
       <div className="card">
         <div className="table-container">
           <table>
-            <thead><tr><th>Nhân viên</th><th>Email</th><th>SĐT</th><th>Chức vụ</th><th>Lương</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+            <thead><tr><th>Nhân viên</th><th>Email</th><th>SĐT</th><th>Chức vụ</th><th>Lương</th><th>Trạng thái</th>
+            {(_canUpdate || _canDelete) && <th>Thao tác</th>}</tr></thead>
             <tbody>
               {employees.map(e => (
                 <tr key={e.employee_id}>
@@ -65,7 +74,12 @@ export default function EmployeesPage() {
                   <td>{e.position_name || '—'}</td>
                   <td>{fmt(e.base_salary)}đ</td>
                   <td><span className={`badge ${e.status === 'active' ? 'badge-success' : 'badge-danger'}`}>{e.status === 'active' ? 'Đang làm' : 'Nghỉ việc'}</span></td>
-                  <td><button className="btn btn-sm btn-outline" onClick={() => openEdit(e)}><FiEdit2 /></button> <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(e)}><FiTrash2 /></button></td>
+                  {(_canUpdate || _canDelete) && (
+                    <td>
+                      {_canUpdate && <button className="btn btn-sm btn-outline" onClick={() => openEdit(e)}><FiEdit2 /></button>}{' '}
+                      {_canDelete && <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(e)}><FiTrash2 /></button>}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

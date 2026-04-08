@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react';
 import { FiPlus, FiCheck, FiX } from 'react-icons/fi';
 import { leaveService } from '../services/dataService';
 import { toast } from 'react-toastify';
-import useAuth from '../hooks/useAuth';
+import usePermission from '../hooks/usePermission';
 
 const statusBadge = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
 const statusLabel = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối' };
 const typeLabel = { annual: 'Phép năm', sick: 'Ốm đau', maternity: 'Thai sản', unpaid: 'Không lương' };
 
 export default function LeavesPage() {
-  const { user } = useAuth();
   const [leaves, setLeaves] = useState([]);
   const [total, setTotal] = useState(0);
-  const isManager = ['admin','manager'].includes(user?.role);
+
+  const { canUpdate } = usePermission();
+  const isManager = canUpdate('leaves');
 
   useEffect(() => { loadData(); }, []);
   const loadData = async () => { try { const d = await leaveService.getAll({ limit: 50 }); setLeaves(d.leaves||[]); setTotal(d.total||0); } catch(e){toast.error(e.message);} };

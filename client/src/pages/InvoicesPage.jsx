@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { invoiceService, customerService, productService } from '../services/dataService';
 import { downloadCSV } from '../services/exportService';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -23,6 +24,10 @@ export default function InvoicesPage() {
   const [cartItems, setCartItems] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const { canCreate, canExport } = usePermission();
+  const _canCreate = canCreate('invoices');
+  const _canExport = canExport('invoices');
 
   useEffect(() => { loadData(); }, [page]);
 
@@ -152,12 +157,16 @@ export default function InvoicesPage() {
       <div className="page-header">
         <div><h1>Hóa đơn bán hàng</h1><p>{total} hóa đơn</p></div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline" onClick={() => downloadCSV(`/reports/export-invoices?year=${new Date().getFullYear()}`, `hoa-don-${new Date().getFullYear()}.csv`).then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
-            📥 Xuất CSV
-          </button>
-          <button className="btn btn-primary" onClick={() => showForm ? resetForm() : openForm()}>
-            {showForm ? '✕ Đóng' : '+ Tạo hóa đơn'}
-          </button>
+          {_canExport && (
+            <button className="btn btn-outline" onClick={() => downloadCSV(`/reports/export-invoices?year=${new Date().getFullYear()}`, `hoa-don-${new Date().getFullYear()}.csv`).then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
+              📥 Xuất CSV
+            </button>
+          )}
+          {_canCreate && (
+            <button className="btn btn-primary" onClick={() => showForm ? resetForm() : openForm()}>
+              {showForm ? '✕ Đóng' : '+ Tạo hóa đơn'}
+            </button>
+          )}
         </div>
       </div>
 

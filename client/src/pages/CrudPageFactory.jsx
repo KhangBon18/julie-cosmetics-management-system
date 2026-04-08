@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FiPlus, FiEdit2, FiTrash2, FiChevronLeft, FiChevronRight, FiSearch, FiAlertTriangle, FiX } from 'react-icons/fi';
 import { toast } from 'react-toastify';
+import usePermission from '../hooks/usePermission';
 
 // ─── Confirm Dialog Component ───
 function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
@@ -20,8 +21,19 @@ function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
   );
 }
 
-// Generic CRUD page factory with pagination, search, and confirm dialog
-export function createCrudPage({ title, service, idField, columns, formFields, nameField }) {
+/**
+ * Generic CRUD page factory with pagination, search, confirm dialog, and permission integration.
+ *
+ * @param {Object} config
+ * @param {string} config.title — Page title
+ * @param {Object} config.service — CRUD service object
+ * @param {string} config.idField — Primary key field name
+ * @param {Array} config.columns — Table columns config
+ * @param {Array} config.formFields — Form fields config
+ * @param {string} config.nameField — Field used for delete confirmation message
+ * @param {string} [config.moduleKey] — Module key for permission checks (e.g. 'brands')
+ */
+export function createCrudPage({ title, service, idField, columns, formFields, nameField, moduleKey }) {
   return function CrudPage() {
     const [items, setItems] = useState([]);
     const [total, setTotal] = useState(0);
@@ -34,6 +46,12 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
     const [loading, setLoading] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const limit = 10;
+
+    // Permission checks
+    const { canCreate, canUpdate, canDelete } = usePermission();
+    const _canCreate = moduleKey ? canCreate(moduleKey) : true;
+    const _canUpdate = moduleKey ? canUpdate(moduleKey) : true;
+    const _canDelete = moduleKey ? canDelete(moduleKey) : true;
 
     // Debounce search
     useEffect(() => {
@@ -75,6 +93,7 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     const openCreate = () => {
+      if (!_canCreate) return;
       setEditing(null);
       const initial = {};
       formFields.forEach(f => initial[f.name] = f.default || '');
@@ -83,6 +102,7 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
     };
 
     const openEdit = (item) => {
+      if (!_canUpdate) return;
       setEditing(item);
       setForm({ ...item });
       setShowModal(true);
@@ -98,6 +118,7 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
     };
 
     const requestDelete = (item) => {
+      if (!_canDelete) return;
       setDeleteTarget(item);
     };
 
@@ -117,7 +138,9 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
       <div>
         <div className="page-header">
           <div><h1>{title}</h1><p>{total} mục</p></div>
-          <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm mới</button>
+          {_canCreate && (
+            <button className="btn btn-primary" onClick={openCreate}><FiPlus /> Thêm mới</button>
+          )}
         </div>
 
         {/* Search bar */}
@@ -143,18 +166,24 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
           ) : (
             <div className="table-container">
               <table>
-                <thead><tr>{columns.map(col => <th key={col.key}>{col.label}</th>)}<th>Thao tác</th></tr></thead>
+                <thead><tr>{columns.map(col => <th key={col.key}>{col.label}</th>)}{(_canUpdate || _canDelete) && <th>Thao tác</th>}</tr></thead>
                 <tbody>
                   {items.map(item => (
                     <tr key={item[idField]}>
                       {columns.map(col => <td key={col.key}>{col.render ? col.render(item[col.key], item, fmt) : item[col.key]}</td>)}
-                      <td>
-                        <button className="btn btn-sm btn-outline" onClick={() => openEdit(item)} aria-label="Sửa"><FiEdit2 aria-hidden="true" /></button>{' '}
-                        <button className="btn btn-sm btn-danger" onClick={() => requestDelete(item)} aria-label="Xóa"><FiTrash2 aria-hidden="true" /></button>
-                      </td>
+                      {(_canUpdate || _canDelete) && (
+                        <td>
+                          {_canUpdate && (
+                            <button className="btn btn-sm btn-outline" onClick={() => openEdit(item)} aria-label="Sửa"><FiEdit2 aria-hidden="true" /></button>
+                          )}{' '}
+                          {_canDelete && (
+                            <button className="btn btn-sm btn-danger" onClick={() => requestDelete(item)} aria-label="Xóa"><FiTrash2 aria-hidden="true" /></button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
-                  {items.length === 0 ? <tr><td colSpan={columns.length + 1} style={{textAlign:'center',padding:40,color:'#94a3b8'}}>{search ? 'Không tìm thấy kết quả' : 'Chưa có dữ liệu'}</td></tr> : null}
+                  {items.length === 0 ? <tr><td colSpan={columns.length + (_canUpdate || _canDelete ? 1 : 0)} style={{textAlign:'center',padding:40,color:'#94a3b8'}}>{search ? 'Không tìm thấy kết quả' : 'Chưa có dữ liệu'}</td></tr> : null}
                 </tbody>
               </table>
             </div>

@@ -7,6 +7,7 @@ export default createCrudPage({
   title: 'Chức vụ',
   service: positionService,
   idField: 'position_id',
+  moduleKey: 'positions',
   columns: [
     { key: 'position_name', label: 'Chức vụ', render: (v) => <span style={{fontWeight:600}}>{v}</span> },
     { key: 'base_salary', label: 'Lương cơ bản', render: (v, _, f) => `${f(v)}đ` },

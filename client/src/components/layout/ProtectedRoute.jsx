@@ -2,12 +2,16 @@ import { Navigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 
 /**
- * ProtectedRoute — kiểm tra role trước khi render.
- * Nếu user không có role phù hợp → redirect về dashboard hoặc staff portal.
- * @param {string[]} allowedRoles — danh sách roles cho phép (e.g. ['admin', 'manager'])
- * @param {React.ReactNode} children — component con
+ * ProtectedRoute — kiểm tra quyền trước khi render.
+ *
+ * Props:
+ *   - allowedRoles: string[] — (backward compat) danh sách roles cho phép
+ *   - permission: string — permission key cần thiết (e.g. 'employees.read')
+ *   - children: React.ReactNode
+ *
+ * Ưu tiên: permission > allowedRoles
  */
-export default function ProtectedRoute({ allowedRoles, children }) {
+export default function ProtectedRoute({ allowedRoles, permission, children }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -18,17 +22,23 @@ export default function ProtectedRoute({ allowedRoles, children }) {
     return <Navigate to="/admin/login" replace />;
   }
 
-  // Nếu không chỉ định roles → cho phép tất cả authenticated users
-  if (!allowedRoles || !allowedRoles.length) {
-    return children;
+  // Permission-based check (new system)
+  if (permission) {
+    // Admin always passes
+    if (user.role === 'admin') return children;
+
+    const userPerms = new Set(user.permissions || []);
+    if (userPerms.has(permission)) return children;
+
+    // No permission — redirect
+    return <Navigate to="/admin" replace />;
   }
 
-  if (!allowedRoles.includes(user.role)) {
-    // Redirect staff/warehouse về staff portal, admin/manager về admin dashboard
-    if (['staff', 'warehouse'].includes(user.role)) {
-      return <Navigate to="/staff" replace />;
+  // Legacy role-based check (backward compat)
+  if (allowedRoles && allowedRoles.length) {
+    if (!allowedRoles.includes(user.role)) {
+      return <Navigate to="/admin" replace />;
     }
-    return <Navigate to="/admin" replace />;
   }
 
   return children;
