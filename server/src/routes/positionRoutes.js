@@ -1,12 +1,12 @@
 const router = require('express').Router();
 const positionController = require('../controllers/positionController');
-const { protect, managerUp } = require('../middleware/authMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
-router.get('/', positionController.getAll);
-router.get('/:id', positionController.getById);
-router.post('/', managerUp, positionController.create);
-router.put('/:id', managerUp, positionController.update);
-router.delete('/:id', managerUp, positionController.delete);
+router.get('/', requirePermission('positions.read'), positionController.getAll);
+router.get('/:id', requirePermission('positions.read'), positionController.getById);
+router.post('/', requirePermission('positions.create'), positionController.create);
+router.put('/:id', requirePermission('positions.update'), positionController.update);
+router.delete('/:id', requirePermission('positions.delete'), positionController.delete);
 
 module.exports = router;

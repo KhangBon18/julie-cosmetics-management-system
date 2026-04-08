@@ -5,6 +5,7 @@ const { protect, adminOnly } = require('../middleware/authMiddleware');
 // All role management is admin-only
 router.use(protect, adminOnly);
 
+router.get('/modules', roleController.getModules);
 router.get('/permissions/all', roleController.getAllPermissions);
 router.get('/', roleController.getAll);
 router.get('/:id', roleController.getById);

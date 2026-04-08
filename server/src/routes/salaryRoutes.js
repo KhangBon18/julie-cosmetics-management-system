@@ -1,16 +1,16 @@
 const router = require('express').Router();
 const salaryController = require('../controllers/salaryController');
-const { protect, managerUp } = require('../middleware/authMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 const { validateSalaryGenerate } = require('../middleware/validationMiddleware');
 
-router.use(protect, managerUp);
-router.get('/', salaryController.getAll);
-router.get('/:id', salaryController.getById);
-router.post('/', salaryController.create);
-router.post('/calculate', salaryController.calculate);
-router.post('/generate', validateSalaryGenerate, salaryController.generateAll);
-router.put('/:id', salaryController.update);
-router.delete('/:id', salaryController.delete);
+router.use(protect);
+router.get('/', requirePermission('salaries.read'), salaryController.getAll);
+router.get('/export', requirePermission('salaries.export', 'salaries.read'), salaryController.exportSalaries);
+router.get('/:id', requirePermission('salaries.read'), salaryController.getById);
+router.post('/', requirePermission('salaries.create'), salaryController.create);
+router.post('/calculate', requirePermission('salaries.create'), salaryController.calculate);
+router.post('/generate', requirePermission('salaries.create'), validateSalaryGenerate, salaryController.generateAll);
+router.put('/:id', requirePermission('salaries.update'), salaryController.update);
+router.delete('/:id', requirePermission('salaries.delete'), salaryController.delete);
 
 module.exports = router;
-

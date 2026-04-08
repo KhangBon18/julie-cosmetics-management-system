@@ -10,6 +10,7 @@ router.get('/dashboard', staffController.getDashboard);
 router.get('/profile', staffController.getProfile);
 router.put('/profile', staffController.updateProfile);
 router.get('/salaries', staffController.getMySalaries);
+router.get('/salaries/export', staffController.exportMySalaries);
 router.get('/salary-formula', staffController.getSalaryFormula);
 router.get('/leaves', staffController.getMyLeaves);
 router.post('/leaves', staffController.createLeave);

@@ -1,12 +1,11 @@
 const router = require('express').Router();
 const importController = require('../controllers/importController');
-const { protect, roleCheck } = require('../middleware/authMiddleware');
-const { validateImport } = require('../middleware/validationMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 
-router.use(protect, roleCheck('admin', 'manager', 'warehouse'));
-router.get('/', importController.getAll);
-router.get('/:id', importController.getById);
-router.post('/', validateImport, importController.create);
-router.delete('/:id', importController.delete);
+router.use(protect);
+router.get('/', requirePermission('imports.read'), importController.getAll);
+router.get('/:id', requirePermission('imports.read'), importController.getById);
+router.post('/', requirePermission('imports.create'), importController.create);
+router.delete('/:id', requirePermission('imports.delete'), importController.delete);
 
 module.exports = router;

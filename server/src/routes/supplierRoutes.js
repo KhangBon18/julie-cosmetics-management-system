@@ -1,12 +1,12 @@
 const router = require('express').Router();
 const supplierController = require('../controllers/supplierController');
-const { protect, roleCheck } = require('../middleware/authMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 
-router.use(protect, roleCheck('admin', 'manager', 'warehouse'));
-router.get('/', supplierController.getAll);
-router.get('/:id', supplierController.getById);
-router.post('/', supplierController.create);
-router.put('/:id', supplierController.update);
-router.delete('/:id', supplierController.delete);
+router.use(protect);
+router.get('/', requirePermission('suppliers.read'), supplierController.getAll);
+router.get('/:id', requirePermission('suppliers.read'), supplierController.getById);
+router.post('/', requirePermission('suppliers.create'), supplierController.create);
+router.put('/:id', requirePermission('suppliers.update'), supplierController.update);
+router.delete('/:id', requirePermission('suppliers.delete'), supplierController.delete);
 
 module.exports = router;

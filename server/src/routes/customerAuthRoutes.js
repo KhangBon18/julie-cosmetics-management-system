@@ -10,8 +10,10 @@ const generateCustomerToken = (customerId) => {
   });
 };
 
+const { authLimiter } = require('../middleware/rateLimiter');
+
 // POST /api/customer-auth/register
-router.post('/register', async (req, res, next) => {
+router.post('/register', authLimiter, async (req, res, next) => {
   try {
     const { full_name, phone, email, password, address, gender } = req.body;
 
@@ -77,7 +79,7 @@ router.post('/register', async (req, res, next) => {
 });
 
 // POST /api/customer-auth/login
-router.post('/login', async (req, res, next) => {
+router.post('/login', authLimiter, async (req, res, next) => {
   try {
     const { phone, password } = req.body;
     const LoginThrottler = require('../utils/loginThrottler');

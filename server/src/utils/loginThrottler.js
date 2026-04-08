@@ -2,7 +2,7 @@ const { pool } = require('../config/db');
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MINUTES = 15;
-const LOCKOUT_MINUTES = 30;
+const LOCKOUT_MINUTES = 0.5; // 30 seconds
 
 const LoginThrottler = {
   /**

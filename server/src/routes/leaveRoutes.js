@@ -1,14 +1,12 @@
 const router = require('express').Router();
 const leaveController = require('../controllers/leaveController');
-const { protect, managerUp } = require('../middleware/authMiddleware');
-const { validateLeave } = require('../middleware/validationMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
-router.get('/', managerUp, leaveController.getAll);
-router.get('/:id', leaveController.getById);
-router.post('/', validateLeave, leaveController.create);
-router.put('/:id/approve', managerUp, leaveController.approve);
-router.put('/:id/reject', managerUp, leaveController.reject);
-router.delete('/:id', managerUp, leaveController.delete);
+router.get('/', requirePermission('leaves.read'), leaveController.getAll);
+router.get('/:id', requirePermission('leaves.read'), leaveController.getById);
+router.post('/', requirePermission('leaves.create'), leaveController.create);
+router.put('/:id/approve', requirePermission('leaves.update'), leaveController.approve);
+router.put('/:id/reject', requirePermission('leaves.update'), leaveController.reject);
 
 module.exports = router;

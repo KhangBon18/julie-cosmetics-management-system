@@ -1,12 +1,12 @@
 const router = require('express').Router();
 const brandController = require('../controllers/brandController');
-const { protect, managerUp } = require('../middleware/authMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
-router.get('/', brandController.getAll);
-router.get('/:id', brandController.getById);
-router.post('/', managerUp, brandController.create);
-router.put('/:id', managerUp, brandController.update);
-router.delete('/:id', managerUp, brandController.delete);
+router.get('/', requirePermission('brands.read'), brandController.getAll);
+router.get('/:id', requirePermission('brands.read'), brandController.getById);
+router.post('/', requirePermission('brands.create'), brandController.create);
+router.put('/:id', requirePermission('brands.update'), brandController.update);
+router.delete('/:id', requirePermission('brands.delete'), brandController.delete);
 
 module.exports = router;
