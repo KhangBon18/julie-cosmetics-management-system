@@ -1,4 +1,5 @@
 const Product = require('../models/productModel');
+const { logAudit } = require('../utils/auditLogger');
 
 const productController = {
   // GET /api/products
@@ -28,6 +29,7 @@ const productController = {
     try {
       const id = await Product.create(req.body);
       const product = await Product.findById(id);
+      await logAudit({ userId: req.user.user_id, action: 'CREATE', entityType: 'product', entityId: id, newValues: product, req });
       res.status(201).json({ message: 'Tạo sản phẩm thành công', product });
     } catch (error) { next(error); }
   },
@@ -35,8 +37,10 @@ const productController = {
   // PUT /api/products/:id
   update: async (req, res, next) => {
     try {
+      const oldProduct = await Product.findById(req.params.id);
       await Product.update(req.params.id, req.body);
       const product = await Product.findById(req.params.id);
+      await logAudit({ userId: req.user.user_id, action: 'UPDATE', entityType: 'product', entityId: req.params.id, oldValues: oldProduct, newValues: product, req });
       res.json({ message: 'Cập nhật sản phẩm thành công', product });
     } catch (error) { next(error); }
   },
@@ -44,7 +48,9 @@ const productController = {
   // DELETE /api/products/:id
   delete: async (req, res, next) => {
     try {
+      const oldProduct = await Product.findById(req.params.id);
       await Product.delete(req.params.id);
+      await logAudit({ userId: req.user.user_id, action: 'DELETE', entityType: 'product', entityId: req.params.id, oldValues: oldProduct, req });
       res.json({ message: 'Xóa sản phẩm thành công' });
     } catch (error) { next(error); }
   },

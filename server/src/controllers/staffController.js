@@ -55,6 +55,39 @@ const staffController = {
     } catch (error) { next(error); }
   },
 
+  // GET /api/staff/salaries/export — In bảng lương cá nhân theo tháng, năm (CSV)
+  exportMySalaries: async (req, res, next) => {
+    try {
+      if (!req.user.employee_id) {
+        return res.status(400).json({ message: 'Tài khoản không liên kết với nhân viên nào' });
+      }
+      const { month, year } = req.query;
+      let query = `SELECT s.salary_id, s.month, s.year,
+                          s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
+                          s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary
+                   FROM salaries s
+                   WHERE s.employee_id = ?`;
+      const params = [req.user.employee_id];
+      if (month) { query += ' AND s.month = ?'; params.push(month); }
+      if (year) { query += ' AND s.year = ?'; params.push(year); }
+      query += ' ORDER BY s.year DESC, s.month DESC';
+
+      const [rows] = await pool.query(query, params);
+
+      const headers = ['Mã Lương', 'Tháng', 'Năm', 'Ngày công chuẩn', 'Ngày công thực tế', 'Nghỉ không lương', 'Lương cơ bản', 'Lương Gross', 'Thưởng', 'Khấu trừ', 'Thực nhận'];
+      const csvRows = rows.map(r => [
+        r.salary_id, r.month, r.year,
+        r.work_days_standard, r.work_days_actual, r.unpaid_leave_days,
+        r.base_salary, r.gross_salary, r.bonus, r.deductions, r.net_salary
+      ]);
+
+      const csv = '\uFEFF' + [headers, ...csvRows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=luong-ca-nhan${month ? '-T'+month : ''}${year ? '-'+year : ''}.csv`);
+      res.send(csv);
+    } catch (error) { next(error); }
+  },
+
   // GET /api/staff/salary-formula — Xem cách tính lương
   getSalaryFormula: async (req, res, next) => {
     try {

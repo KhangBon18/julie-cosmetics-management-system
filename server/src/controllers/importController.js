@@ -1,4 +1,5 @@
 const Import = require('../models/importModel');
+const { logAudit } = require('../utils/auditLogger');
 
 const importController = {
   getAll: async (req, res, next) => {
@@ -19,12 +20,15 @@ const importController = {
     try {
       const id = await Import.create({ ...req.body, created_by: req.user.user_id });
       const receipt = await Import.findById(id);
+      await logAudit({ userId: req.user.user_id, action: 'CREATE', entityType: 'import_receipt', entityId: id, newValues: receipt, req });
       res.status(201).json({ message: 'Tạo phiếu nhập thành công', import_receipt: receipt });
     } catch (error) { next(error); }
   },
   delete: async (req, res, next) => {
     try {
+      const oldImport = await Import.findById(req.params.id);
       await Import.delete(req.params.id);
+      await logAudit({ userId: req.user.user_id, action: 'DELETE', entityType: 'import_receipt', entityId: req.params.id, oldValues: oldImport, req });
       res.json({ message: 'Xóa phiếu nhập thành công' });
     } catch (error) { next(error); }
   }

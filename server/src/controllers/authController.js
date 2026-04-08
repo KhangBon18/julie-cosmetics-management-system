@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
+const Role = require('../models/roleModel');
 const { generateToken, generateAccessToken, generateRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } = require('../utils/generateToken');
 const LoginThrottler = require('../utils/loginThrottler');
 const { logAudit } = require('../utils/auditLogger');
@@ -75,8 +76,12 @@ const authController = {
         entityId: user.user_id, req
       });
 
-      // Lấy thông tin đầy đủ (kèm employee)
+      // Lấy thông tin đầy đủ (kèm employee + role)
       const fullUser = await User.findById(user.user_id);
+
+      // Lấy permissions cho user
+      const permissions = await Role.getUserPermissions(user.user_id);
+      const permissionNames = permissions.map(p => p.permission_name);
 
       res.json({
         message: 'Đăng nhập thành công',
@@ -84,14 +89,16 @@ const authController = {
           user_id: fullUser.user_id,
           username: fullUser.username,
           role: fullUser.role,
+          role_id: fullUser.role_id,
+          role_name: fullUser.role_name,
           employee_id: fullUser.employee_id,
           full_name: fullUser.full_name || fullUser.username,
           email: fullUser.email,
-          phone: fullUser.phone
+          phone: fullUser.phone,
+          permissions: permissionNames,
         },
         token: accessToken,         // short-lived access token
         refreshToken,               // long-lived refresh token
-        // backward compat: also provide 'token' key that old clients use
       });
     } catch (error) {
       next(error);
@@ -158,7 +165,12 @@ const authController = {
       if (!user) {
         return res.status(404).json({ message: 'Không tìm thấy người dùng' });
       }
-      res.json(user);
+
+      // Kèm permissions
+      const permissions = await Role.getUserPermissions(req.user.user_id);
+      const permissionNames = permissions.map(p => p.permission_name);
+
+      res.json({ ...user, permissions: permissionNames });
     } catch (error) {
       next(error);
     }

@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
@@ -52,21 +51,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting cho auth routes (chống brute force)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 phút
-  max: 20, // tối đa 20 requests / 15 phút
-  message: { message: 'Quá nhiều yêu cầu đăng nhập, vui lòng thử lại sau 15 phút' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
+// Import limiters
+const { globalLimiter } = require('./src/middleware/rateLimiter');
 
 // Rate limiting toàn cục
-const globalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 phút
-  max: 200, // 200 requests / phút
-  message: { message: 'Quá nhiều yêu cầu, vui lòng thử lại sau' }
-});
 app.use('/api', globalLimiter);
 
 // Static files - uploads
@@ -76,8 +64,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/public', publicRoutes);
 
 // API Routes
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/customer-auth', authLimiter, require('./src/routes/customerAuthRoutes'));
+app.use('/api/auth', authRoutes);
+app.use('/api/customer-auth', require('./src/routes/customerAuthRoutes'));
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
