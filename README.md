@@ -1,117 +1,69 @@
-# 🌸 Julie Cosmetics
+# 🌸 Julie Cosmetics - Fullstack E-commerce System
 
-Ứng dụng quản lý cửa hàng mỹ phẩm fullstack sử dụng **React** + **Node.js/Express** + **MySQL**.
+[![Status](https://img.shields.io/badge/status-active-success.svg)]()
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
 
-## 📋 Yêu cầu
+Hệ thống quản lý mỹ phẩm toàn diện tích hợp cửa hàng trực tuyến và bảng điều khiển quản trị (Admin Dashboard). Dự án được thiết kế chuyên nghiệp với kiến trúc Client-Server hiện đại, tập trung vào trải nghiệm người dùng và tính bảo mật cao.
 
-- **Node.js** >= 18
-- **MySQL** >= 8.0
-- **npm** >= 9
+## ✨ Tính năng nổi bật
 
-## 🚀 Cài đặt
+### 🛒 Storefront (Khách hàng)
+- **Giao diện Premium**: Thiết kế hiện đại, responsive hoàn toàn trên mọi thiết bị.
+- **Giỏ hàng thông minh**: Quản lý giỏ hàng realtime, tính toán giá trị đơn hàng tự động.
+- **Thanh toán đa phương thức**: Hỗ trợ các phương thức thanh toán phổ biến.
 
-### 1. Clone dự án
+### 🛡️ Admin Dashboard (Quản trị)
+- **RBAC (Role-Based Access Control)**: Hệ thống phân quyền chi tiết (Admin, Manager, Staff, Warehouse).
+- **Quản lý tồn kho**: Theo dõi nhập/xuất kho, cảnh báo hàng sắp hết.
+- **Báo cáo & Phân tích**: Biểu đồ doanh thu, lợi nhuận, sản phẩm bán chạy theo thời gian thực.
+- **Quản lý nhân sự**: Chấm công, tính lương, quản lý đơn nghỉ phép.
 
-```bash
-cd "Julie Cosmetics"
-```
+## 🛠️ Stack Công nghệ
 
-### 2. Tạo database
+- **Frontend**: React.js, TailwindCSS, Framer Motion (Animations).
+- **Backend**: Node.js, Express.js.
+- **Database**: PostgreSQL / MySQL (Support Migrations).
+- **Infrastructure**: Docker, Docker Compose, Rate Limiting Security.
 
-```bash
-mysql -u root -p < database/schema.sql
-mysql -u root -p < database/seed.sql
-```
-
-### 3. Cấu hình môi trường
-
-```bash
-# Server
-cp server/.env.example server/.env
-# Sửa file server/.env với thông tin MySQL và JWT_SECRET riêng
-```
-
-### 4. Cài đặt dependencies
+## 📂 Cấu trúc dự án
 
 ```bash
-npm run install:all
+├── client/          # Giao diện người dùng (React framework)
+├── server/          # API logic & Business services (Node.js)
+├── database/        # Schema & SQL migrations
+├── docs/            # Tài liệu dự án & Báo cáo
+└── docker-compose.yml
 ```
 
-### 5. Chạy dự án
+## 🚀 Cài đặt & Chạy dự án
 
-```bash
-npm run dev
-```
+### 📋 Yêu cầu hệ thống
+- Node.js (v18+)
+- Database: MySQL hoặc PostgreSQL
+- Docker (Tùy chọn)
 
-- 🌐 **Frontend**: http://localhost:5173
-- 🔌 **Backend API**: http://localhost:5001/api
-- 🛍️ **Shop**: http://localhost:5173/shop
+### 💻 Chạy Local
+1. Clone dự án:
+   ```bash
+   git clone <your-repo-url>
+   ```
+2. Cài đặt dependencies:
+   ```bash
+   npm run install:all
+   ```
+3. Chạy môi trường phát triển:
+   ```bash
+   npm run dev
+   ```
 
-## 👤 Tài khoản mặc định
+## 🔐 Phân quyền Hệ thống
 
-| Vai trò | Username | Mật khẩu |
-|---------|----------|-----------|
-| Admin | admin | admin123 |
-| Manager | manager01 | manager123 |
-| Nhân viên | staff01 | staff123 |
-| Thủ kho | warehouse01 | warehouse123 |
+| Vai trò | Quyền hạn chính |
+| :--- | :--- |
+| **Admin** | Toàn quyền hệ thống, quản lý tài khoản & phân quyền. |
+| **Manager** | Quản lý sản phẩm, nhân viên, xem báo cáo doanh thu. |
+| **Staff** | Tạo hóa đơn, quản lý khách hàng (CRM). |
+| **Warehouse**| Quản lý nhập kho & Nhà cung cấp. |
 
-> **Lưu ý:** Đăng nhập bằng **username** (không phải email) tại `/login`
-
-## 📁 Cấu trúc dự án
-
-```
-Julie Cosmetics/
-├── client/          # React Frontend (Vite)
-│   ├── src/
-│   │   ├── components/  # UI Components
-│   │   ├── pages/       # Page Components
-│   │   ├── context/     # React Context (Auth, Cart)
-│   │   ├── hooks/       # Custom Hooks
-│   │   ├── services/    # API Services (Axios)
-│   │   └── utils/       # Helper Functions
-│   └── ...
-├── server/          # Node.js/Express Backend
-│   ├── src/
-│   │   ├── config/      # Database Config
-│   │   ├── controllers/ # Request Handlers
-│   │   ├── middleware/   # Auth, Error, Upload
-│   │   ├── models/      # Database Models
-│   │   ├── routes/      # API Routes
-│   │   └── utils/       # Utilities
-│   └── ...
-├── database/        # SQL Scripts
-│   ├── schema.sql   # Database Schema
-│   ├── seed.sql     # Sample Data
-│   ├── backup.sh    # Backup Script
-│   └── restore.sh   # Restore Script
-└── package.json     # Root (concurrently)
-```
-
-## 🔌 API Endpoints chính
-
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| POST | `/api/auth/login` | Đăng nhập (username + password) |
-| GET | `/api/auth/profile` | Thông tin user hiện tại |
-| PUT | `/api/auth/change-password` | Đổi mật khẩu |
-| GET/POST/PUT/DELETE | `/api/products` | Quản lý sản phẩm |
-| GET/POST/PUT/DELETE | `/api/employees` | Quản lý nhân viên |
-| GET/POST/PUT/DELETE | `/api/customers` | Quản lý khách hàng CRM |
-| GET/POST/DELETE | `/api/invoices` | Hóa đơn bán hàng |
-| GET/POST/DELETE | `/api/imports` | Phiếu nhập kho |
-| GET/POST | `/api/leaves` | Đơn nghỉ phép |
-| GET/POST | `/api/salaries` | Bảng lương |
-| GET | `/api/reports/*` | Báo cáo (revenue, profit, top-products, inventory, hr) |
-| GET | `/api/public/products` | Shop công khai (không cần auth) |
-| GET | `/api/staff/*` | Cổng nhân viên |
-| GET | `/api/health` | Health check |
-
-## 🔑 Phân quyền
-
-| Role | Quyền |
-|------|-------|
-| **admin** | Toàn quyền, quản lý tài khoản |
-| **manager** | Quản lý nhân viên, sản phẩm, báo cáo, phê duyệt nghỉ phép |
-| **staff** | Tạo hóa đơn, quản lý khách hàng, xem thông tin cá nhân |
-| **warehouse** | Nhập kho, quản lý nhà cung cấp |
+---
+*Dự án HTTTDN - Julie Cosmetics - 2026*
