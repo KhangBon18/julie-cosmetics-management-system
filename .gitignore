@@ -34,3 +34,6 @@ server/uploads/*
 *.rtf
 *.zip
 *.pdf
+!docs/project-assignments/*.docx
+!docs/project-assignments/*.rtf
+!docs/project-assignments/*.zip
