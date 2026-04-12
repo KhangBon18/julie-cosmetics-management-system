@@ -13,6 +13,10 @@ export default function EmployeesPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [positionTarget, setPositionTarget] = useState(null);
+  const [positionHistory, setPositionHistory] = useState([]);
+  const [positionForm, setPositionForm] = useState({});
+  const [submittingPosition, setSubmittingPosition] = useState(false);
   const limit = 10;
 
   const { canCreate, canUpdate, canDelete } = usePermission();
@@ -33,6 +37,21 @@ export default function EmployeesPage() {
 
   const openCreate = () => { setEditing(null); setForm({ full_name:'', email:'', phone:'', gender:'Nam', hire_date: new Date().toISOString().slice(0,10), base_salary:0, status:'active' }); setShowModal(true); };
   const openEdit = (e) => { setEditing(e); setForm({ ...e, date_of_birth: e.date_of_birth?.slice(0,10), hire_date: e.hire_date?.slice(0,10) }); setShowModal(true); };
+  const openAssignPosition = async (employee) => {
+    try {
+      const history = await employeeService.getPositionHistory(employee.employee_id);
+      setPositionHistory(history || []);
+      setPositionTarget(employee);
+      setPositionForm({
+        position_id: '',
+        effective_date: new Date().toISOString().slice(0, 10),
+        salary_at_time: employee.base_salary || 0,
+        note: ''
+      });
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -47,6 +66,23 @@ export default function EmployeesPage() {
     if (!deleteTarget) return;
     try { await employeeService.delete(deleteTarget.employee_id); toast.success('Đã xóa'); loadEmployees(); } catch (err) { toast.error(err.message); }
     finally { setDeleteTarget(null); }
+  };
+
+  const handleAssignPosition = async (e) => {
+    e.preventDefault();
+    if (!positionTarget) return;
+    setSubmittingPosition(true);
+    try {
+      await employeeService.assignPosition(positionTarget.employee_id, positionForm);
+      toast.success('Cập nhật chức vụ thành công');
+      setPositionTarget(null);
+      setPositionHistory([]);
+      loadEmployees();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmittingPosition(false);
+    }
   };
 
   const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
@@ -77,6 +113,7 @@ export default function EmployeesPage() {
                   {(_canUpdate || _canDelete) && (
                     <td>
                       {_canUpdate && <button className="btn btn-sm btn-outline" onClick={() => openEdit(e)}><FiEdit2 /></button>}{' '}
+                      {_canUpdate && <button className="btn btn-sm btn-outline" onClick={() => openAssignPosition(e)} title="Đổi chức vụ">🎯</button>}{' '}
                       {_canDelete && <button className="btn btn-sm btn-danger" onClick={() => setDeleteTarget(e)}><FiTrash2 /></button>}
                     </td>
                   )}
@@ -104,12 +141,108 @@ export default function EmployeesPage() {
                 </div>
                 <div className="form-row">
                   <div className="form-group"><label>Ngày vào làm *</label><input className="form-control" type="date" required value={form.hire_date||''} onChange={e => setForm({...form, hire_date: e.target.value})} /></div>
-                  <div className="form-group"><label>Lương cơ bản</label><input className="form-control" type="number" value={form.base_salary||''} onChange={e => setForm({...form, base_salary: e.target.value})} /></div>
+                  <div className="form-group">
+                    <label>Lương cơ bản</label>
+                    <input
+                      className="form-control"
+                      type="number"
+                      value={form.base_salary||''}
+                      disabled={!!editing}
+                      onChange={e => setForm({...form, base_salary: e.target.value})}
+                    />
+                    {editing && (
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                        Muốn đổi lương/chức vụ theo thời điểm, vui lòng dùng nút 🎯 để hệ thống lưu lịch sử chức vụ đúng nghiệp vụ.
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="form-group"><label>Địa chỉ</label><input className="form-control" value={form.address||''} onChange={e => setForm({...form, address: e.target.value})} /></div>
                 {editing && <div className="form-group"><label>Trạng thái</label><select className="form-control" value={form.status||'active'} onChange={e => setForm({...form, status: e.target.value})}><option value="active">Đang làm</option><option value="inactive">Nghỉ việc</option></select></div>}
                 <div className="form-actions"><button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Hủy</button><button type="submit" className="btn btn-primary">{editing ? 'Cập nhật' : 'Thêm mới'}</button></div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {positionTarget && (
+        <div className="modal-overlay" onClick={() => setPositionTarget(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Đổi chức vụ nhân viên</h3>
+              <button className="modal-close" onClick={() => setPositionTarget(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 700 }}>{positionTarget.full_name}</div>
+                <div style={{ color: '#64748b', fontSize: 13 }}>Chức vụ hiện tại: {positionTarget.position_name || '—'} • Lương hiện tại: {fmt(positionTarget.base_salary)}đ</div>
+              </div>
+
+              <form onSubmit={handleAssignPosition}>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Chức vụ mới *</label>
+                    <select className="form-control" required value={positionForm.position_id || ''} onChange={e => {
+                      const nextPositionId = e.target.value;
+                      const nextPosition = positions.find(p => String(p.position_id) === nextPositionId);
+                      setPositionForm({
+                        ...positionForm,
+                        position_id: nextPositionId,
+                        salary_at_time: nextPosition?.base_salary || positionForm.salary_at_time
+                      });
+                    }}>
+                      <option value="">Chọn chức vụ</option>
+                      {positions.map(p => (
+                        <option key={p.position_id} value={p.position_id}>{p.position_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Ngày hiệu lực *</label>
+                    <input className="form-control" type="date" required value={positionForm.effective_date || ''} onChange={e => setPositionForm({ ...positionForm, effective_date: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Lương tại thời điểm nhận chức vụ *</label>
+                    <input className="form-control" type="number" min="0" required value={positionForm.salary_at_time || 0} onChange={e => setPositionForm({ ...positionForm, salary_at_time: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Ghi chú</label>
+                    <input className="form-control" value={positionForm.note || ''} onChange={e => setPositionForm({ ...positionForm, note: e.target.value })} placeholder="VD: Điều chuyển nội bộ / thăng chức" />
+                  </div>
+                </div>
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, color: '#64748b', fontSize: 13, marginBottom: 16 }}>
+                  Hệ thống sẽ tự động kết thúc chức vụ hiện tại vào ngày trước hiệu lực mới và dùng lịch sử này để prorate bảng lương theo từng giai đoạn trong tháng.
+                </div>
+                <div className="form-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setPositionTarget(null)}>Hủy</button>
+                  <button type="submit" className="btn btn-primary" disabled={submittingPosition}>
+                    {submittingPosition ? 'Đang cập nhật...' : 'Lưu chức vụ mới'}
+                  </button>
+                </div>
+              </form>
+
+              <div style={{ marginTop: 20 }}>
+                <h4 style={{ marginBottom: 12 }}>Lịch sử chức vụ</h4>
+                <div className="table-container">
+                  <table>
+                    <thead><tr><th>Chức vụ</th><th>Hiệu lực từ</th><th>Đến ngày</th><th>Lương tại thời điểm đó</th></tr></thead>
+                    <tbody>
+                      {positionHistory.map(item => (
+                        <tr key={item.id}>
+                          <td>{item.position_name}</td>
+                          <td>{item.effective_date?.slice(0, 10)}</td>
+                          <td>{item.end_date ? item.end_date.slice(0, 10) : 'Hiện tại'}</td>
+                          <td>{fmt(item.salary_at_time)}đ</td>
+                        </tr>
+                      ))}
+                      {!positionHistory.length && <tr><td colSpan={4} style={{ textAlign: 'center', color: '#94a3b8', padding: 24 }}>Chưa có lịch sử chức vụ</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>

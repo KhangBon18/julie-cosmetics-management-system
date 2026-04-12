@@ -16,6 +16,15 @@ const Role = {
     }
   },
 
+  // Tìm role theo tên (phục vụ map legacy role -> role_id)
+  findByName: async (roleName) => {
+    const [rows] = await pool.query(
+      'SELECT * FROM roles WHERE role_name = ? LIMIT 1',
+      [roleName]
+    );
+    return rows[0] || null;
+  },
+
   // Tìm role theo ID kèm permissions
   findById: async (id) => {
     const [roles] = await pool.query(

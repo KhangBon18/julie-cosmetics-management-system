@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MySQL Database
   mysql:
@@ -7,13 +5,21 @@ services:
     container_name: julie_mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: ${DB_NAME:-julie_cosmetics}
     ports:
-      - "3306:3306"
+      - "${DB_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./database/seed_rbac.sql:/docker-entrypoint-initdb.d/03-seed_rbac.sql:ro
+      - ./database/seed_settings.sql:/docker-entrypoint-initdb.d/04-seed_settings.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   # Node.js Express Backend
   server:
@@ -27,25 +33,47 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USER: root
-      DB_PASSWORD: ${DB_PASSWORD:-root}
+      DB_USER: ${DB_USER:-julie_app}
+      DB_PASSWORD: ${DB_PASSWORD:-julie_demo_123}
       DB_NAME: ${DB_NAME:-julie_cosmetics}
       JWT_SECRET: ${JWT_SECRET:-super_secret_jwt_key}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+      PORT: ${PORT:-5001}
       NODE_ENV: production
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
-  # React Vite Frontend (optional, usually build and serve via Nginx for prod)
-  # Uncomment the client section if you want full docker dev
-  # client:
-  #   build:
-  #     context: ./client
-  #   container_name: julie_client
-  #   ports:
-  #     - "5173:80"
-  #   depends_on:
-  #     - server
+  demo_seed:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: julie_demo_seed
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-julie_app}
+      DB_PASSWORD: ${DB_PASSWORD:-julie_demo_123}
+      DB_NAME: ${DB_NAME:-julie_cosmetics}
+    command: ["node", "seed-demo.js"]
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: julie_client
+    ports:
+      - "${CLIENT_PORT:-5173}:5173"
+    environment:
+      VITE_API_URL: /api
+      VITE_PROXY_TARGET: http://server:${PORT:-5001}
+      VITE_APP_NAME: Julie Cosmetics
+    depends_on:
+      - server
 
 volumes:
   mysql_data:

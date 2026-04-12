@@ -2,22 +2,80 @@
  * Seed demo data: invoices, import receipts, and reviews
  * Run: cd server && node seed-demo.js
  */
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: true });
 const mysql = require('mysql2/promise');
+const { calculateLoyaltyPoints } = require('./src/utils/crmRules');
+const { logInventoryMovement } = require('./src/utils/inventoryLogger');
+
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const forceSeed = process.env.SEED_DEMO_FORCE === '1' || process.argv.includes('--force');
+
+function castSettingValue(value, dataType) {
+  switch (dataType) {
+    case 'number':
+      return Number(value);
+    case 'boolean':
+      return value === 'true' || value === '1';
+    case 'json':
+      try { return JSON.parse(value); }
+      catch { return value; }
+    default:
+      return value;
+  }
+}
 
 async function seed() {
   const pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'julie_cosmetics',
     waitForConnections: true
   });
 
-  const conn = await pool.getConnection();
+  let conn;
 
   try {
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      try {
+        conn = await pool.getConnection();
+        break;
+      } catch (error) {
+        if (attempt === 10) throw error;
+        console.log(`⏳ Waiting for database... (${attempt}/10)`);
+        await wait(3000);
+      }
+    }
+
     console.log('🌱 Seeding demo data...\n');
+
+    const [settingRows] = await conn.query(
+      'SELECT setting_key, setting_value, data_type FROM settings WHERE category = ?',
+      ['crm']
+    );
+    const crmSettings = {};
+    for (const row of settingRows) {
+      crmSettings[row.setting_key] = castSettingValue(row.setting_value, row.data_type);
+    }
+
+    const [existingCounts] = await conn.query(`
+      SELECT
+        (SELECT COUNT(*) FROM invoices) AS invoice_count,
+        (SELECT COUNT(*) FROM import_receipts) AS import_count,
+        (SELECT COUNT(*) FROM reviews) AS review_count
+    `);
+
+    const alreadySeeded = (existingCounts[0]?.invoice_count || 0) > 0
+      && (existingCounts[0]?.import_count || 0) > 0
+      && (existingCounts[0]?.review_count || 0) > 0;
+
+    if (alreadySeeded && !forceSeed) {
+      console.log('ℹ️ Demo data already exists. Skip seeding. Use --force to reseed.');
+      return;
+    }
 
     // Get products with stock
     const [products] = await conn.query(
@@ -64,6 +122,16 @@ async function seed() {
       const receiptId = result.insertId;
 
       for (const item of items) {
+        await logInventoryMovement(conn, {
+          productId: item.product_id,
+          movementType: 'import',
+          quantity: item.quantity,
+          referenceType: 'import_receipt',
+          referenceId: receiptId,
+          unitCost: item.unit_price,
+          createdBy: 1
+        });
+
         await conn.query(
           'INSERT INTO import_receipt_items (receipt_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)',
           [receiptId, item.product_id, item.quantity, item.unit_price]
@@ -90,7 +158,7 @@ async function seed() {
 
     // Re-fetch stock after imports
     const [freshProducts] = await conn.query(
-      'SELECT product_id, product_name, sell_price, stock_quantity FROM products WHERE is_active = 1 AND stock_quantity > 3 ORDER BY RAND() LIMIT 30'
+      'SELECT product_id, product_name, sell_price, import_price, stock_quantity FROM products WHERE is_active = 1 AND stock_quantity > 3 ORDER BY RAND() LIMIT 30'
     );
 
     for (const dateStr of invoiceDates) {
@@ -109,7 +177,8 @@ async function seed() {
           product_id: p.product_id,
           product_name: p.product_name,
           quantity: qty,
-          unit_price: parseFloat(p.sell_price)
+          unit_price: parseFloat(p.sell_price),
+          unit_cost: parseFloat(p.import_price) || 0
         });
       }
       if (items.length === 0) continue;
@@ -122,7 +191,7 @@ async function seed() {
       }
       const discountAmount = Math.round(subtotal * discountPct / 100);
       const finalTotal = subtotal - discountAmount;
-      const pointsEarned = Math.floor(finalTotal / 10000);
+      const pointsEarned = customer ? calculateLoyaltyPoints(finalTotal, crmSettings) : 0;
       const payMethod = payMethods[Math.floor(Math.random() * payMethods.length)];
 
       const [invResult] = await conn.query(
@@ -133,6 +202,16 @@ async function seed() {
       const invoiceId = invResult.insertId;
 
       for (const item of items) {
+        await logInventoryMovement(conn, {
+          productId: item.product_id,
+          movementType: 'sale',
+          quantity: -item.quantity,
+          referenceType: 'invoice',
+          referenceId: invoiceId,
+          unitCost: item.unit_cost,
+          createdBy: 1
+        });
+
         await conn.query(
           'INSERT INTO invoice_items (invoice_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
           [invoiceId, item.product_id, item.quantity, item.unit_price, item.unit_price * item.quantity]
@@ -218,7 +297,7 @@ async function seed() {
     console.error('❌ Error:', error.message);
     throw error;
   } finally {
-    conn.release();
+    if (conn) conn.release();
     await pool.end();
   }
 }

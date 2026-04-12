@@ -192,7 +192,10 @@ export default function MySalaryPage() {
             <tbody>
               {salaries.map(s => (
                 <tr key={s.salary_id}>
-                  <td style={{ fontWeight: 600 }}>{s.month}/{s.year}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    <div>{s.month}/{s.year}</div>
+                    {s.notes && <div style={{ fontSize: 12, color: '#64748b', fontWeight: 400, marginTop: 4 }}>{s.notes}</div>}
+                  </td>
                   <td>{s.work_days_actual}/{s.work_days_standard}</td>
                   <td>{fmt(s.base_salary)}đ</td>
                   <td>{fmt(s.gross_salary)}đ</td>

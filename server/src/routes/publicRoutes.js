@@ -4,6 +4,13 @@ const Category = require('../models/categoryModel');
 const Brand = require('../models/brandModel');
 const Invoice = require('../models/invoiceModel');
 const { body, validationResult } = require('express-validator');
+const {
+  SALES_ANALYTICS_INVOICE_STATUSES,
+  COMPLETED_RETURN_INVOICE_AGGREGATE_SQL,
+  COMPLETED_RETURN_ITEM_AGGREGATE_SQL,
+  buildPlaceholders,
+  buildReturnedQuantitySql
+} = require('../utils/salesAnalyticsRules');
 
 // Public product listings (no auth needed)
 router.get('/products', async (req, res, next) => {
@@ -47,23 +54,47 @@ router.get('/featured', async (req, res, next) => {
   try {
     const { pool } = require('../config/db');
     const limit = parseInt(req.query.limit) || 8;
+    const invoiceStatusPlaceholders = buildPlaceholders(SALES_ANALYTICS_INVOICE_STATUSES);
+    const returnedQuantitySql = buildReturnedQuantitySql({
+      invoiceAlias: 'i',
+      itemAlias: 'ii',
+      invoiceReturnsAlias: 'invoice_returns',
+      itemReturnsAlias: 'item_returns'
+    });
     const [rows] = await pool.query(
       `SELECT p.product_id, p.product_name, p.sell_price, p.import_price, p.stock_quantity,
               p.image_url, p.volume, p.skin_type, p.is_active, p.created_at,
               b.brand_name, c.category_name,
-              COALESCE(SUM(ii.quantity), 0) as total_sold,
-              COALESCE(AVG(r.rating), 0) as avg_rating,
-              COUNT(DISTINCT r.review_id) as review_count
+              COALESCE(s.total_sold, 0) as total_sold,
+              COALESCE(rv.avg_rating, 0) as avg_rating,
+              COALESCE(rv.review_count, 0) as review_count
        FROM products p
        LEFT JOIN brands b ON p.brand_id = b.brand_id
        LEFT JOIN categories c ON p.category_id = c.category_id
-       LEFT JOIN invoice_items ii ON p.product_id = ii.product_id
-       LEFT JOIN reviews r ON p.product_id = r.product_id AND r.is_visible = 1
+       LEFT JOIN (
+         SELECT
+           ii.product_id,
+           SUM(GREATEST(0, ii.quantity - ${returnedQuantitySql})) as total_sold
+         FROM invoice_items ii
+         JOIN invoices i ON ii.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+           ON invoice_returns.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_ITEM_AGGREGATE_SQL}) item_returns
+           ON item_returns.invoice_id = i.invoice_id
+          AND item_returns.product_id = ii.product_id
+         WHERE i.status IN (${invoiceStatusPlaceholders})
+         GROUP BY ii.product_id
+       ) s ON p.product_id = s.product_id
+       LEFT JOIN (
+         SELECT product_id, AVG(rating) as avg_rating, COUNT(*) as review_count
+         FROM reviews
+         WHERE is_visible = 1
+         GROUP BY product_id
+       ) rv ON p.product_id = rv.product_id
        WHERE p.is_active = 1
-       GROUP BY p.product_id
        ORDER BY total_sold DESC, avg_rating DESC
        LIMIT ?`,
-      [limit]
+      [...SALES_ANALYTICS_INVOICE_STATUSES, limit]
     );
     res.json(rows);
   } catch (error) { next(error); }

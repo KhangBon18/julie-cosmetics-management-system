@@ -30,7 +30,7 @@ CREATE TABLE settings (
 -- Seed default settings
 INSERT INTO settings (setting_key, setting_value, data_type, category, description, is_public) VALUES
   -- CRM Configuration
-  ('crm.points_per_1000',       '1',       'number',  'crm',     'Số điểm tích lũy cho mỗi 1.000₫ chi tiêu', FALSE),
+  ('crm.points_per_10000',      '1',       'number',  'crm',     'Số điểm tích lũy cho mỗi 10.000đ chi tiêu', FALSE),
   ('crm.silver_threshold',      '100',     'number',  'crm',     'Điểm tối thiểu để lên Silver', FALSE),
   ('crm.gold_threshold',        '500',     'number',  'crm',     'Điểm tối thiểu để lên Gold', FALSE),
   ('crm.silver_discount',       '5',       'number',  'crm',     'Phần trăm giảm giá cho Silver (%)', FALSE),

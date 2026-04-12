@@ -51,11 +51,11 @@ const Employee = {
   },
 
   update: async (id, data) => {
-    const { full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary, status } = data;
+    const { full_name, email, phone, address, gender, date_of_birth, hire_date, status } = data;
     const [result] = await pool.query(
-      `UPDATE employees SET full_name = ?, email = ?, phone = ?, address = ?, gender = ?, date_of_birth = ?, hire_date = ?, base_salary = ?, status = ?
+      `UPDATE employees SET full_name = ?, email = ?, phone = ?, address = ?, gender = ?, date_of_birth = ?, hire_date = ?, status = ?
        WHERE employee_id = ?`,
-      [full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary, status, id]
+      [full_name, email, phone, address, gender, date_of_birth, hire_date, status, id]
     );
     return result.affectedRows;
   },
@@ -103,9 +103,24 @@ const Employee = {
     try {
       await connection.beginTransaction();
 
-      // Kết thúc chức vụ hiện tại
+      const [currentRows] = await connection.query(
+        `SELECT id, effective_date
+         FROM employee_positions
+         WHERE employee_id = ? AND end_date IS NULL
+         ORDER BY effective_date DESC
+         LIMIT 1`,
+        [employee_id]
+      );
+
+      if (currentRows[0] && new Date(effective_date) <= new Date(currentRows[0].effective_date)) {
+        throw Object.assign(new Error('Ngày hiệu lực chức vụ mới phải sau chức vụ hiện tại'), { status: 400 });
+      }
+
+      // Kết thúc chức vụ hiện tại từ ngày trước effective_date mới để tránh overlap.
       await connection.query(
-        `UPDATE employee_positions SET end_date = ? WHERE employee_id = ? AND end_date IS NULL`,
+        `UPDATE employee_positions
+         SET end_date = DATE_SUB(?, INTERVAL 1 DAY)
+         WHERE employee_id = ? AND end_date IS NULL`,
         [effective_date, employee_id]
       );
 

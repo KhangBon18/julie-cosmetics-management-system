@@ -8,7 +8,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const SettingsCache = {
   /**
    * Get all settings as a key-value map. Cached for 5 minutes.
-   * @returns {Object} { 'crm.points_per_1000': 1, 'crm.gold_threshold': 500, ... }
+   * @returns {Object} { 'crm.points_per_10000': 1, 'crm.gold_threshold': 500, ... }
    */
   getAll: async () => {
     const now = Date.now();

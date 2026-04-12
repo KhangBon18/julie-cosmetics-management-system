@@ -64,7 +64,7 @@ export default function DashboardPage() {
         <div className="stat-card">
           <div className="stat-icon orange" aria-hidden="true"><FiDollarSign /></div>
           <div className="stat-content">
-            <h4>Doanh thu năm</h4>
+            <h4>Doanh thu ròng năm</h4>
             <div className="stat-value">{fmt(stats.revenue)}đ</div>
           </div>
         </div>
@@ -106,14 +106,14 @@ export default function DashboardPage() {
       </div>
 
       {/* ═══ MAIN CONTENT GRID ═══ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginTop: 20 }}>
+      <div className="dashboard-grid">
         {/* LEFT: Revenue chart + Recent invoices */}
         <div>
           {/* Revenue Chart */}
           {monthlyRevenue.length > 0 && (
             <div className="card" style={{ marginBottom: 20 }}>
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3><FiTrendingUp style={{ verticalAlign: 'middle', marginRight: 6 }} /> Doanh thu theo tháng</h3>
+                <h3><FiTrendingUp style={{ verticalAlign: 'middle', marginRight: 6 }} /> Doanh thu ròng theo tháng</h3>
                 <span style={{ fontSize: 12, color: '#64748b' }}>Năm {new Date().getFullYear()}</span>
               </div>
               <div className="card-body">

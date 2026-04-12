@@ -37,3 +37,4 @@ server/uploads/*
 !docs/project-assignments/*.docx
 !docs/project-assignments/*.rtf
 !docs/project-assignments/*.zip
+database/backups/

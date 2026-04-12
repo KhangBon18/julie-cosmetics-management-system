@@ -29,6 +29,7 @@ const ReviewsPage = lazy(() => import('./pages/ReviewsPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const RolesPage = lazy(() => import('./pages/RolesPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const StorefrontHome = lazy(() => import('./components/shop/StorefrontHome'));
 const ShopPage = lazy(() => import('./components/shop/ShopPage'));
 const ProductDetailPage = lazy(() => import('./components/shop/ProductDetailPage'));
@@ -94,6 +95,7 @@ function App() {
                   <Route path="imports" element={<P perm="imports.read"><ImportsPage /></P>} />
                   <Route path="users" element={<P perm="users.read"><UsersPage /></P>} />
                   <Route path="roles" element={<P perm="roles.read"><RolesPage /></P>} />
+                  <Route path="settings" element={<P perm="settings.read"><SettingsPage /></P>} />
                 </Route>
 
                 {/* Root redirects to shop, staff redirects to admin */}

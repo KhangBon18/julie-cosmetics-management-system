@@ -64,7 +64,7 @@ const staffController = {
       const { month, year } = req.query;
       let query = `SELECT s.salary_id, s.month, s.year,
                           s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
-                          s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary
+                          s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary, s.notes
                    FROM salaries s
                    WHERE s.employee_id = ?`;
       const params = [req.user.employee_id];
@@ -74,11 +74,11 @@ const staffController = {
 
       const [rows] = await pool.query(query, params);
 
-      const headers = ['Mã Lương', 'Tháng', 'Năm', 'Ngày công chuẩn', 'Ngày công thực tế', 'Nghỉ không lương', 'Lương cơ bản', 'Lương Gross', 'Thưởng', 'Khấu trừ', 'Thực nhận'];
+      const headers = ['Mã Lương', 'Tháng', 'Năm', 'Ngày công chuẩn', 'Ngày công thực tế', 'Nghỉ không lương', 'Lương cơ bản', 'Lương Gross', 'Thưởng', 'Khấu trừ', 'Thực nhận', 'Ghi chú'];
       const csvRows = rows.map(r => [
         r.salary_id, r.month, r.year,
         r.work_days_standard, r.work_days_actual, r.unpaid_leave_days,
-        r.base_salary, r.gross_salary, r.bonus, r.deductions, r.net_salary
+        r.base_salary, r.gross_salary, r.bonus, r.deductions, r.net_salary, r.notes || ''
       ]);
 
       const csv = '\uFEFF' + [headers, ...csvRows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
@@ -92,14 +92,14 @@ const staffController = {
   getSalaryFormula: async (req, res, next) => {
     try {
       res.json({
-        formula: 'Lương thực nhận = Lương cơ bản × (Ngày công thực tế / 22) + Thưởng − Khấu trừ',
+        formula: 'Lương thực nhận = Tổng lương prorate theo từng giai đoạn chức vụ trong tháng + Thưởng − Khấu trừ',
         details: [
-          'Ngày công chuẩn: 22 ngày/tháng',
-          'Nghỉ phép năm (annual leave) đã duyệt: không trừ lương',
-          'Nghỉ không phép (unpaid): trừ theo ngày',
-          'Nghỉ ốm (sick): tùy quy định, có thể trừ 50%',
-          'Thưởng doanh số: do Manager nhập cuối tháng',
-          'Khấu trừ: bảo hiểm, thuế (nếu có)'
+          'Ngày công chuẩn lấy từ cấu hình hệ thống (mặc định 22 ngày/tháng).',
+          'Nếu không đổi chức vụ trong tháng: lương được tính như công thức thông thường theo ngày công thực tế.',
+          'Nếu đổi chức vụ giữa tháng: hệ thống chia tháng thành nhiều giai đoạn theo effective_date và tính riêng từng mức lương tại thời điểm đó.',
+          'Nghỉ phép không lương (unpaid) đã duyệt sẽ bị trừ vào giai đoạn lương tương ứng.',
+          'Nghỉ phép năm (annual) đã duyệt: không trừ lương.',
+          'Thưởng và khấu trừ do quản lý cập nhật khi chốt bảng lương.'
         ]
       });
     } catch (error) { next(error); }

@@ -71,7 +71,7 @@ export default function StaffDashboard() {
       <div className="card">
         <div className="card-header"><h3>Thông tin cá nhân</h3></div>
         <div className="card-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, paddingBottom: 8 }}>
+          <div className="grid-cols-2" style={{ paddingBottom: 8 }}>
             <div><strong>Họ tên:</strong> {data?.employee?.full_name}</div>
             <div><strong>Email:</strong> {data?.employee?.email}</div>
             <div><strong>Số điện thoại:</strong> {data?.employee?.phone || '—'}</div>
@@ -86,7 +86,7 @@ export default function StaffDashboard() {
         <div className="card" style={{ marginTop: 20 }}>
           <div className="card-header"><h3>Bảng lương tháng {data.latest_salary.month}/{data.latest_salary.year}</h3></div>
           <div className="card-body">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div className="grid-cols-3">
               <div><strong>Ngày công:</strong> {data.latest_salary.work_days_actual}/{data.latest_salary.work_days_standard}</div>
               <div><strong>Lương cơ bản:</strong> {fmt(data.latest_salary.base_salary)}đ</div>
               <div><strong>Lương thực:</strong> {fmt(data.latest_salary.gross_salary)}đ</div>

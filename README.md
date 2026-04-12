@@ -1,69 +1,179 @@
-# 🌸 Julie Cosmetics - Fullstack E-commerce System
+# Julie Cosmetics
 
-[![Status](https://img.shields.io/badge/status-active-success.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
+Hệ thống quản lý mỹ phẩm phục vụ đồ án HTTT doanh nghiệp, gồm:
 
-Hệ thống quản lý mỹ phẩm toàn diện tích hợp cửa hàng trực tuyến và bảng điều khiển quản trị (Admin Dashboard). Dự án được thiết kế chuyên nghiệp với kiến trúc Client-Server hiện đại, tập trung vào trải nghiệm người dùng và tính bảo mật cao.
+- Storefront cho khách hàng
+- Admin dashboard cho bán hàng, kho, nhân sự, báo cáo
+- API Express + MySQL
+- Dữ liệu demo và tài khoản test sẵn sàng cho chạy thử
 
-## ✨ Tính năng nổi bật
+## Stack thực tế
 
-### 🛒 Storefront (Khách hàng)
-- **Giao diện Premium**: Thiết kế hiện đại, responsive hoàn toàn trên mọi thiết bị.
-- **Giỏ hàng thông minh**: Quản lý giỏ hàng realtime, tính toán giá trị đơn hàng tự động.
-- **Thanh toán đa phương thức**: Hỗ trợ các phương thức thanh toán phổ biến.
+- Frontend: React + Vite + Axios + Recharts
+- Backend: Node.js + Express
+- Database: MySQL 8
+- Runtime demo: local dev hoặc Docker Compose
 
-### 🛡️ Admin Dashboard (Quản trị)
-- **RBAC (Role-Based Access Control)**: Hệ thống phân quyền chi tiết (Admin, Manager, Staff, Warehouse).
-- **Quản lý tồn kho**: Theo dõi nhập/xuất kho, cảnh báo hàng sắp hết.
-- **Báo cáo & Phân tích**: Biểu đồ doanh thu, lợi nhuận, sản phẩm bán chạy theo thời gian thực.
-- **Quản lý nhân sự**: Chấm công, tính lương, quản lý đơn nghỉ phép.
+## Cổng chuẩn của dự án
 
-## 🛠️ Stack Công nghệ
+- Client: `http://localhost:5173`
+- Server API: `http://localhost:5001`
+- MySQL host port mặc định: `localhost:3307`
+- Frontend luôn gọi API qua `/api`
+- App DB user mặc định: `julie_app / julie_demo_123`
 
-- **Frontend**: React.js, TailwindCSS, Framer Motion (Animations).
-- **Backend**: Node.js, Express.js.
-- **Database**: PostgreSQL / MySQL (Support Migrations).
-- **Infrastructure**: Docker, Docker Compose, Rate Limiting Security.
+## Tài khoản test mặc định
 
-## 📂 Cấu trúc dự án
+- `admin / admin123`
+- `manager01 / manager123`
+- `staff01 / staff123`
+- `warehouse01 / warehouse123`
+
+## Flow khuyến nghị cho máy trắng
+
+Flow ổn định nhất để demo là:
+
+1. Dùng Docker để chạy MySQL đã tự init dữ liệu.
+2. Chạy server + client bằng local Node.js để dễ debug và chỉnh sửa.
+
+## Chuẩn bị môi trường
+
+1. Cài Node.js 18+ và Docker Desktop.
+2. Tạo file env:
 
 ```bash
-├── client/          # Giao diện người dùng (React framework)
-├── server/          # API logic & Business services (Node.js)
-├── database/        # Schema & SQL migrations
-├── docs/            # Tài liệu dự án & Báo cáo
-└── docker-compose.yml
+cd "Julie Cosmetics"
+cp .env.example .env
+cp server/.env.example server/.env
+cp client/.env.example client/.env
 ```
 
-## 🚀 Cài đặt & Chạy dự án
+3. Cài dependencies:
 
-### 📋 Yêu cầu hệ thống
-- Node.js (v18+)
-- Database: MySQL hoặc PostgreSQL
-- Docker (Tùy chọn)
+```bash
+npm run install:all
+```
 
-### 💻 Chạy Local
-1. Clone dự án:
-   ```bash
-   git clone <your-repo-url>
-   ```
-2. Cài đặt dependencies:
-   ```bash
-   npm run install:all
-   ```
-3. Chạy môi trường phát triển:
-   ```bash
-   npm run dev
-   ```
+## Local run flow
 
-## 🔐 Phân quyền Hệ thống
+1. Khởi động MySQL đã seed dữ liệu:
 
-| Vai trò | Quyền hạn chính |
-| :--- | :--- |
-| **Admin** | Toàn quyền hệ thống, quản lý tài khoản & phân quyền. |
-| **Manager** | Quản lý sản phẩm, nhân viên, xem báo cáo doanh thu. |
-| **Staff** | Tạo hóa đơn, quản lý khách hàng (CRM). |
-| **Warehouse**| Quản lý nhập kho & Nhà cung cấp. |
+```bash
+npm run db:up
+```
 
----
-*Dự án HTTTDN - Julie Cosmetics - 2026*
+2. Chạy client + server:
+
+```bash
+npm run dev
+```
+
+3. Mở:
+
+- `http://localhost:5173`
+- Admin login: `http://localhost:5173/admin/login`
+- Nếu `5173` đang bận, Vite có thể tự chuyển sang `5174`; server đã cho phép local CORS cho `localhost/127.0.0.1`.
+
+### Lưu ý local flow
+
+- Sau khi pull patch setup mới, cần reset Docker volume 1 lần để chạy lại init scripts:
+
+```bash
+npm run docker:reset
+```
+
+- `docker compose up -d mysql` sẽ tự chạy:
+  - [schema.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/schema.sql)
+  - [seed.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed.sql)
+  - [seed_rbac.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed_rbac.sql)
+  - [seed_settings.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed_settings.sql)
+- Sau khi DB sẵn sàng, nếu cần bổ sung thêm giao dịch demo thì chạy:
+
+```bash
+npm run seed:demo
+```
+
+- Script `seed:demo` có kiểm tra dữ liệu sẵn có và sẽ bỏ qua nếu demo data đã tồn tại.
+- `seed:demo` và các script import dữ liệu sẽ đọc `DB_PORT` từ `.env`; cổng mặc định của Docker host là `3307`, không phải `3306`.
+- Local backend mặc định sẽ đọc thêm file `.env` ở thư mục gốc để đồng bộ `DB_PORT/DB_PASSWORD/CLIENT_URL` với Docker Compose.
+- Backend và script seed dùng app user `julie_app` thay vì `root`, để tránh lỗi TCP auth khi kết nối từ host vào MySQL Docker.
+- Nếu muốn reset toàn bộ DB để seed lại từ đầu:
+
+```bash
+npm run docker:reset
+npm run db:up
+npm run seed:demo
+```
+
+## Docker run flow
+
+Chạy toàn bộ stack bằng Docker:
+
+```bash
+npm run docker:up
+```
+
+Compose sẽ chạy:
+
+- `mysql`: tạo schema + seed base + RBAC + settings
+- `server`: API tại cổng `5001`
+- `client`: Vite dev server tại cổng `5173`
+- `demo_seed`: tự bơm thêm hóa đơn / phiếu nhập / review nếu DB chưa có
+
+Dừng stack:
+
+```bash
+npm run docker:down
+```
+
+Reset volume để chạy lại từ đầu:
+
+```bash
+npm run docker:reset
+```
+
+## Tính nhất quán API
+
+- Client env mặc định dùng `VITE_API_URL=/api`
+- Vite proxy dùng `VITE_PROXY_TARGET`
+- Local dev proxy tới `http://localhost:5001`
+- Docker client proxy tới `http://server:5001`
+- Vì vậy browser luôn gọi cùng một dạng URL là `/api/...`
+
+## Seed/demo data
+
+### Base demo data
+
+Được nạp tự động từ SQL init:
+
+- Nhân sự, chức vụ, user, khách hàng
+- Sản phẩm, nhà cung cấp, nhập kho, hóa đơn cơ bản
+- Role, permission, role_permission, sync `role_id`
+- Settings nghiệp vụ
+
+### Extra demo transactions
+
+[server/seed-demo.js](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/server/seed-demo.js) thêm:
+
+- Import receipts bổ sung
+- Invoices bổ sung
+- Reviews bổ sung
+- Cập nhật lại thống kê CRM theo hóa đơn
+
+## Tập seed không nằm trong flow mặc định
+
+[seed_catalog.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed_catalog.sql) là tập catalog mở rộng, không dùng trong flow demo mặc định vì nó xóa và nạp lại dữ liệu sản phẩm/giao dịch để phục vụ kịch bản dữ liệu khác.
+
+## Backup / restore
+
+- Backup: [backup.sh](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/backup.sh)
+- Restore: [restore.sh](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/restore.sh)
+
+## Checklist chạy demo nhanh
+
+1. `cp .env.example .env && cp server/.env.example server/.env && cp client/.env.example client/.env`
+2. `npm run install:all`
+3. `npm run db:up`
+4. `npm run seed:demo`
+5. `npm run dev`
+6. Đăng nhập `admin / admin123`

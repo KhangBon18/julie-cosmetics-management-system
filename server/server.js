@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: true });
 
 const { testConnection, pool } = require('./src/config/db');
 const errorHandler = require('./src/middleware/errorHandler');
@@ -41,9 +42,27 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
 // CORS — hỗ trợ nhiều origins từ env (comma-separated)
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174').split(',').map(s => s.trim());
+const isPrivateDevOrigin = (origin) => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (!['http:', 'https:'].includes(protocol)) return false;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (/^10\.\d+\.\d+\.\d+$/.test(hostname)) return true;
+    if (/^192\.168\.\d+\.\d+$/.test(hostname)) return true;
+    const match = hostname.match(/^172\.(\d+)\.\d+\.\d+$/);
+    if (match) {
+      const second = parseInt(match[1], 10);
+      return second >= 16 && second <= 31;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+    const allowDevOrigin = process.env.NODE_ENV !== 'production' && isPrivateDevOrigin(origin);
+    if (!origin || allowedOrigins.includes(origin) || allowDevOrigin) cb(null, true);
     else cb(new Error('CORS not allowed'));
   },
   credentials: true

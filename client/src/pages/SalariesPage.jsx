@@ -106,7 +106,7 @@ export default function SalariesPage() {
           <div className="card-header"><h3>⚡ Tính lương tự động cho tất cả nhân viên</h3></div>
           <div className="card-body">
             <p style={{ color: '#64748b', marginBottom: 16 }}>
-              Hệ thống sẽ tự động tính lương cho tất cả nhân viên đang hoạt động dựa trên: lương cơ bản, ngày công chuẩn (22 ngày), và số ngày nghỉ không lương đã duyệt trong tháng.
+              Hệ thống sẽ tự động tính lương cho tất cả nhân viên đang hoạt động dựa trên: lịch sử chức vụ theo ngày hiệu lực, ngày công chuẩn trong cấu hình hệ thống, và số ngày nghỉ không lương đã duyệt trong tháng. Nếu đổi chức vụ giữa tháng, lương sẽ được prorate theo từng giai đoạn chức vụ.
             </p>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
               <div className="form-group">
@@ -147,7 +147,10 @@ export default function SalariesPage() {
             <tbody>
               {salaries.map(s => (
                 <tr key={s.salary_id}>
-                  <td style={{ fontWeight: 600 }}>{s.employee_name}</td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{s.employee_name}</div>
+                    {s.notes && <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{s.notes}</div>}
+                  </td>
                   <td>{s.month}/{s.year}</td>
                   <td>{s.work_days_actual}/{s.work_days_standard}</td>
                   <td>{fmt(s.base_salary)}đ</td>

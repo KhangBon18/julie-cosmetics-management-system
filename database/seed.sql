@@ -180,3 +180,9 @@ INSERT INTO salaries (employee_id, month, year, work_days_standard, work_days_ac
 (3, 2, 2026, 22, 21, 0,  8000000,  7636364,        0, 0,  7636364, 'Nghỉ 1 ngày phép năm', 1),
 (4, 2, 2026, 22, 22, 0,  7500000,  7500000,        0, 0,  7500000, '', 1),
 (5, 2, 2026, 22, 20, 1,  8000000,  7272727,        0, 0,  7272727, 'Nghỉ 2 ngày (1 phép + 1 không phép)', 1);
+-- ── SETTINGS ──────────────────────────────────────────────────
+INSERT INTO settings (setting_key, setting_value, data_type, category, description, is_public) VALUES
+('work_days_standard', '22', 'number', 'hr', 'Số ngày công chuẩn trong tháng để tính lương', FALSE),
+('crm.silver_discount', '2', 'number', 'crm', 'Phần trăm giảm giá cho hạng Bạc (%)', TRUE),
+('crm.gold_discount', '5', 'number', 'crm', 'Phần trăm giảm giá cho hạng Vàng (%)', TRUE),
+('crm.points_per_10000', '1', 'number', 'crm', 'Số điểm tích lũy trên mỗi 10.000đ chi tiêu', TRUE);

@@ -1,5 +1,12 @@
 const { pool } = require('../config/db');
 const { logInventoryMovement } = require('../utils/inventoryLogger');
+const { calculateLoyaltyPoints } = require('../utils/crmRules');
+const {
+  SALES_ANALYTICS_INVOICE_STATUSES,
+  COMPLETED_RETURN_INVOICE_AGGREGATE_SQL,
+  buildPlaceholders,
+  buildInvoiceRefundAmountSql
+} = require('../utils/salesAnalyticsRules');
 
 const Invoice = {
   findAll: async ({ page = 1, limit = 10, customer_id, payment_method, status }) => {
@@ -77,17 +84,37 @@ const Invoice = {
         throw Object.assign(new Error('Hóa đơn phải có ít nhất 1 sản phẩm'), { status: 400 });
       }
 
-      // Sắp xếp items theo product_id để tránh MySQL Deadlock
-      items.sort((a, b) => a.product_id - b.product_id);
+      // Backend là nguồn sự thật: gộp các dòng cùng product_id để kiểm tồn kho
+      // và tính giá từ DB, tuyệt đối không trust unit_price từ client.
+      const normalizedItemsMap = new Map();
+      for (const item of items) {
+        const productId = Number(item.product_id);
+        const quantity = Number(item.quantity);
+        const existing = normalizedItemsMap.get(productId);
+        normalizedItemsMap.set(productId, {
+          product_id: productId,
+          quantity: (existing?.quantity || 0) + quantity
+        });
+      }
+      const normalizedItems = Array.from(normalizedItemsMap.values()).sort((a, b) => a.product_id - b.product_id);
+
+      const resolvedItems = [];
+      let subtotal = 0;
 
       // Kiểm tra tồn kho trước khi tạo (SELECT ... FOR UPDATE để lock rows)
-      for (const item of items) {
+      for (const item of normalizedItems) {
         const [rows] = await connection.query(
-          'SELECT product_id, product_name, stock_quantity FROM products WHERE product_id = ? FOR UPDATE',
+          `SELECT product_id, product_name, stock_quantity, sell_price, import_price, is_active
+           FROM products
+           WHERE product_id = ?
+           FOR UPDATE`,
           [item.product_id]
         );
         if (!rows.length) {
           throw Object.assign(new Error(`Sản phẩm ID ${item.product_id} không tồn tại`), { status: 400 });
+        }
+        if (!rows[0].is_active) {
+          throw Object.assign(new Error(`Sản phẩm "${rows[0].product_name}" đã ngừng kinh doanh`), { status: 400 });
         }
         if (rows[0].stock_quantity < item.quantity) {
           throw Object.assign(
@@ -95,20 +122,24 @@ const Invoice = {
             { status: 400 }
           );
         }
-      }
-
-      // Tính tổng subtotal
-      let subtotal = 0;
-      for (const item of items) {
-        subtotal += item.quantity * item.unit_price;
+        const sellPrice = Number(rows[0].sell_price) || 0;
+        const importPrice = Number(rows[0].import_price) || 0;
+        const lineSubtotal = item.quantity * sellPrice;
+        subtotal += lineSubtotal;
+        resolvedItems.push({
+          product_id: item.product_id,
+          product_name: rows[0].product_name,
+          quantity: item.quantity,
+          unit_price: sellPrice,
+          unit_cost: importPrice,
+          subtotal: lineSubtotal
+        });
       }
 
       // Load CRM settings from DB (no hardcode)
       const settings = await SettingsCache.getAll();
       const silverDiscount = settings['crm.silver_discount'] || 2;
       const goldDiscount = settings['crm.gold_discount'] || 5;
-      const pointsPer = settings['crm.points_per_1000'] || 1;
-
       // Tính discount server-side dựa trên membership tier
       let discountPct = 0;
       if (customer_id) {
@@ -160,7 +191,7 @@ const Invoice = {
 
       const discountAmount = Math.round(subtotal * discountPct / 100);
       const finalTotal = subtotal - discountAmount;
-      const pointsEarned = Math.floor(finalTotal / 1000) * pointsPer;
+      const pointsEarned = customer_id ? calculateLoyaltyPoints(finalTotal, settings) : 0;
 
       // Insert hóa đơn
       const [invoiceResult] = await connection.query(
@@ -181,7 +212,7 @@ const Invoice = {
       );
 
       // Insert chi tiết hóa đơn (trigger sẽ trừ tồn kho)
-      for (const item of items) {
+      for (const item of resolvedItems) {
         // Log inventory movement BEFORE trigger fires
         await logInventoryMovement(connection, {
           productId: item.product_id,
@@ -189,13 +220,13 @@ const Invoice = {
           quantity: -item.quantity,
           referenceType: 'invoice',
           referenceId: invoiceId,
-          unitCost: item.unit_price,
+          unitCost: item.unit_cost,
           createdBy: created_by
         });
 
         await connection.query(
           'INSERT INTO invoice_items (invoice_id, product_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?)',
-          [invoiceId, item.product_id, item.quantity, item.unit_price, item.quantity * item.unit_price]
+          [invoiceId, item.product_id, item.quantity, item.unit_price, item.subtotal]
         );
       }
 
@@ -211,13 +242,25 @@ const Invoice = {
 
   // Thống kê doanh thu theo thời gian
   getRevenueStats: async (startDate, endDate) => {
+    const invoiceStatusPlaceholders = buildPlaceholders(SALES_ANALYTICS_INVOICE_STATUSES);
+    const invoiceRefundSql = buildInvoiceRefundAmountSql({
+      invoiceAlias: 'i',
+      invoiceReturnsAlias: 'invoice_returns'
+    });
     const [rows] = await pool.query(
-      `SELECT DATE(created_at) as date, COUNT(*) as invoice_count, SUM(final_total) as total_revenue
-       FROM invoices
-       WHERE created_at BETWEEN ? AND ?
-       GROUP BY DATE(created_at)
+      `SELECT
+         DATE(i.created_at) as date,
+         COUNT(*) as invoice_count,
+         SUM(i.final_total) as gross_revenue,
+         SUM(${invoiceRefundSql}) as refunded_revenue,
+         SUM(i.final_total - ${invoiceRefundSql}) as total_revenue
+       FROM invoices i
+       LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+         ON invoice_returns.invoice_id = i.invoice_id
+       WHERE i.created_at BETWEEN ? AND ? AND i.status IN (${invoiceStatusPlaceholders})
+       GROUP BY DATE(i.created_at)
        ORDER BY date ASC`,
-      [startDate, endDate]
+      [startDate, endDate, ...SALES_ANALYTICS_INVOICE_STATUSES]
     );
     return rows;
   },

@@ -34,6 +34,16 @@ export const invoiceService = {
   ...createService('/invoices'),
   getRevenueStats: (params) => api.get('/invoices/revenue', { params })
 };
+export const settingsService = {
+  getAll: (params) => api.get('/settings', { params }),
+  getByKey: (key) => api.get(`/settings/${key}`),
+  update: (key, value) => api.put(`/settings/${key}`, { value }),
+  bulkUpdate: (settings) => api.put('/settings/bulk', { settings }),
+  backup: () => api.post('/settings/backup')
+};
+export const publicSettingService = {
+  getAll: () => api.get('/public/settings')
+};
 export const reviewService = {
   ...createService('/reviews'),
   toggleVisibility: (id, isVisible) => api.put(`/reviews/${id}/visibility`, { is_visible: isVisible })

@@ -1,6 +1,6 @@
 # Julie Cosmetics — API Contract Changes
 
-> Last updated: 27/03/2026
+> Last updated: 11/04/2026
 
 ## New Endpoints
 
@@ -55,6 +55,26 @@ Guest checkout — creates an invoice from cart items.
 
 ## Modified Endpoints
 
+### `POST /api/returns`
+**Behavior changes:**
+- `unit_price` từ client **bị bỏ qua**; hệ thống lấy giá từ `invoice_items`.
+- `items` bắt buộc thuộc về hóa đơn gốc.
+- Không cho trả vượt quá số lượng còn lại (đã trừ các lần đổi trả trước đó, trừ `rejected`).
+
+**Request (khuyến nghị):**
+```json
+{
+  "invoice_id": 42,
+  "return_type": "refund",
+  "reason": "Sản phẩm lỗi",
+  "items": [
+    { "product_id": 3, "quantity": 1, "reason": "Hộp bị móp" }
+  ]
+}
+```
+
+**Response:** không đổi.
+
 ### `GET /api/public/products`
 **Added query params:**
 - `min_price` — filter products with sell_price >= value
@@ -83,6 +103,7 @@ All following routes now enforce server-side validation via `express-validator`:
 | `PUT /api/auth/change-password` | `validateChangePassword` | Already existed |
 | `POST /api/invoices` | `validateInvoice` | Already existed |
 | `POST /api/imports` | `validateImport` | Already existed |
+| `POST /api/returns` | `validateReturn` | **NEW** |
 
 **Validation error format (all routes):**
 ```json

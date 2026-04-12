@@ -74,12 +74,24 @@ export default function ReportsPage() {
       {!loading && activeTab === 'revenue' && revenue && (
         <div>
           <div className="stats-grid" style={{ marginBottom: 20 }}>
-            <div className="stat-card"><div className="stat-icon green">📊</div><div className="stat-content"><h4>Tổng doanh thu {year}</h4><div className="stat-value">{fmt(revenue.summary?.total_revenue || 0)}đ</div></div></div>
-            <div className="stat-card"><div className="stat-icon blue">🧾</div><div className="stat-content"><h4>Tổng hóa đơn</h4><div className="stat-value">{revenue.summary?.total_invoices || 0}</div></div></div>
+            <div className="stat-card"><div className="stat-icon blue">🧾</div><div className="stat-content"><h4>Hóa đơn phát sinh bán hàng</h4><div className="stat-value">{revenue.summary?.total_invoices || 0}</div></div></div>
+            <div className="stat-card"><div className="stat-icon orange">↩️</div><div className="stat-content"><h4>Refund completed đã trừ</h4><div className="stat-value">{fmt(revenue.summary?.refunded_revenue || 0)}đ</div></div></div>
+            <div className="stat-card"><div className="stat-icon green">📊</div><div className="stat-content"><h4>Doanh thu ròng {year}</h4><div className="stat-value">{fmt(revenue.summary?.total_revenue || 0)}đ</div></div></div>
           </div>
           <div className="card">
-            <div className="card-header"><h3>Doanh thu theo tháng — {year}</h3></div>
+            <div className="card-header"><h3>Doanh thu ròng theo tháng — {year}</h3></div>
             <div className="card-body">
+              <div style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, color: '#475569', fontSize: 13 }}>
+                <div style={{ marginBottom: 6 }}>
+                  <strong>Rule báo cáo doanh thu:</strong> {revenue.meta?.scope_rule}
+                </div>
+                <div>
+                  Hóa đơn đã hủy bị loại: <strong>{revenue.meta?.cancelled_invoices || 0}</strong>
+                  {' • '}Hóa đơn fully refunded trong cohort: <strong>{revenue.meta?.fully_refunded_invoices || 0}</strong>
+                  {' • '}Refund completed đã net: <strong>{fmt(revenue.meta?.completed_refund_value || 0)}đ</strong>
+                  {' • '}Số yêu cầu refund completed: <strong>{revenue.meta?.completed_refund_requests || 0}</strong>
+                </div>
+              </div>
               <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={revenue.data}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -87,7 +99,7 @@ export default function ReportsPage() {
                   <YAxis tickFormatter={v => fmt(v)} />
                   <Tooltip formatter={v => fmt(v) + 'đ'} />
                   <Legend />
-                  <Bar dataKey="revenue" name="Doanh thu" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" name="Doanh thu ròng" fill="#6366f1" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -97,21 +109,44 @@ export default function ReportsPage() {
 
       {/* ═══ LỢI NHUẬN ═══ */}
       {!loading && activeTab === 'profit' && profit && (
-        <div className="card">
-          <div className="card-header"><h3>Doanh thu vs Chi phí nhập vs Lợi nhuận — {year}</h3></div>
-          <div className="card-body">
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={profit.data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" />
-                <YAxis tickFormatter={v => fmt(v)} />
-                <Tooltip formatter={v => fmt(v) + 'đ'} />
-                <Legend />
-                <Bar dataKey="revenue" name="Doanh thu" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="cost" name="Chi phí nhập" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="profit" name="Lợi nhuận" fill="#059669" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+        <div>
+          <div className="stats-grid" style={{ marginBottom: 20 }}>
+            <div className="stat-card"><div className="stat-icon blue">💵</div><div className="stat-content"><h4>Doanh thu ròng</h4><div className="stat-value">{fmt(profit.summary?.total_revenue || 0)}đ</div></div></div>
+            <div className="stat-card"><div className="stat-icon orange">📉</div><div className="stat-content"><h4>Giá vốn ròng</h4><div className="stat-value">{fmt(profit.summary?.total_cogs || 0)}đ</div></div></div>
+            <div className="stat-card"><div className="stat-icon green">💰</div><div className="stat-content"><h4>Lợi nhuận ròng</h4><div className="stat-value">{fmt(profit.summary?.total_profit || 0)}đ</div></div></div>
+          </div>
+
+          <div className="card">
+            <div className="card-header"><h3>Doanh thu ròng vs Giá vốn ròng vs Lợi nhuận ròng — {year}</h3></div>
+            <div className="card-body">
+              <div style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, color: '#475569', fontSize: 13 }}>
+                <div style={{ marginBottom: 6 }}>
+                  <strong>Rule báo cáo lợi nhuận:</strong> {profit.meta?.cogs_rule}
+                </div>
+                <div>
+                  Refund completed đã trừ doanh thu: <strong>{fmt(profit.meta?.refunded_revenue_total || 0)}đ</strong>
+                  {' • '}Giá vốn hàng trả lại đã hoàn nhập: <strong>{fmt(profit.meta?.returned_cogs_total || 0)}đ</strong>
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  Snapshot trực tiếp: <strong>{profit.meta?.movement_snapshot_items || 0}</strong> dòng bán hàng
+                  {' • '}Fallback theo lịch sử nhập: <strong>{profit.meta?.fallback_import_history_items || 0}</strong>
+                  {' • '}Fallback cuối theo giá nhập hiện tại: <strong>{profit.meta?.fallback_current_cost_items || 0}</strong>
+                </div>
+              </div>
+
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={profit.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="label" />
+                  <YAxis tickFormatter={v => fmt(v)} />
+                  <Tooltip formatter={v => fmt(v) + 'đ'} />
+                  <Legend />
+                  <Bar dataKey="revenue" name="Doanh thu ròng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="cost" name="Giá vốn ròng" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="profit" name="Lợi nhuận ròng" fill="#059669" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}
@@ -119,22 +154,25 @@ export default function ReportsPage() {
       {/* ═══ TOP SẢN PHẨM ═══ */}
       {!loading && activeTab === 'products' && topProducts && (
         <div className="card">
-          <div className="card-header"><h3>🏆 Top 10 sản phẩm bán chạy — {year}</h3></div>
+          <div className="card-header"><h3>🏆 Top 10 sản phẩm bán ròng — {year}</h3></div>
           <div className="card-body">
+            <div style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, color: '#475569', fontSize: 13 }}>
+              <strong>Rule xếp hạng:</strong> {topProducts.meta?.scope_rule}
+            </div>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={topProducts.data} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis type="number" />
-                <YAxis dataKey="product_name" type="category" width={160} tick={{ fontSize: 12 }} />
-                <Tooltip formatter={v => fmt(v)} />
-                <Legend />
-                <Bar dataKey="total_sold" name="Số lượng bán" fill="#6366f1" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                  <XAxis type="number" />
+                  <YAxis dataKey="product_name" type="category" width={160} tick={{ fontSize: 12 }} />
+                  <Tooltip formatter={v => fmt(v)} />
+                  <Legend />
+                  <Bar dataKey="total_sold" name="Số lượng bán ròng" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           <div className="table-container">
             <table>
-              <thead><tr><th>STT</th><th>Sản phẩm</th><th>Giá bán</th><th>SL bán</th><th>Doanh thu</th></tr></thead>
+              <thead><tr><th>STT</th><th>Sản phẩm</th><th>Giá bán</th><th>SL bán ròng</th><th>SL trả</th><th>Doanh thu ròng</th></tr></thead>
               <tbody>
                 {topProducts.data.map((p, i) => (
                   <tr key={p.product_id}>
@@ -142,6 +180,7 @@ export default function ReportsPage() {
                     <td style={{ fontWeight: 600 }}>{p.product_name}</td>
                     <td>{fmt(p.sell_price)}đ</td>
                     <td style={{ fontWeight: 600 }}>{p.total_sold}</td>
+                    <td>{p.returned_quantity || 0}</td>
                     <td style={{ fontWeight: 600, color: '#059669' }}>{fmt(p.total_revenue)}đ</td>
                   </tr>
                 ))}
@@ -155,10 +194,29 @@ export default function ReportsPage() {
       {!loading && activeTab === 'inventory' && inventory && (
         <div>
           <div className="stats-grid" style={{ marginBottom: 20 }}>
-            <div className="stat-card"><div className="stat-icon orange">📦</div><div className="stat-content"><h4>Tổng nhập kho</h4><div className="stat-value">{fmt(inventory.import_summary?.total_import_value || 0)}đ</div></div></div>
-            <div className="stat-card"><div className="stat-icon green">📤</div><div className="stat-content"><h4>Tổng xuất kho</h4><div className="stat-value">{fmt(inventory.export_summary?.total_export_value || 0)}đ</div></div></div>
-            <div className="stat-card"><div className="stat-icon blue">📋</div><div className="stat-content"><h4>Phiếu nhập</h4><div className="stat-value">{inventory.import_summary?.total_receipts || 0}</div></div></div>
-            <div className="stat-card"><div className="stat-icon pink">📊</div><div className="stat-content"><h4>Tổng SP đã xuất</h4><div className="stat-value">{fmt(inventory.export_summary?.total_exported || 0)}</div></div></div>
+            <div className="stat-card"><div className="stat-icon orange">📦</div><div className="stat-content"><h4>Tổng nhập kho hoàn tất</h4><div className="stat-value">{fmt(inventory.import_summary?.total_import_value || 0)}đ</div></div></div>
+            <div className="stat-card"><div className="stat-icon green">📤</div><div className="stat-content"><h4>Giá trị xuất bán ròng</h4><div className="stat-value">{fmt(inventory.export_summary?.total_export_value || 0)}đ</div></div></div>
+            <div className="stat-card"><div className="stat-icon blue">📋</div><div className="stat-content"><h4>Phiếu nhập hoàn tất</h4><div className="stat-value">{inventory.import_summary?.total_receipts || 0}</div></div></div>
+            <div className="stat-card"><div className="stat-icon pink">📊</div><div className="stat-content"><h4>Tổng SP xuất ròng</h4><div className="stat-value">{fmt(inventory.export_summary?.total_exported || 0)}</div></div></div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-body" style={{ padding: 12, color: '#475569', fontSize: 13 }}>
+              <div style={{ marginBottom: 6 }}>
+                <strong>Rule báo cáo kho:</strong> {inventory.meta?.scope_rule}
+              </div>
+              <div>
+                Hóa đơn hủy bị loại: <strong>{inventory.meta?.cancelled_invoices || 0}</strong>
+                {' • '}Hóa đơn fully refunded trong cohort: <strong>{inventory.meta?.fully_refunded_invoices || 0}</strong>
+                {' • '}Yêu cầu return completed: <strong>{inventory.meta?.completed_return_requests || 0}</strong>
+                {' • '}SL trả đã net: <strong>{fmt(inventory.meta?.completed_return_quantity || 0)}</strong>
+                {' • '}Phiếu nhập hủy bị loại: <strong>{inventory.meta?.cancelled_import_receipts || 0}</strong>
+              </div>
+              <div style={{ marginTop: 6 }}>
+                Giá trị refund đã trừ khỏi xuất bán ròng: <strong>{fmt(inventory.export_summary?.refunded_export_value || 0)}đ</strong>.
+                Exchange chỉ làm giảm số lượng ròng, không trừ doanh thu.
+              </div>
+            </div>
           </div>
 
           {inventory.low_stock?.length > 0 && (

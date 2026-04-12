@@ -547,6 +547,7 @@ CREATE TABLE return_items (
   product_id  INT NOT NULL,
   quantity    INT NOT NULL,
   unit_price  DECIMAL(12,2) NOT NULL,
+  refund_subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
   reason      VARCHAR(255) NULL,
   FOREIGN KEY (return_id) REFERENCES returns(return_id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(product_id),
@@ -578,13 +579,16 @@ BEGIN
   WHERE product_id = OLD.product_id;
 END$$
 
--- Tự động cộng tồn kho khi nhập hàng (fixed: no import_price overwrite)
+-- Tự động cộng tồn kho khi nhập hàng và tính lại giá vốn trung bình (Moving Average Price)
 CREATE TRIGGER trg_import_item_insert
 AFTER INSERT ON import_receipt_items
 FOR EACH ROW
 BEGIN
   UPDATE products
-  SET stock_quantity = stock_quantity + NEW.quantity
+  SET import_price = IF(stock_quantity + NEW.quantity > 0, 
+                        (import_price * stock_quantity + NEW.unit_price * NEW.quantity) / (stock_quantity + NEW.quantity), 
+                        import_price),
+      stock_quantity = stock_quantity + NEW.quantity
   WHERE product_id = NEW.product_id;
 END$$
 
@@ -634,12 +638,13 @@ BEGIN
   END IF;
 END$$
 
--- Cập nhật: Rollback CRM points và hàng hóa khi Invoice chuyển sang trạng thái Hủy/Hoàn tiền
+-- Cập nhật: Rollback CRM points và hàng hóa khi Invoice chuyển sang trạng thái Hủy.
+-- Refund được xử lý ở luồng returns để hỗ trợ partial/full refund chính xác.
 CREATE TRIGGER trg_invoice_after_update
 AFTER UPDATE ON invoices
 FOR EACH ROW
 BEGIN
-  IF (NEW.status = 'cancelled' OR NEW.status = 'refunded') AND (OLD.status != 'cancelled' AND OLD.status != 'refunded') THEN
+  IF NEW.status = 'cancelled' AND OLD.status != 'cancelled' THEN
     UPDATE products p
     JOIN invoice_items ii ON p.product_id = ii.product_id
     SET p.stock_quantity = p.stock_quantity + ii.quantity
@@ -658,7 +663,7 @@ BEGIN
     END IF;
   END IF;
   
-  IF (OLD.status = 'cancelled' OR OLD.status = 'refunded') AND (NEW.status = 'paid' OR NEW.status = 'completed') THEN
+  IF OLD.status = 'cancelled' AND (NEW.status = 'paid' OR NEW.status = 'completed') THEN
     UPDATE products p
     JOIN invoice_items ii ON p.product_id = ii.product_id
     SET p.stock_quantity = p.stock_quantity - ii.quantity

@@ -1,13 +1,11 @@
 const router = require('express').Router();
 const settingController = require('../controllers/settingController');
-const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 
-// All setting routes require admin
-router.use(protect, adminOnly);
-
-router.get('/', settingController.getAll);
-router.get('/:key', settingController.getByKey);
-router.put('/bulk', settingController.bulkUpdate);
-router.put('/:key', settingController.update);
+router.get('/', protect, requirePermission('settings.read'), settingController.getAll);
+router.get('/:key', protect, requirePermission('settings.read'), settingController.getByKey);
+router.post('/backup', protect, requirePermission('settings.update'), settingController.backup);
+router.put('/bulk', protect, requirePermission('settings.update'), settingController.bulkUpdate);
+router.put('/:key', protect, requirePermission('settings.update'), settingController.update);
 
 module.exports = router;

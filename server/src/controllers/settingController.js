@@ -1,5 +1,7 @@
 const Setting = require('../models/settingModel');
 const SettingsCache = require('../utils/settingsCache');
+const { exec } = require('child_process');
+const path = require('path');
 
 const settingController = {
   // GET /api/settings — admin only
@@ -48,6 +50,27 @@ const settingController = {
       res.json({ message: `Cập nhật ${count} cấu hình thành công` });
     } catch (error) {
       res.status(500).json({ message: 'Lỗi khi cập nhật cấu hình', error: error.message });
+    }
+  },
+
+  // POST /api/settings/backup — admin only
+  backup: async (req, res) => {
+    try {
+      const scriptPath = path.join(__dirname, '../../../database/backup.sh');
+      // Chạy script backup.sh
+      exec(`bash "${scriptPath}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Backup error: ${error}`);
+          return res.status(500).json({ message: 'Lỗi khi thực hiện sao lưu', error: stderr || error.message });
+        }
+        res.json({ 
+          success: true,
+          message: 'Sao lưu dữ liệu thành công', 
+          output: stdout.split('\n').filter(line => line.trim() !== '')
+        });
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Lỗi hệ thống khi sao lưu', error: error.message });
     }
   }
 };

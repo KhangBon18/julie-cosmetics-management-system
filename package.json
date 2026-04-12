@@ -7,7 +7,14 @@
     "server": "cd server && npm run dev",
     "client": "cd client && npm run dev",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
-    "start": "cd server && npm start"
+    "start": "cd server && npm start",
+    "seed:demo": "cd server && npm run seed:demo",
+    "seed:demo:force": "cd server && npm run seed:demo:force",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v",
+    "db:up": "docker compose up -d mysql",
+    "db:down": "docker compose stop mysql"
   },
   "dependencies": {
     "concurrently": "^9.0.1"

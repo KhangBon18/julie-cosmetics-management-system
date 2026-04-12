@@ -42,9 +42,21 @@ const returnController = {
 
   complete: async (req, res, next) => {
     try {
-      await Return.complete(req.params.id, req.user.user_id);
-      await logAudit({ userId: req.user.user_id, action: 'UPDATE', entityType: 'return', entityId: Number(req.params.id), newValues: { status: 'completed' }, req });
-      res.json({ message: 'Hoàn tất đổi trả — đã hoàn kho' });
+      const result = await Return.complete(req.params.id, req.user.user_id);
+      await logAudit({
+        userId: req.user.user_id,
+        action: 'UPDATE',
+        entityType: 'return',
+        entityId: Number(req.params.id),
+        newValues: { status: 'completed', ...result },
+        req
+      });
+      res.json({
+        message: result.is_full_refund
+          ? 'Hoàn tất hoàn tiền toàn phần — đã hoàn kho, cập nhật CRM và đánh dấu hóa đơn refunded'
+          : 'Hoàn tất đổi/trả hàng — đã hoàn kho và cập nhật nghiệp vụ liên quan',
+        result
+      });
     } catch (error) { next(error); }
   },
 

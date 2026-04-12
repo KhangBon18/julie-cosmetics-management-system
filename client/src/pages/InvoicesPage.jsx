@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { invoiceService, customerService, productService } from '../services/dataService';
+import { invoiceService, customerService, productService, publicSettingService } from '../services/dataService';
 import { downloadCSV } from '../services/exportService';
 import { toast } from 'react-toastify';
 import usePermission from '../hooks/usePermission';
+import { calculateLoyaltyPoints, formatPointsRule } from '../utils/crmRules';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -24,6 +25,7 @@ export default function InvoicesPage() {
   const [cartItems, setCartItems] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [crmSettings, setCrmSettings] = useState({});
 
   const { canCreate, canExport } = usePermission();
   const _canCreate = canCreate('invoices');
@@ -45,8 +47,10 @@ export default function InvoicesPage() {
         customerService.getAll({ limit: 200 }),
         productService.getAll({ limit: 500 })
       ]);
+      const publicSettings = await publicSettingService.getAll().catch(() => null);
       setCustomers(custData.customers || []);
       setProducts((prodData.products || []).filter(p => p.is_active && p.stock_quantity > 0));
+      setCrmSettings(publicSettings || {});
       setShowForm(true);
     } catch (err) { toast.error(err.message); }
   };
@@ -63,8 +67,8 @@ export default function InvoicesPage() {
 
   const getDiscount = () => {
     if (!customerInfo) return 0;
-    if (customerInfo.membership_tier === 'gold') return 5;
-    if (customerInfo.membership_tier === 'silver') return 2;
+    if (customerInfo.membership_tier === 'gold') return Number(crmSettings['crm.gold_discount'] || 5);
+    if (customerInfo.membership_tier === 'silver') return Number(crmSettings['crm.silver_discount'] || 2);
     return 0;
   };
 
@@ -102,7 +106,8 @@ export default function InvoicesPage() {
   const discountPct = getDiscount();
   const discountAmount = Math.round(subtotal * discountPct / 100);
   const finalTotal = subtotal - discountAmount;
-  const pointsEarned = Math.floor(finalTotal / 10000);
+  const pointsEarned = customerInfo ? calculateLoyaltyPoints(finalTotal, crmSettings) : 0;
+  const pointsRuleLabel = formatPointsRule(crmSettings);
 
   const handleSubmit = async () => {
     if (!cartItems.length) return toast.error('Vui lòng thêm sản phẩm');
@@ -110,13 +115,11 @@ export default function InvoicesPage() {
     try {
       await invoiceService.create({
         customer_id: selectedCustomer || null,
-        discount_percent: discountPct,
         payment_method: paymentMethod,
         note: note || null,
         items: cartItems.map(i => ({
           product_id: i.product_id,
-          quantity: i.quantity,
-          unit_price: i.unit_price
+          quantity: i.quantity
         }))
       });
       toast.success('Tạo hóa đơn thành công!');
@@ -158,7 +161,7 @@ export default function InvoicesPage() {
         <div><h1>Hóa đơn bán hàng</h1><p>{total} hóa đơn</p></div>
         <div style={{ display: 'flex', gap: 8 }}>
           {_canExport && (
-            <button className="btn btn-outline" onClick={() => downloadCSV(`/reports/export-invoices?year=${new Date().getFullYear()}`, `hoa-don-${new Date().getFullYear()}.csv`).then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
+            <button className="btn btn-outline" onClick={() => downloadCSV(`/reports/export-invoices?year=${new Date().getFullYear()}&scope=all`, `hoa-don-${new Date().getFullYear()}.csv`).then(() => toast.success('Đã tải xuống!')).catch(e => toast.error(e.message))} style={{ fontSize: 13 }}>
               📥 Xuất CSV
             </button>
           )}
@@ -277,8 +280,12 @@ export default function InvoicesPage() {
                 {customerInfo && (
                   <div style={{ textAlign: 'right', fontSize: 13, color: '#059669', marginTop: 4 }}>
                     +{pointsEarned} điểm tích lũy
+                    <div style={{ color: '#64748b', marginTop: 2 }}>Quy tắc CRM: {pointsRuleLabel}</div>
                   </div>
                 )}
+                <div style={{ textAlign: 'right', fontSize: 12, color: '#64748b', marginTop: 6 }}>
+                  Đơn giá, giảm giá và thành tiền chính thức sẽ được server xác nhận lại khi lưu hóa đơn.
+                </div>
               </div>
             )}
 
