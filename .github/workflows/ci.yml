@@ -6,6 +6,9 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   frontend:
     name: Frontend Build
@@ -58,7 +61,7 @@ jobs:
         shell: bash
         run: |
           HAS_TEST_SCRIPT=$(node -e "const p=require('./package.json'); process.stdout.write(String(Boolean(p.scripts && p.scripts.test)));")
-          HAS_TEST_FILES=$(find . -path ./node_modules -prune -o -type f \( -name "*.test.js" -o -name "*.spec.js" -o -name "*.test.cjs" -o -name "*.spec.cjs" -o -name "*.test.mjs" -o -name "*.spec.mjs" -o -path "*/__tests__/*" \) -print | head -n 1)
+          HAS_TEST_FILES=$(git ls-files -- './**/*.test.js' './**/*.spec.js' './**/*.test.cjs' './**/*.spec.cjs' './**/*.test.mjs' './**/*.spec.mjs' './**/__tests__/**' | head -n 1)
 
           if [[ "$HAS_TEST_SCRIPT" == "true" && -n "$HAS_TEST_FILES" ]]; then
             echo "has_tests=true" >> "$GITHUB_OUTPUT"

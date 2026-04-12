@@ -43,7 +43,14 @@ process.on('SIGTERM', () => {
 
       try {
         const response = await fetch(`http://127.0.0.1:${port}/api/health`);
-        if (response.status === 200 || response.status === 503) {
+        let payload;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if ((response.status === 200 && payload?.status === 'OK') || (response.status === 503 && payload?.status === 'ERROR')) {
           console.log(`Smoke check passed with /api/health status ${response.status}`);
           stopServer();
           process.exit(0);
@@ -54,7 +61,7 @@ process.on('SIGTERM', () => {
       await delay(1000);
     }
 
-    throw new Error('Smoke check failed: /api/health did not respond in time');
+    throw new Error('Smoke check failed: /api/health did not respond successfully within 20 seconds (20 attempts)');
   } catch (error) {
     console.error(error.message);
     stopServer();
