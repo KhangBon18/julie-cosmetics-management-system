@@ -12,6 +12,7 @@ import {
   FiFileText, FiDollarSign, FiCalendar, FiStar, FiSettings, FiUser,
   FiTag, FiGrid, FiUserCheck, FiClipboard, FiShield, FiBarChart2
 } from 'react-icons/fi';
+import { rebaseInternalPath } from '../utils/workspace';
 
 const MODULES = [
   // ─── Tổng quan ───
@@ -246,7 +247,7 @@ export const ACTION_LABELS = {
  * @param {string} userRole — user's role ENUM ('admin', 'manager', 'staff', etc.)
  * @returns {Array<{title, items[]}>}
  */
-export const buildSidebarSections = (userPermissions = [], userRole = '') => {
+export const buildSidebarSections = (userPermissions = [], userRole = '', basePath = '/admin') => {
   const isAdmin = userRole === 'admin';
   const permSet = new Set(userPermissions);
   const sectionMap = new Map();
@@ -264,7 +265,10 @@ export const buildSidebarSections = (userPermissions = [], userRole = '') => {
     if (!sectionMap.has(mod.section)) {
       sectionMap.set(mod.section, []);
     }
-    sectionMap.get(mod.section).push(mod);
+    sectionMap.get(mod.section).push({
+      ...mod,
+      path: rebaseInternalPath(mod.path, basePath)
+    });
   }
 
   const sections = [];

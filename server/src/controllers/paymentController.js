@@ -38,6 +38,7 @@ const paymentController = {
     try {
       const result = await Payment.markFailed(req.params.id, req.body.note);
       if (!result) return res.status(400).json({ message: 'Giao dịch không ở trạng thái pending' });
+      await logAudit({ userId: req.user.user_id, action: 'UPDATE', entityType: 'payment_transaction', entityId: Number(req.params.id), newValues: { status: 'failed', note: req.body.note || null }, req });
       res.json({ message: 'Đã đánh dấu thanh toán thất bại' });
     } catch (error) { next(error); }
   },
@@ -45,7 +46,7 @@ const paymentController = {
   refund: async (req, res, next) => {
     try {
       const result = await Payment.refund(req.params.id, req.user.user_id);
-      if (!result) return res.status(400).json({ message: 'Giao dịch không ở trạng thái confirmed' });
+      if (!result) return res.status(400).json({ message: 'Chỉ hoàn tiền giao dịch đã xác nhận của hóa đơn đã chuyển trạng thái refunded' });
       await logAudit({ userId: req.user.user_id, action: 'UPDATE', entityType: 'payment_transaction', entityId: Number(req.params.id), newValues: { status: 'refunded' }, req });
       res.json({ message: 'Hoàn tiền thành công' });
     } catch (error) { next(error); }

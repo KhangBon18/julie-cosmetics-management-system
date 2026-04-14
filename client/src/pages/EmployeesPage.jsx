@@ -35,7 +35,20 @@ export default function EmployeesPage() {
     } catch (err) { toast.error(err.message); }
   };
 
-  const openCreate = () => { setEditing(null); setForm({ full_name:'', email:'', phone:'', gender:'Nam', hire_date: new Date().toISOString().slice(0,10), base_salary:0, status:'active' }); setShowModal(true); };
+  const openCreate = () => {
+    setEditing(null);
+    setForm({
+      full_name: '',
+      email: '',
+      phone: '',
+      gender: 'Nam',
+      hire_date: new Date().toISOString().slice(0, 10),
+      position_id: '',
+      base_salary: 0,
+      status: 'active'
+    });
+    setShowModal(true);
+  };
   const openEdit = (e) => { setEditing(e); setForm({ ...e, date_of_birth: e.date_of_birth?.slice(0,10), hire_date: e.hire_date?.slice(0,10) }); setShowModal(true); };
   const openAssignPosition = async (employee) => {
     try {
@@ -56,8 +69,17 @@ export default function EmployeesPage() {
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      if (editing) { await employeeService.update(editing.employee_id, form); toast.success('Cập nhật thành công'); }
-      else { await employeeService.create(form); toast.success('Thêm nhân viên thành công'); }
+      if (editing) {
+        await employeeService.update(editing.employee_id, form);
+        toast.success('Cập nhật thành công');
+      } else {
+        await employeeService.create({
+          ...form,
+          position_id: Number(form.position_id),
+          base_salary: Number(form.base_salary || 0)
+        });
+        toast.success('Thêm nhân viên thành công');
+      }
       setShowModal(false); loadEmployees();
     } catch (err) { toast.error(err.message); }
   };
@@ -142,7 +164,7 @@ export default function EmployeesPage() {
                 <div className="form-row">
                   <div className="form-group"><label>Ngày vào làm *</label><input className="form-control" type="date" required value={form.hire_date||''} onChange={e => setForm({...form, hire_date: e.target.value})} /></div>
                   <div className="form-group">
-                    <label>Lương cơ bản</label>
+                    <label>{editing ? 'Lương cơ bản' : 'Lương tại thời điểm nhận chức vụ'}</label>
                     <input
                       className="form-control"
                       type="number"
@@ -157,6 +179,49 @@ export default function EmployeesPage() {
                     )}
                   </div>
                 </div>
+                {!editing && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Chức vụ ban đầu *</label>
+                      <select
+                        className="form-control"
+                        required
+                        value={form.position_id || ''}
+                        onChange={e => {
+                          const nextPositionId = e.target.value;
+                          const nextPosition = positions.find(p => String(p.position_id) === nextPositionId);
+                          setForm({
+                            ...form,
+                            position_id: nextPositionId,
+                            base_salary: nextPosition?.base_salary || form.base_salary
+                          });
+                        }}
+                      >
+                        <option value="">Chọn chức vụ</option>
+                        {positions.map(position => (
+                          <option key={position.position_id} value={position.position_id}>
+                            {position.position_name}
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                        Hệ thống sẽ tự tạo lịch sử chức vụ đầu tiên ngay khi thêm nhân viên.
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Gợi ý theo chức vụ</label>
+                      <input
+                        className="form-control"
+                        disabled
+                        value={
+                          form.position_id
+                            ? `${fmt(positions.find(p => String(p.position_id) === String(form.position_id))?.base_salary || 0)}đ`
+                            : 'Chọn chức vụ để xem mức lương gợi ý'
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="form-group"><label>Địa chỉ</label><input className="form-control" value={form.address||''} onChange={e => setForm({...form, address: e.target.value})} /></div>
                 {editing && <div className="form-group"><label>Trạng thái</label><select className="form-control" value={form.status||'active'} onChange={e => setForm({...form, status: e.target.value})}><option value="active">Đang làm</option><option value="inactive">Nghỉ việc</option></select></div>}
                 <div className="form-actions"><button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Hủy</button><button type="submit" className="btn btn-primary">{editing ? 'Cập nhật' : 'Thêm mới'}</button></div>

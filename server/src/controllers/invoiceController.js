@@ -4,8 +4,8 @@ const { logAudit } = require('../utils/auditLogger');
 const invoiceController = {
   getAll: async (req, res, next) => {
     try {
-      const { page, limit, customer_id, payment_method } = req.query;
-      const result = await Invoice.findAll({ page: parseInt(page) || 1, limit: parseInt(limit) || 10, customer_id, payment_method });
+      const { page, limit, customer_id, payment_method, status } = req.query;
+      const result = await Invoice.findAll({ page: parseInt(page) || 1, limit: parseInt(limit) || 10, customer_id, payment_method, status });
       res.json(result);
     } catch (error) { next(error); }
   },

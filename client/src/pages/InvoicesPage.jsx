@@ -1,11 +1,38 @@
 import { useState, useEffect } from 'react';
-import { invoiceService, customerService, productService, publicSettingService } from '../services/dataService';
+import { invoiceService, customerService, productService, publicSettingService, paymentService } from '../services/dataService';
 import { downloadCSV } from '../services/exportService';
 import { toast } from 'react-toastify';
 import usePermission from '../hooks/usePermission';
+import useAuth from '../hooks/useAuth';
 import { calculateLoyaltyPoints, formatPointsRule } from '../utils/crmRules';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
+const invoiceStatusLabels = {
+  confirmed: 'Chờ thanh toán',
+  paid: 'Đã thanh toán',
+  completed: 'Hoàn tất',
+  refunded: 'Đã hoàn tiền',
+  cancelled: 'Đã hủy'
+};
+const invoiceStatusBadge = {
+  confirmed: 'badge-warning',
+  paid: 'badge-success',
+  completed: 'badge-info',
+  refunded: 'badge-purple',
+  cancelled: 'badge-danger'
+};
+const paymentStatusLabels = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  failed: 'Failed',
+  refunded: 'Refunded'
+};
+const paymentStatusBadge = {
+  pending: 'badge-warning',
+  confirmed: 'badge-success',
+  failed: 'badge-danger',
+  refunded: 'badge-purple'
+};
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
@@ -27,9 +54,11 @@ export default function InvoicesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [crmSettings, setCrmSettings] = useState({});
 
+  const { user } = useAuth();
   const { canCreate, canExport } = usePermission();
   const _canCreate = canCreate('invoices');
   const _canExport = canExport('invoices');
+  const canHandlePayments = user?.role === 'admin' || user?.role === 'manager';
 
   useEffect(() => { loadData(); }, [page]);
 
@@ -122,7 +151,7 @@ export default function InvoicesPage() {
           quantity: i.quantity
         }))
       });
-      toast.success('Tạo hóa đơn thành công!');
+      toast.success(paymentMethod === 'cash' ? 'Tạo hóa đơn thành công!' : 'Tạo hóa đơn thành công, chờ xác nhận thanh toán.');
       resetForm();
       loadData();
     } catch (err) {
@@ -147,6 +176,36 @@ export default function InvoicesPage() {
       const data = await invoiceService.getById(id);
       setViewInvoice(data);
     } catch (err) { toast.error(err.message); }
+  };
+
+  const handleConfirmPayment = async (invoice) => {
+    if (!invoice.latest_transaction_id) return;
+    try {
+      await paymentService.confirm(invoice.latest_transaction_id);
+      toast.success(`Đã xác nhận thanh toán hóa đơn #${invoice.invoice_id}`);
+      if (viewInvoice?.invoice_id === invoice.invoice_id) {
+        await viewDetail(invoice.invoice_id);
+      }
+      loadData();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleFailPayment = async (invoice) => {
+    if (!invoice.latest_transaction_id) return;
+    const note = window.prompt('Lý do thanh toán thất bại / hủy hóa đơn:', 'Khách chưa thanh toán, hủy hóa đơn');
+    if (note === null) return;
+    try {
+      await paymentService.markFailed(invoice.latest_transaction_id, { note });
+      toast.success(`Đã đánh dấu thanh toán thất bại cho hóa đơn #${invoice.invoice_id}`);
+      if (viewInvoice?.invoice_id === invoice.invoice_id) {
+        await viewDetail(invoice.invoice_id);
+      }
+      loadData();
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   const filteredProducts = products.filter(p =>
@@ -310,8 +369,16 @@ export default function InvoicesPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16, fontSize: 14 }}>
               <div><strong>Khách hàng:</strong> {viewInvoice.customer_name || 'Vãng lai'}</div>
               <div><strong>Thanh toán:</strong> {viewInvoice.payment_method}</div>
+              <div><strong>Trạng thái HĐ:</strong> <span className={`badge ${invoiceStatusBadge[viewInvoice.status] || 'badge-info'}`}>{invoiceStatusLabels[viewInvoice.status] || viewInvoice.status}</span></div>
+              <div><strong>Trạng thái giao dịch:</strong> <span className={`badge ${paymentStatusBadge[viewInvoice.payment_status] || 'badge-info'}`}>{paymentStatusLabels[viewInvoice.payment_status] || (viewInvoice.payment_status || '—')}</span></div>
               <div><strong>Ngày:</strong> {new Date(viewInvoice.created_at).toLocaleString('vi-VN')}</div>
             </div>
+            {canHandlePayments && viewInvoice.payment_status === 'pending' && viewInvoice.latest_transaction_id ? (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <button className="btn btn-success" onClick={() => handleConfirmPayment(viewInvoice)}>✅ Xác nhận đã thanh toán</button>
+                <button className="btn btn-danger" onClick={() => handleFailPayment(viewInvoice)}>❌ Đánh dấu thất bại / hủy đơn</button>
+              </div>
+            ) : null}
             <table>
               <thead><tr><th>Sản phẩm</th><th>Đơn giá</th><th>SL</th><th>Thành tiền</th></tr></thead>
               <tbody>
@@ -332,7 +399,7 @@ export default function InvoicesPage() {
       <div className="card">
         <div className="table-container">
           <table>
-            <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Tổng tiền</th><th>Giảm giá</th><th>Thành tiền</th><th>Điểm</th><th>Thanh toán</th><th>Ngày</th><th></th></tr></thead>
+            <thead><tr><th>Mã HĐ</th><th>Khách hàng</th><th>Tổng tiền</th><th>Giảm giá</th><th>Thành tiền</th><th>Điểm</th><th>Thanh toán</th><th>Trạng thái</th><th>Giao dịch</th><th>Ngày</th><th></th></tr></thead>
             <tbody>
               {invoices.map(inv => (
                 <tr key={inv.invoice_id}>
@@ -343,11 +410,27 @@ export default function InvoicesPage() {
                   <td style={{ fontWeight: 600, color: '#059669' }}>{fmt(inv.final_total)}đ</td>
                   <td>{inv.points_earned > 0 ? `+${inv.points_earned}` : '—'}</td>
                   <td><span className={`badge ${inv.payment_method === 'cash' ? 'badge-success' : inv.payment_method === 'card' ? 'badge-info' : 'badge-purple'}`}>{inv.payment_method}</span></td>
+                  <td><span className={`badge ${invoiceStatusBadge[inv.status] || 'badge-info'}`}>{invoiceStatusLabels[inv.status] || inv.status}</span></td>
+                  <td>
+                    <span className={`badge ${paymentStatusBadge[inv.payment_status] || 'badge-info'}`}>
+                      {paymentStatusLabels[inv.payment_status] || (inv.payment_status || '—')}
+                    </span>
+                  </td>
                   <td>{new Date(inv.created_at).toLocaleDateString('vi-VN')}</td>
-                  <td><button className="btn btn-outline" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => viewDetail(inv.invoice_id)}>👁</button></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-outline" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => viewDetail(inv.invoice_id)}>👁</button>
+                      {canHandlePayments && inv.payment_status === 'pending' && inv.latest_transaction_id ? (
+                        <>
+                          <button className="btn btn-success" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => handleConfirmPayment(inv)}>✅</button>
+                          <button className="btn btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => handleFailPayment(inv)}>❌</button>
+                        </>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               ))}
-              {!invoices.length && <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có hóa đơn nào</td></tr>}
+              {!invoices.length && <tr><td colSpan={11} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có hóa đơn nào</td></tr>}
             </tbody>
           </table>
         </div>

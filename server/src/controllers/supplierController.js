@@ -2,7 +2,16 @@ const Supplier = require('../models/supplierModel');
 
 const supplierController = {
   getAll: async (req, res, next) => {
-    try { res.json(await Supplier.findAll()); } catch (error) { next(error); }
+    try {
+      const { page, limit, search, is_active, sort } = req.query;
+      res.json(await Supplier.findAll({
+        page: Number(page) || 1,
+        limit: Number(limit) || 10,
+        search,
+        is_active,
+        sort
+      }));
+    } catch (error) { next(error); }
   },
   getById: async (req, res, next) => {
     try {

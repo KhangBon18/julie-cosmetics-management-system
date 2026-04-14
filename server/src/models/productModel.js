@@ -1,7 +1,19 @@
 const { pool } = require('../config/db');
 
 const Product = {
-  findAll: async ({ page = 1, limit = 12, category_id, brand_id, search, sort, min_price, max_price, is_public = false }) => {
+  findAll: async ({
+    page = 1,
+    limit = 12,
+    category_id,
+    brand_id,
+    search,
+    sort,
+    min_price,
+    max_price,
+    is_active,
+    stock_status,
+    is_public = false
+  }) => {
     let query = `SELECT p.*, c.category_name, b.brand_name,
                         pc.category_name as parent_category_name, pc.category_id as parent_category_id
                  FROM products p
@@ -19,6 +31,11 @@ const Product = {
     if (is_public) {
       query += ' AND p.is_active = 1';
       countQuery += ' AND p.is_active = 1';
+    } else if (is_active !== undefined && is_active !== null && is_active !== '') {
+      query += ' AND p.is_active = ?';
+      countQuery += ' AND p.is_active = ?';
+      params.push(Number(is_active));
+      countParams.push(Number(is_active));
     }
 
     // Category filter: if parent category, include all children
@@ -61,11 +78,25 @@ const Product = {
       countParams.push(max_price);
     }
 
+    if (stock_status === 'out') {
+      query += ' AND p.stock_quantity = 0';
+      countQuery += ' AND p.stock_quantity = 0';
+    } else if (stock_status === 'low') {
+      query += ' AND p.stock_quantity BETWEEN 1 AND 10';
+      countQuery += ' AND p.stock_quantity BETWEEN 1 AND 10';
+    } else if (stock_status === 'in_stock') {
+      query += ' AND p.stock_quantity > 0';
+      countQuery += ' AND p.stock_quantity > 0';
+    }
+
     switch (sort) {
       case 'price_asc': query += ' ORDER BY p.sell_price ASC'; break;
       case 'price_desc': query += ' ORDER BY p.sell_price DESC'; break;
       case 'name': query += ' ORDER BY p.product_name ASC'; break;
+      case 'name_desc': query += ' ORDER BY p.product_name DESC'; break;
       case 'stock_asc': query += ' ORDER BY p.stock_quantity ASC'; break;
+      case 'stock_desc': query += ' ORDER BY p.stock_quantity DESC'; break;
+      case 'oldest': query += ' ORDER BY p.created_at ASC'; break;
       default: query += ' ORDER BY p.created_at DESC';
     }
 
@@ -98,22 +129,40 @@ const Product = {
     return rows[0];
   },
 
+  findByIds: async (ids = []) => {
+    const normalizedIds = [...new Set(ids.map(Number).filter(Boolean))];
+    if (!normalizedIds.length) return [];
+
+    const placeholders = normalizedIds.map(() => '?').join(', ');
+    const [rows] = await pool.query(
+      `SELECT p.*, c.category_name, b.brand_name,
+              pc.category_name as parent_category_name, pc.category_id as parent_category_id
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.category_id
+       LEFT JOIN categories pc ON c.parent_id = pc.category_id
+       LEFT JOIN brands b ON p.brand_id = b.brand_id
+       WHERE p.product_id IN (${placeholders})`,
+      normalizedIds
+    );
+    return rows;
+  },
+
   create: async (data) => {
-    const { product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, stock_quantity, image_url } = data;
+    const { product_name, brand_id, category_id, description, skin_type, volume, sell_price, image_url } = data;
     const [result] = await pool.query(
       `INSERT INTO products (product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, stock_quantity, image_url)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [product_name, brand_id, category_id, description || null, skin_type || null, volume || null, import_price || 0, sell_price || 0, stock_quantity || 0, image_url || null]
+      [product_name, brand_id, category_id, description || null, skin_type || null, volume || null, 0, sell_price || 0, 0, image_url || null]
     );
     return result.insertId;
   },
 
   update: async (id, data) => {
-    const { product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, image_url, is_active } = data;
+    const { product_name, brand_id, category_id, description, skin_type, volume, sell_price, image_url, is_active } = data;
     const [result] = await pool.query(
-      `UPDATE products SET product_name = ?, brand_id = ?, category_id = ?, description = ?, skin_type = ?, volume = ?, import_price = ?, sell_price = ?, image_url = ?, is_active = ?
+      `UPDATE products SET product_name = ?, brand_id = ?, category_id = ?, description = ?, skin_type = ?, volume = ?, sell_price = ?, image_url = ?, is_active = ?
        WHERE product_id = ?`,
-      [product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, image_url, is_active, id]
+      [product_name, brand_id, category_id, description, skin_type, volume, sell_price, image_url, is_active, id]
     );
     return result.affectedRows;
   },

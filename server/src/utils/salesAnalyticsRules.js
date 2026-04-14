@@ -62,16 +62,25 @@ const buildLineNetRevenueSql = (invoiceAlias = 'i', itemAlias = 'ii') => `
   )
 `;
 
-const buildInvoiceRefundAmountSql = (invoiceAlias = 'i', invoiceReturnsAlias = 'invoice_returns') => `
+const buildInvoiceRefundAmountSql = (invoiceAliasOrOptions = 'i', invoiceReturnsAlias = 'invoice_returns') => {
+  const invoiceAlias = typeof invoiceAliasOrOptions === 'object'
+    ? (invoiceAliasOrOptions.invoiceAlias || 'i')
+    : invoiceAliasOrOptions;
+  const invoiceReturns = typeof invoiceAliasOrOptions === 'object'
+    ? (invoiceAliasOrOptions.invoiceReturnsAlias || 'invoice_returns')
+    : invoiceReturnsAlias;
+
+  return `
   LEAST(
     ${invoiceAlias}.final_total,
     CASE
       WHEN ${invoiceAlias}.status = '${REFUNDED_INVOICE_STATUS}'
         THEN ${invoiceAlias}.final_total
-      ELSE COALESCE(${invoiceReturnsAlias}.completed_refund_total, 0)
+      ELSE COALESCE(${invoiceReturns}.completed_refund_total, 0)
     END
   )
 `;
+};
 
 const buildReturnedQuantitySql = ({
   invoiceAlias = 'i',

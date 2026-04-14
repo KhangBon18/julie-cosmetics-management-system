@@ -10,6 +10,7 @@ const publicService = {
   getNewArrivals: (params) => api.get('/public/new-arrivals', { params }),
   getRelatedProducts: (id, params) => api.get(`/public/products/${id}/related`, { params }),
   getProductReviews: (id, params) => api.get(`/public/products/${id}/reviews`, { params }),
+  validateCart: (data) => api.post('/public/cart/validate', data),
   checkout: (data) => api.post('/public/checkout', data)
 };
 

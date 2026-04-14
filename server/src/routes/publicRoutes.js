@@ -12,6 +12,107 @@ const {
   buildReturnedQuantitySql
 } = require('../utils/salesAnalyticsRules');
 
+const normalizeCartItems = (items = []) => {
+  const merged = new Map();
+  for (const item of items) {
+    const productId = Number(item?.product_id);
+    const quantity = Number(item?.quantity);
+    if (!productId || quantity <= 0) continue;
+    const existing = merged.get(productId);
+    merged.set(productId, {
+      product_id: productId,
+      quantity: (existing?.quantity || 0) + quantity
+    });
+  }
+  return Array.from(merged.values());
+};
+
+const resolveCartSnapshot = async (items = []) => {
+  const normalizedItems = normalizeCartItems(items);
+  if (!normalizedItems.length) {
+    return {
+      items: [],
+      issues: [{ type: 'empty_cart', message: 'Giỏ hàng không có sản phẩm hợp lệ' }],
+      summary: { item_count: 0, cart_total: 0, changed: true }
+    };
+  }
+
+  const products = await Product.findByIds(normalizedItems.map(item => item.product_id));
+  const productMap = new Map(products.map(product => [Number(product.product_id), product]));
+  const resolvedItems = [];
+  const issues = [];
+
+  for (const item of normalizedItems) {
+    const product = productMap.get(item.product_id);
+
+    if (!product || product.deleted_at) {
+      issues.push({
+        type: 'removed',
+        product_id: item.product_id,
+        requested_quantity: item.quantity,
+        message: `Sản phẩm ID ${item.product_id} không còn tồn tại trong hệ thống`
+      });
+      continue;
+    }
+
+    if (!product.is_active) {
+      issues.push({
+        type: 'inactive',
+        product_id: product.product_id,
+        product_name: product.product_name,
+        requested_quantity: item.quantity,
+        message: `Sản phẩm "${product.product_name}" đã ngừng kinh doanh và được loại khỏi giỏ`
+      });
+      continue;
+    }
+
+    if (Number(product.stock_quantity) <= 0) {
+      issues.push({
+        type: 'out_of_stock',
+        product_id: product.product_id,
+        product_name: product.product_name,
+        requested_quantity: item.quantity,
+        available_quantity: 0,
+        message: `Sản phẩm "${product.product_name}" đã hết hàng và được loại khỏi giỏ`
+      });
+      continue;
+    }
+
+    const adjustedQuantity = Math.min(item.quantity, Number(product.stock_quantity));
+    if (adjustedQuantity !== item.quantity) {
+      issues.push({
+        type: 'quantity_adjusted',
+        product_id: product.product_id,
+        product_name: product.product_name,
+        requested_quantity: item.quantity,
+        available_quantity: adjustedQuantity,
+        message: `Sản phẩm "${product.product_name}" chỉ còn ${adjustedQuantity} trong kho. Giỏ hàng đã được cập nhật.`
+      });
+    }
+
+    resolvedItems.push({
+      product_id: product.product_id,
+      product_name: product.product_name,
+      brand_name: product.brand_name,
+      image_url: product.image_url,
+      sell_price: Number(product.sell_price),
+      stock_quantity: Number(product.stock_quantity),
+      is_active: Number(product.is_active),
+      quantity: adjustedQuantity
+    });
+  }
+
+  return {
+    items: resolvedItems,
+    issues,
+    summary: {
+      item_count: resolvedItems.reduce((sum, item) => sum + item.quantity, 0),
+      cart_total: resolvedItems.reduce((sum, item) => sum + item.sell_price * item.quantity, 0),
+      changed: issues.length > 0
+    }
+  };
+};
+
 // Public product listings (no auth needed)
 router.get('/products', async (req, res, next) => {
   try {
@@ -154,6 +255,13 @@ router.get('/products/:id/related', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.post('/cart/validate', async (req, res, next) => {
+  try {
+    const snapshot = await resolveCartSnapshot(req.body?.items || []);
+    res.json(snapshot);
+  } catch (error) { next(error); }
+});
+
 // Public checkout — guest order (no auth needed)
 const validateCheckout = [
   body('items').isArray({ min: 1 }).withMessage('Đơn hàng phải có ít nhất 1 sản phẩm'),
@@ -172,6 +280,21 @@ router.post('/checkout', validateCheckout, async (req, res, next) => {
     }
 
     const { items, customer_name, customer_phone, customer_email, shipping_address, payment_method, note, promotion_code } = req.body;
+    const cartSnapshot = await resolveCartSnapshot(items);
+
+    if (!cartSnapshot.items.length) {
+      return res.status(400).json({
+        message: cartSnapshot.issues[0]?.message || 'Giỏ hàng không còn sản phẩm hợp lệ',
+        cart_snapshot: cartSnapshot
+      });
+    }
+
+    if (cartSnapshot.summary.changed) {
+      return res.status(409).json({
+        message: 'Giỏ hàng đã thay đổi do tồn kho hoặc trạng thái sản phẩm. Vui lòng kiểm tra lại trước khi đặt hàng.',
+        cart_snapshot: cartSnapshot
+      });
+    }
 
     // Validate promotion code if provided
     let promotionId = null;
@@ -184,26 +307,11 @@ router.post('/checkout', validateCheckout, async (req, res, next) => {
     }
 
     // Build invoice items with server-side price lookup
-    const invoiceItems = [];
-    for (const item of items) {
-      const product = await Product.findById(item.product_id);
-      if (!product) {
-        return res.status(400).json({ message: `Sản phẩm ID ${item.product_id} không tồn tại` });
-      }
-      if (!product.is_active) {
-        return res.status(400).json({ message: `Sản phẩm "${product.product_name}" đã ngừng kinh doanh` });
-      }
-      if (product.stock_quantity < item.quantity) {
-        return res.status(400).json({
-          message: `Sản phẩm "${product.product_name}" chỉ còn ${product.stock_quantity} trong kho`
-        });
-      }
-      invoiceItems.push({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: product.sell_price
-      });
-    }
+    const invoiceItems = cartSnapshot.items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.sell_price
+    }));
 
     // Create invoice via existing model (handles transactions, stock, CRM, payment)
     const invoiceId = await Invoice.create({

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import useAuth from '../../hooks/useAuth';
 import { FiMenu } from 'react-icons/fi';
 
-export default function TopHeader({ title, toggleSidebar }) {
+export default function TopHeader({ title, subtitle, toggleSidebar }) {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const ref = useRef();
@@ -23,7 +23,10 @@ export default function TopHeader({ title, toggleSidebar }) {
         <button className="mobile-menu-btn" onClick={toggleSidebar} aria-label="Menu" type="button">
           <FiMenu />
         </button>
-        <h2>{title}</h2>
+        <div>
+          <h2>{title}</h2>
+          {subtitle ? <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>{subtitle}</div> : null}
+        </div>
       </div>
       <div className="top-header-right">
         <div className="user-menu" ref={ref}>
@@ -50,4 +53,3 @@ export default function TopHeader({ title, toggleSidebar }) {
     </header>
   );
 }
-

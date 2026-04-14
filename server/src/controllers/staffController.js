@@ -2,6 +2,7 @@ const Employee = require('../models/employeeModel');
 const Salary = require('../models/salaryModel');
 const Leave = require('../models/leaveModel');
 const { pool } = require('../config/db');
+const { logAudit } = require('../utils/auditLogger');
 
 const staffController = {
   // GET /api/staff/profile — Lấy thông tin nhân viên gắn với user
@@ -99,6 +100,7 @@ const staffController = {
           'Nếu đổi chức vụ giữa tháng: hệ thống chia tháng thành nhiều giai đoạn theo effective_date và tính riêng từng mức lương tại thời điểm đó.',
           'Nghỉ phép không lương (unpaid) đã duyệt sẽ bị trừ vào giai đoạn lương tương ứng.',
           'Nghỉ phép năm (annual) đã duyệt: không trừ lương.',
+          'Đơn nghỉ việc đã duyệt sẽ chặn phát sinh bảng lương cho các kỳ sau ngày nghỉ chính thức.',
           'Thưởng và khấu trừ do quản lý cập nhật khi chốt bảng lương.'
         ]
       });
@@ -127,28 +129,23 @@ const staffController = {
       if (!req.user.employee_id) {
         return res.status(400).json({ message: 'Tài khoản không liên kết với nhân viên nào' });
       }
-      const { leave_type, start_date, end_date, reason } = req.body;
-
-      if (!start_date || !end_date || !reason) {
-        return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin' });
-      }
-
-      // Tính số ngày nghỉ
-      const start = new Date(start_date);
-      const end = new Date(end_date);
-      const diffTime = Math.abs(end - start);
-      const total_days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
       const id = await Leave.create({
         employee_id: req.user.employee_id,
-        leave_type: leave_type || 'annual',
-        start_date,
-        end_date,
-        total_days,
-        reason
+        leave_type: req.body.leave_type,
+        start_date: req.body.start_date,
+        end_date: req.body.end_date,
+        reason: req.body.reason
       });
 
       const leave = await Leave.findById(id);
+      await logAudit({
+        userId: req.user.user_id,
+        action: 'CREATE',
+        entityType: 'leave_request',
+        entityId: id,
+        newValues: leave,
+        req
+      });
       res.status(201).json({ message: 'Nộp đơn nghỉ phép thành công', leave });
     } catch (error) { next(error); }
   },

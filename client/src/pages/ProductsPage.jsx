@@ -14,6 +14,10 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterActive, setFilterActive] = useState('');
+  const [filterStock, setFilterStock] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [sort, setSort] = useState('');
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -29,7 +33,7 @@ export default function ProductsPage() {
   const _canDelete = canDelete('products');
   const _canExport = canExport('products');
 
-  useEffect(() => { loadProducts(); }, [page, search, filterBrand, filterCategory, sort]);
+  useEffect(() => { loadProducts(); }, [page, search, filterBrand, filterCategory, filterActive, filterStock, minPrice, maxPrice, sort]);
   useEffect(() => {
     // async-parallel: load independent data in parallel
     Promise.all([
@@ -45,6 +49,10 @@ export default function ProductsPage() {
         search: search || undefined,
         brand_id: filterBrand || undefined,
         category_id: filterCategory || undefined,
+        is_active: filterActive || undefined,
+        stock_status: filterStock || undefined,
+        min_price: minPrice || undefined,
+        max_price: maxPrice || undefined,
         sort: sort || undefined
       });
       setProducts(data.products || []);
@@ -52,14 +60,25 @@ export default function ProductsPage() {
     } catch (err) { toast.error(err.message); }
   };
 
-  const openCreate = () => { setEditing(null); setForm({ product_name: '', brand_id: '', category_id: '', sell_price: '', import_price: '', stock_quantity: '', skin_type: '', volume: '', description: '', is_active: 1 }); setShowModal(true); };
+  const openCreate = () => { setEditing(null); setForm({ product_name: '', brand_id: '', category_id: '', sell_price: '', skin_type: '', volume: '', description: '', is_active: 1 }); setShowModal(true); };
   const openEdit = (p) => { setEditing(p); setForm({ ...p }); setShowModal(true); };
 
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      if (editing) { await productService.update(editing.product_id, form); toast.success('Cập nhật thành công'); }
-      else { await productService.create(form); toast.success('Thêm sản phẩm thành công'); }
+      const payload = {
+        product_name: form.product_name,
+        brand_id: form.brand_id,
+        category_id: form.category_id,
+        sell_price: form.sell_price,
+        skin_type: form.skin_type || null,
+        volume: form.volume || null,
+        description: form.description || null,
+        image_url: form.image_url || null,
+        is_active: form.is_active ?? 1
+      };
+      if (editing) { await productService.update(editing.product_id, payload); toast.success('Cập nhật thành công'); }
+      else { await productService.create(payload); toast.success('Thêm sản phẩm thành công'); }
       setShowModal(false); loadProducts();
     } catch (err) { toast.error(err.message); }
   };
@@ -103,13 +122,43 @@ export default function ProductsPage() {
             </select>
             <select className="form-control" style={{ width: 140 }} value={sort} onChange={e => setSort(e.target.value)}>
               <option value="">Mới nhất</option>
+              <option value="oldest">Cũ nhất</option>
               <option value="name">Tên A-Z</option>
+              <option value="name_desc">Tên Z-A</option>
               <option value="price_asc">Giá tăng dần</option>
               <option value="price_desc">Giá giảm dần</option>
               <option value="stock_asc">Tồn kho thấp</option>
+              <option value="stock_desc">Tồn kho cao</option>
             </select>
-            {(search || filterBrand || filterCategory || sort) ? (
-              <button className="btn btn-outline" style={{ fontSize: 12 }} onClick={() => { setSearch(''); setFilterBrand(''); setFilterCategory(''); setSort(''); setPage(1); }}>
+            <select className="form-control" style={{ width: 140 }} value={filterActive} onChange={e => { setFilterActive(e.target.value); setPage(1); }}>
+              <option value="">Tất cả trạng thái</option>
+              <option value="1">Đang kinh doanh</option>
+              <option value="0">Ngừng kinh doanh</option>
+            </select>
+            <select className="form-control" style={{ width: 150 }} value={filterStock} onChange={e => { setFilterStock(e.target.value); setPage(1); }}>
+              <option value="">Tất cả tồn kho</option>
+              <option value="out">Hết hàng</option>
+              <option value="low">Sắp hết hàng</option>
+              <option value="in_stock">Còn hàng</option>
+            </select>
+            <input className="form-control" style={{ width: 120 }} type="number" inputMode="numeric" min="0" placeholder="Giá từ" value={minPrice} onChange={e => { setMinPrice(e.target.value); setPage(1); }} />
+            <input className="form-control" style={{ width: 120 }} type="number" inputMode="numeric" min="0" placeholder="Giá đến" value={maxPrice} onChange={e => { setMaxPrice(e.target.value); setPage(1); }} />
+            {(search || filterBrand || filterCategory || filterActive || filterStock || minPrice || maxPrice || sort) ? (
+              <button
+                className="btn btn-outline"
+                style={{ fontSize: 12 }}
+                onClick={() => {
+                  setSearch('');
+                  setFilterBrand('');
+                  setFilterCategory('');
+                  setFilterActive('');
+                  setFilterStock('');
+                  setMinPrice('');
+                  setMaxPrice('');
+                  setSort('');
+                  setPage(1);
+                }}
+              >
                 ✕ Xóa bộ lọc
               </button>
             ) : null}
@@ -118,7 +167,7 @@ export default function ProductsPage() {
         <div className="table-container">
           <table>
             <thead>
-              <tr><th>Sản phẩm</th><th>Thương hiệu</th><th>Danh mục</th><th>Giá nhập</th><th>Giá bán</th><th>Tồn kho</th>
+              <tr><th>Sản phẩm</th><th>Thương hiệu</th><th>Danh mục</th><th>Giá nhập</th><th>Giá bán</th><th>Tồn kho</th><th>Trạng thái</th>
               {(_canUpdate || _canDelete) && <th>Thao tác</th>}</tr>
             </thead>
             <tbody>
@@ -130,6 +179,7 @@ export default function ProductsPage() {
                   <td>{fmt(p.import_price)}đ</td>
                   <td style={{ fontWeight: 600 }}>{fmt(p.sell_price)}đ</td>
                   <td><span className={`badge ${p.stock_quantity <= 10 ? 'badge-danger' : 'badge-success'}`}>{p.stock_quantity}</span></td>
+                  <td><span className={`badge ${p.is_active ? 'badge-success' : 'badge-secondary'}`}>{p.is_active ? 'Đang bán' : 'Ngừng bán'}</span></td>
                   {(_canUpdate || _canDelete) && (
                     <td>
                       {_canUpdate && <button className="btn btn-sm btn-outline" onClick={() => openEdit(p)} aria-label="Sửa sản phẩm"><FiEdit2 aria-hidden="true" /></button>}{' '}
@@ -138,7 +188,7 @@ export default function ProductsPage() {
                   )}
                 </tr>
               ))}
-              {products.length === 0 ? <tr><td colSpan={7} className="empty-state">Không có sản phẩm</td></tr> : null}
+              {products.length === 0 ? <tr><td colSpan={(_canUpdate || _canDelete) ? 8 : 7} className="empty-state">Không có sản phẩm</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -165,12 +215,36 @@ export default function ProductsPage() {
                   <div className="form-group"><label htmlFor="prd-cat">Danh mục *</label><select id="prd-cat" className="form-control" required value={form.category_id || ''} onChange={e => setForm({...form, category_id: e.target.value})}><option value="">Chọn…</option>{categories.map(c => <option key={c.category_id} value={c.category_id}>{c.category_name}</option>)}</select></div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label htmlFor="prd-import">Giá nhập</label><input id="prd-import" className="form-control" type="number" inputMode="numeric" value={form.import_price || ''} onChange={e => setForm({...form, import_price: e.target.value})} autoComplete="off" /></div>
                   <div className="form-group"><label htmlFor="prd-sell">Giá bán *</label><input id="prd-sell" className="form-control" type="number" inputMode="numeric" required value={form.sell_price || ''} onChange={e => setForm({...form, sell_price: e.target.value})} autoComplete="off" /></div>
+                  <div className="form-group">
+                    <label>Giá nhập hiện tại</label>
+                    <input className="form-control" disabled value={editing ? `${fmt(form.import_price || 0)}đ` : 'Sẽ được cập nhật từ phiếu nhập kho'} />
+                    <small style={{ color: '#64748b', marginTop: 6, display: 'block' }}>
+                      Giá nhập hiện tại là dữ liệu phát sinh từ phiếu nhập đã hoàn tất, không sửa trực tiếp tại đây.
+                    </small>
+                  </div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label htmlFor="prd-stock">Tồn kho</label><input id="prd-stock" className="form-control" type="number" inputMode="numeric" value={form.stock_quantity || ''} onChange={e => setForm({...form, stock_quantity: e.target.value})} autoComplete="off" /></div>
+                  <div className="form-group">
+                    <label>Tồn kho hiện tại</label>
+                    <input className="form-control" disabled value={editing ? `${form.stock_quantity || 0}` : '0'} />
+                    <small style={{ color: '#64748b', marginTop: 6, display: 'block' }}>
+                      Tồn kho do hệ thống cập nhật từ nhập kho, bán hàng, đổi trả và các biến động kho hợp lệ.
+                    </small>
+                  </div>
                   <div className="form-group"><label htmlFor="prd-volume">Dung tích</label><input id="prd-volume" className="form-control" placeholder="VD: 50ml, 30g…" value={form.volume || ''} onChange={e => setForm({...form, volume: e.target.value})} autoComplete="off" /></div>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="prd-active">Trạng thái kinh doanh</label>
+                  <select
+                    id="prd-active"
+                    className="form-control"
+                    value={String(form.is_active ?? 1)}
+                    onChange={e => setForm({ ...form, is_active: Number(e.target.value) })}
+                  >
+                    <option value="1">Đang kinh doanh</option>
+                    <option value="0">Ngừng kinh doanh</option>
+                  </select>
                 </div>
                 <div className="form-group"><label htmlFor="prd-skin">Loại da</label><input id="prd-skin" className="form-control" placeholder="VD: Da dầu, Mọi loại da…" value={form.skin_type || ''} onChange={e => setForm({...form, skin_type: e.target.value})} autoComplete="off" /></div>
                 <div className="form-group"><label htmlFor="prd-desc">Mô tả</label><textarea id="prd-desc" className="form-control" rows={3} value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})} /></div>

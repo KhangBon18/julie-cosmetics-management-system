@@ -5,11 +5,18 @@ const productController = {
   // GET /api/products
   getAll: async (req, res, next) => {
     try {
-      const { page, limit, category_id, brand_id, search, sort } = req.query;
+      const { page, limit, category_id, brand_id, search, sort, min_price, max_price, is_active, stock_status } = req.query;
       const result = await Product.findAll({
         page: parseInt(page) || 1,
         limit: parseInt(limit) || 12,
-        category_id, brand_id, search, sort
+        category_id,
+        brand_id,
+        search,
+        sort,
+        min_price: min_price !== undefined && min_price !== '' ? Number(min_price) : undefined,
+        max_price: max_price !== undefined && max_price !== '' ? Number(max_price) : undefined,
+        is_active,
+        stock_status
       });
       res.json(result);
     } catch (error) { next(error); }

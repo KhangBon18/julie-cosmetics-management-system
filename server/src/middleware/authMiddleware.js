@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 const Role = require('../models/roleModel');
+const { syncApprovedResignations } = require('../utils/employeeLifecycle');
 
 // ─── Cache permissions per user (in-memory, cleared on role change) ───
 const _permCache = new Map();
@@ -40,10 +41,18 @@ const protect = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    let user = await User.findById(decoded.id);
 
     if (!user) {
       return res.status(401).json({ message: 'Token không hợp lệ' });
+    }
+
+    if (user.employee_id) {
+      await syncApprovedResignations(undefined, user.employee_id);
+      user = await User.findById(decoded.id);
+      if (!user) {
+        return res.status(401).json({ message: 'Token không hợp lệ' });
+      }
     }
 
     if (!user.is_active) {

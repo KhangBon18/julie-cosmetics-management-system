@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/userModel');
 const Role = require('../models/roleModel');
 const { pool } = require('../config/db');
+const { clearPermissionCache } = require('../middleware/authMiddleware');
 
 const LEGACY_ROLES = new Set(['admin', 'manager', 'staff', 'warehouse']);
 
@@ -33,6 +34,50 @@ async function resolveRoleAssignment(input = {}) {
   };
 }
 
+async function assertEmployeeAssignable(employeeId, excludeUserId = null) {
+  if (!employeeId) return;
+
+  const [employeeRows] = await pool.query(
+    `SELECT employee_id, status
+     FROM employees
+     WHERE employee_id = ? AND deleted_at IS NULL`,
+    [employeeId]
+  );
+
+  if (!employeeRows.length) {
+    const error = new Error('Nhân viên được liên kết không tồn tại');
+    error.status = 400;
+    throw error;
+  }
+
+  if (employeeRows[0].status !== 'active') {
+    const error = new Error('Chỉ được liên kết tài khoản với nhân sự đang hoạt động');
+    error.status = 400;
+    throw error;
+  }
+
+  const params = [employeeId];
+  let duplicateQuery = `
+    SELECT user_id, username
+    FROM users
+    WHERE employee_id = ?
+      AND deleted_at IS NULL`;
+
+  if (excludeUserId) {
+    duplicateQuery += ' AND user_id != ?';
+    params.push(excludeUserId);
+  }
+
+  duplicateQuery += ' LIMIT 1';
+
+  const [duplicateRows] = await pool.query(duplicateQuery, params);
+  if (duplicateRows.length) {
+    const error = new Error(`Nhân viên này đã được liên kết với tài khoản "${duplicateRows[0].username}"`);
+    error.status = 409;
+    throw error;
+  }
+}
+
 const userController = {
   // GET /api/users
   getAll: async (req, res, next) => {
@@ -59,6 +104,7 @@ const userController = {
 
       const existing = await User.findByUsername(username);
       if (existing) return res.status(400).json({ message: 'Username đã tồn tại' });
+      await assertEmployeeAssignable(employee_id);
 
       const salt = await bcrypt.genSalt(10);
       const password_hash = await bcrypt.hash(password, salt);
@@ -79,9 +125,21 @@ const userController = {
   // PUT /api/users/:id
   update: async (req, res, next) => {
     try {
-      const currentUser = await User.findById(req.params.id);
+      const targetId = Number(req.params.id);
+      const currentUser = await User.findById(targetId);
       if (!currentUser) {
         return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
+      }
+
+      if (req.body.username && req.body.username !== currentUser.username) {
+        const existing = await User.findByUsername(req.body.username);
+        if (existing && Number(existing.user_id) !== targetId) {
+          return res.status(400).json({ message: 'Username đã tồn tại' });
+        }
+      }
+
+      if (Object.prototype.hasOwnProperty.call(req.body, 'employee_id')) {
+        await assertEmployeeAssignable(req.body.employee_id, targetId);
       }
 
       const hasRoleChange = req.body.role || req.body.role_id;
@@ -89,12 +147,13 @@ const userController = {
         ? await resolveRoleAssignment(req.body)
         : { role: currentUser.role, role_id: currentUser.role_id };
 
-      await User.update(req.params.id, {
+      await User.update(targetId, {
         ...req.body,
         role: roleAssignment.role,
         role_id: roleAssignment.role_id
       });
-      const user = await User.findById(req.params.id);
+      clearPermissionCache(targetId);
+      const user = await User.findById(targetId);
       res.json({ message: 'Cập nhật tài khoản thành công', user });
     } catch (error) { next(error); }
   },
@@ -106,6 +165,7 @@ const userController = {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(new_password, salt);
       await User.updatePassword(req.params.id, hashedPassword);
+      clearPermissionCache(Number(req.params.id));
       res.json({ message: 'Reset mật khẩu thành công' });
     } catch (error) { next(error); }
   },
@@ -135,6 +195,7 @@ const userController = {
       }
 
       await User.toggleActive(targetId, is_active);
+      clearPermissionCache(targetId);
       res.json({ message: is_active ? 'Đã kích hoạt tài khoản' : 'Đã khóa tài khoản' });
     } catch (error) { next(error); }
   },
@@ -150,6 +211,7 @@ const userController = {
       }
 
       await User.delete(targetId);
+      clearPermissionCache(targetId);
       res.json({ message: 'Xóa tài khoản thành công' });
     } catch (error) { next(error); }
   }

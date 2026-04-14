@@ -34,6 +34,13 @@ export const invoiceService = {
   ...createService('/invoices'),
   getRevenueStats: (params) => api.get('/invoices/revenue', { params })
 };
+export const paymentService = {
+  ...createService('/payments'),
+  getByInvoice: (invoiceId) => api.get(`/payments/invoice/${invoiceId}`),
+  confirm: (id) => api.put(`/payments/${id}/confirm`),
+  markFailed: (id, data) => api.put(`/payments/${id}/failed`, data),
+  refund: (id) => api.put(`/payments/${id}/refund`)
+};
 export const settingsService = {
   getAll: (params) => api.get('/settings', { params }),
   getByKey: (key) => api.get(`/settings/${key}`),

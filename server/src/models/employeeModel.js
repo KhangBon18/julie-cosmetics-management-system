@@ -1,7 +1,10 @@
 const { pool } = require('../config/db');
+const { syncApprovedResignations } = require('../utils/employeeLifecycle');
 
 const Employee = {
   findAll: async (page = 1, limit = 10, status) => {
+    await syncApprovedResignations();
+
     let query = `SELECT e.*, p.position_name, p.position_id
                  FROM employees e
                  LEFT JOIN employee_positions ep ON e.employee_id = ep.employee_id AND ep.end_date IS NULL
@@ -29,6 +32,8 @@ const Employee = {
   },
 
   findById: async (id) => {
+    await syncApprovedResignations(undefined, id);
+
     const [rows] = await pool.query(
       `SELECT e.*, p.position_name, p.position_id
        FROM employees e
@@ -41,23 +46,82 @@ const Employee = {
   },
 
   create: async (data) => {
-    const { full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary } = data;
-    const [result] = await pool.query(
-      `INSERT INTO employees (full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [full_name, email, phone || null, address || null, gender || 'Nam', date_of_birth || null, hire_date, base_salary || 0]
-    );
-    return result.insertId;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const {
+        full_name,
+        email,
+        phone,
+        address,
+        gender,
+        date_of_birth,
+        hire_date,
+        base_salary,
+        position_id
+      } = data;
+
+      const [positionRows] = await connection.query(
+        'SELECT position_id, base_salary FROM positions WHERE position_id = ?',
+        [position_id]
+      );
+
+      if (!positionRows.length) {
+        throw Object.assign(new Error('Chức vụ ban đầu không tồn tại'), { status: 400 });
+      }
+
+      const salaryAtTime = Number(base_salary || positionRows[0].base_salary || 0);
+
+      const [result] = await connection.query(
+        `INSERT INTO employees (full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [full_name, email, phone || null, address || null, gender || 'Nam', date_of_birth || null, hire_date, salaryAtTime]
+      );
+
+      await connection.query(
+        `INSERT INTO employee_positions (employee_id, position_id, effective_date, salary_at_time, note)
+         VALUES (?, ?, ?, ?, ?)`,
+        [result.insertId, position_id, hire_date, salaryAtTime, 'Chức vụ ban đầu khi tạo hồ sơ nhân sự']
+      );
+
+      await connection.commit();
+      return result.insertId;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 
   update: async (id, data) => {
     const { full_name, email, phone, address, gender, date_of_birth, hire_date, status } = data;
-    const [result] = await pool.query(
-      `UPDATE employees SET full_name = ?, email = ?, phone = ?, address = ?, gender = ?, date_of_birth = ?, hire_date = ?, status = ?
-       WHERE employee_id = ?`,
-      [full_name, email, phone, address, gender, date_of_birth, hire_date, status, id]
-    );
-    return result.affectedRows;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [result] = await connection.query(
+        `UPDATE employees SET full_name = ?, email = ?, phone = ?, address = ?, gender = ?, date_of_birth = ?, hire_date = ?, status = ?
+         WHERE employee_id = ?`,
+        [full_name, email, phone, address, gender, date_of_birth, hire_date, status, id]
+      );
+
+      if (status === 'inactive') {
+        await connection.query(
+          'UPDATE users SET is_active = 0 WHERE employee_id = ? AND deleted_at IS NULL',
+          [id]
+        );
+      }
+
+      await connection.commit();
+      return result.affectedRows;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 
   delete: async (id) => {
@@ -102,6 +166,25 @@ const Employee = {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
+
+      const [employeeRows] = await connection.query(
+        `SELECT employee_id, status, hire_date
+         FROM employees
+         WHERE employee_id = ? AND deleted_at IS NULL
+         FOR UPDATE`,
+        [employee_id]
+      );
+
+      const employee = employeeRows[0];
+      if (!employee) {
+        throw Object.assign(new Error('Không tìm thấy nhân viên'), { status: 404 });
+      }
+      if (employee.status !== 'active') {
+        throw Object.assign(new Error('Không thể đổi chức vụ cho nhân sự đã nghỉ việc'), { status: 400 });
+      }
+      if (new Date(effective_date) < new Date(employee.hire_date)) {
+        throw Object.assign(new Error('Ngày hiệu lực chức vụ không được trước ngày vào làm'), { status: 400 });
+      }
 
       const [currentRows] = await connection.query(
         `SELECT id, effective_date

@@ -6,7 +6,7 @@ import usePermission from '../hooks/usePermission';
 
 const statusBadge = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
 const statusLabel = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối' };
-const typeLabel = { annual: 'Phép năm', sick: 'Ốm đau', maternity: 'Thai sản', unpaid: 'Không lương' };
+const typeLabel = { annual: 'Phép năm', sick: 'Ốm đau', maternity: 'Thai sản', unpaid: 'Không lương', resignation: 'Nghỉ việc' };
 
 export default function LeavesPage() {
   const [leaves, setLeaves] = useState([]);
@@ -18,11 +18,21 @@ export default function LeavesPage() {
   useEffect(() => { loadData(); }, []);
   const loadData = async () => { try { const d = await leaveService.getAll({ limit: 50 }); setLeaves(d.leaves||[]); setTotal(d.total||0); } catch(e){toast.error(e.message);} };
   const handleApprove = async (id) => { try { await leaveService.approve(id); toast.success('Đã duyệt'); loadData(); } catch(e){toast.error(e.message);} };
-  const handleReject = async (id) => { const r=prompt('Lý do từ chối:'); if(!r) return; try { await leaveService.reject(id, {reject_reason:r}); toast.success('Đã từ chối'); loadData(); } catch(e){toast.error(e.message);} };
+  const handleReject = async (id) => {
+    const r = prompt('Lý do từ chối:');
+    if (!r?.trim()) return;
+    try {
+      await leaveService.reject(id, { reject_reason: r.trim() });
+      toast.success('Đã từ chối');
+      loadData();
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
 
   return (
     <div>
-      <div className="page-header"><div><h1>Nghỉ phép</h1><p>{total} đơn</p></div></div>
+      <div className="page-header"><div><h1>Nghỉ phép & Nghỉ việc</h1><p>{total} đơn</p></div></div>
       <div className="card"><div className="table-container">
         <table>
           <thead><tr><th>Nhân viên</th><th>Loại</th><th>Từ ngày</th><th>Đến ngày</th><th>Số ngày</th><th>Lý do</th><th>Trạng thái</th>{isManager&&<th>Thao tác</th>}</tr></thead>
@@ -34,7 +44,14 @@ export default function LeavesPage() {
                 <td>{new Date(l.start_date).toLocaleDateString('vi-VN')}</td>
                 <td>{new Date(l.end_date).toLocaleDateString('vi-VN')}</td>
                 <td>{l.total_days}</td>
-                <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.reason}</td>
+                <td style={{maxWidth:220}}>
+                  <div style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.reason}</div>
+                  {l.status === 'rejected' && l.reject_reason ? (
+                    <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                      Lý do từ chối: {l.reject_reason}
+                    </div>
+                  ) : null}
+                </td>
                 <td><span className={`badge ${statusBadge[l.status]}`}>{statusLabel[l.status]}</span></td>
                 {isManager && <td>{l.status==='pending' && <><button className="btn btn-sm btn-success" onClick={()=>handleApprove(l.request_id)}><FiCheck /></button>{' '}<button className="btn btn-sm btn-danger" onClick={()=>handleReject(l.request_id)}><FiX /></button></>}</td>}
               </tr>
