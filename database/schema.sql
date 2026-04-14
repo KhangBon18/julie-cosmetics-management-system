@@ -72,7 +72,7 @@ CREATE TABLE users (
 CREATE TABLE leave_requests (
   request_id     INT            AUTO_INCREMENT PRIMARY KEY,
   employee_id    INT            NOT NULL,
-  leave_type     ENUM('annual','sick','maternity','unpaid') NOT NULL DEFAULT 'annual',
+  leave_type     ENUM('annual','sick','maternity','unpaid','resignation') NOT NULL DEFAULT 'annual',
   start_date     DATE           NOT NULL,
   end_date       DATE           NOT NULL,
   total_days     INT            NOT NULL DEFAULT 1,
@@ -82,9 +82,11 @@ CREATE TABLE leave_requests (
   approved_at    TIMESTAMP      NULL,
   reject_reason  TEXT           NULL,
   created_at     TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_leave_date_range CHECK (end_date >= start_date),
   CONSTRAINT fk_lr_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE RESTRICT,
   FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL,
-  INDEX idx_leave_emp_status (employee_id, status)
+  INDEX idx_leave_emp_status (employee_id, status),
+  INDEX idx_leave_emp_dates (employee_id, start_date, end_date, status)
 ) ENGINE=InnoDB COMMENT='Đơn xin nghỉ phép';
 
 CREATE TABLE salaries (
@@ -700,6 +702,42 @@ BEGIN
     JOIN import_receipt_items iri ON p.product_id = iri.product_id
     SET p.stock_quantity = p.stock_quantity + iri.quantity
     WHERE iri.receipt_id = NEW.receipt_id;
+  END IF;
+END$$
+
+-- Chặn 1 nhân sự được gắn với nhiều tài khoản hệ thống chưa xóa
+CREATE TRIGGER trg_users_unique_employee_insert
+BEFORE INSERT ON users
+FOR EACH ROW
+BEGIN
+  IF NEW.employee_id IS NOT NULL
+     AND NEW.deleted_at IS NULL
+     AND EXISTS (
+       SELECT 1
+       FROM users u
+       WHERE u.employee_id = NEW.employee_id
+         AND u.deleted_at IS NULL
+     ) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Mỗi nhân viên chỉ được liên kết với một tài khoản hệ thống chưa xóa';
+  END IF;
+END$$
+
+CREATE TRIGGER trg_users_unique_employee_update
+BEFORE UPDATE ON users
+FOR EACH ROW
+BEGIN
+  IF NEW.employee_id IS NOT NULL
+     AND NEW.deleted_at IS NULL
+     AND EXISTS (
+       SELECT 1
+       FROM users u
+       WHERE u.employee_id = NEW.employee_id
+         AND u.deleted_at IS NULL
+         AND u.user_id <> OLD.user_id
+     ) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Mỗi nhân viên chỉ được liên kết với một tài khoản hệ thống chưa xóa';
   END IF;
 END$$
 

@@ -22,8 +22,9 @@ export default function ImportsPage() {
   const [searchProduct, setSearchProduct] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const { canCreate } = usePermission();
+  const { canCreate, canDelete } = usePermission();
   const _canCreate = canCreate('imports');
+  const _canDelete = canDelete('imports');
 
   useEffect(() => { loadData(); }, [page]);
   const loadData = async () => {
@@ -110,6 +111,23 @@ export default function ImportsPage() {
       const data = await importService.getById(id);
       setViewReceipt(data);
     } catch (err) { toast.error(err.message); }
+  };
+
+  const cancelReceipt = async (receipt) => {
+    if (!window.confirm(`Hủy phiếu nhập #${receipt.receipt_id}? Chỉ hủy được khi chưa có biến động kho phát sinh sau phiếu nhập này.`)) {
+      return;
+    }
+    try {
+      await importService.delete(receipt.receipt_id);
+      toast.success('Đã hủy phiếu nhập');
+      if (viewReceipt?.receipt_id === receipt.receipt_id) {
+        const fresh = await importService.getById(receipt.receipt_id);
+        setViewReceipt(fresh);
+      }
+      loadData();
+    } catch (err) {
+      toast.error(err.message || 'Không thể hủy phiếu nhập');
+    }
   };
 
   const filteredProducts = products.filter(p =>
@@ -200,6 +218,10 @@ export default function ImportsPage() {
               </div>
             )}
 
+            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>
+              Giá nhập trên form là giá theo chứng từ nhà cung cấp. Hệ thống sẽ tự cập nhật giá nhập hiện tại của sản phẩm khi phiếu nhập được lưu thành công.
+            </div>
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !importItems.length || !selectedSupplier}>
                 {submitting ? 'Đang tạo...' : '✅ Xác nhận nhập kho'}
@@ -223,6 +245,12 @@ export default function ImportsPage() {
               <div><strong>Người tạo:</strong> {viewReceipt.created_by_name || '—'}</div>
               <div><strong>Ngày:</strong> {new Date(viewReceipt.created_at).toLocaleString('vi-VN')}</div>
             </div>
+            <div style={{ marginBottom: 12 }}>
+              <strong>Trạng thái:</strong>{' '}
+              <span className={`badge ${viewReceipt.status === 'cancelled' ? 'badge-danger' : 'badge-success'}`}>
+                {viewReceipt.status === 'cancelled' ? 'Đã hủy' : 'Hoàn tất'}
+              </span>
+            </div>
             <table>
               <thead><tr><th>Sản phẩm</th><th>Giá nhập</th><th>SL</th><th>Thành tiền</th></tr></thead>
               <tbody>
@@ -241,7 +269,7 @@ export default function ImportsPage() {
       {/* ═══ DANH SÁCH ═══ */}
       <div className="card"><div className="table-container">
         <table>
-          <thead><tr><th>Mã</th><th>Nhà cung cấp</th><th>Người tạo</th><th>Tổng tiền</th><th>Ghi chú</th><th>Ngày nhập</th><th></th></tr></thead>
+          <thead><tr><th>Mã</th><th>Nhà cung cấp</th><th>Người tạo</th><th>Tổng tiền</th><th>Trạng thái</th><th>Ghi chú</th><th>Ngày nhập</th><th></th></tr></thead>
           <tbody>
             {imports.map(i => (
               <tr key={i.receipt_id}>
@@ -249,12 +277,24 @@ export default function ImportsPage() {
                 <td style={{ fontWeight: 600 }}>{i.supplier_name}</td>
                 <td>{i.created_by_name || '—'}</td>
                 <td style={{ fontWeight: 600, color: '#f59e0b' }}>{fmt(i.total_amount)}đ</td>
+                <td>
+                  <span className={`badge ${i.status === 'cancelled' ? 'badge-danger' : 'badge-success'}`}>
+                    {i.status === 'cancelled' ? 'Đã hủy' : 'Hoàn tất'}
+                  </span>
+                </td>
                 <td>{i.note || '—'}</td>
                 <td>{new Date(i.created_at).toLocaleDateString('vi-VN')}</td>
-                <td><button className="btn btn-outline" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => viewDetail(i.receipt_id)}>👁</button></td>
+                <td style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-outline" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => viewDetail(i.receipt_id)}>👁</button>
+                  {_canDelete && i.status === 'completed' ? (
+                    <button className="btn btn-outline" style={{ padding: '2px 8px', fontSize: 12, color: '#ef4444' }} onClick={() => cancelReceipt(i)}>
+                      Hủy
+                    </button>
+                  ) : null}
+                </td>
               </tr>
             ))}
-            {!imports.length && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có phiếu nhập nào</td></tr>}
+            {!imports.length && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có phiếu nhập nào</td></tr>}
           </tbody>
         </table>
       </div></div>

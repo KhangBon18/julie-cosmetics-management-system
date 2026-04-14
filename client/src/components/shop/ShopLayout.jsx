@@ -4,6 +4,7 @@ import { FiShoppingBag, FiUser, FiChevronDown, FiLogOut, FiPackage } from 'react
 import { CartContext } from '../../context/CartContext';
 import { AuthContext } from '../../context/AuthContext';
 import publicService from '../../services/publicService';
+import { getWorkspaceHomePath } from '../../utils/workspace';
 
 export default function ShopLayout() {
   const { cartCount } = useContext(CartContext);
@@ -138,7 +139,7 @@ export default function ShopLayout() {
                 </div>
               ) : (
                 /* ── Staff/Admin dashboard link ── */
-                <Link to={user.role === 'admin' || user.role === 'manager' ? '/admin' : '/staff'} className="shop-cart-btn" title="Dashboard">
+                <Link to={getWorkspaceHomePath(user)} className="shop-cart-btn" title="Dashboard">
                   <FiUser size={18} />
                 </Link>
               )

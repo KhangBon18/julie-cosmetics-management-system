@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FiUsers, FiPackage, FiShoppingBag, FiDollarSign, FiTag, FiTruck, FiArrowRight, FiAlertTriangle, FiTrendingUp, FiCalendar } from 'react-icons/fi';
 import { productService, customerService, invoiceService, employeeService, brandService } from '../services/dataService';
 import api from '../services/api';
+import useAuth from '../hooks/useAuth';
+import { getWorkspaceHomePath, rebaseInternalPath } from '../utils/workspace';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const location = useLocation();
   const [stats, setStats] = useState({ products: 0, customers: 0, invoices: 0, employees: 0, brands: 0, revenue: 0 });
   const [recentInvoices, setRecentInvoices] = useState([]);
   const [lowStock, setLowStock] = useState([]);
@@ -46,6 +50,8 @@ export default function DashboardPage() {
 
   // Calculate max revenue for chart bar heights
   const maxRevenue = Math.max(...monthlyRevenue.map(m => parseFloat(m.revenue) || 0), 1);
+  const workspaceHome = getWorkspaceHomePath(user, location.pathname);
+  const toWorkspace = (path) => rebaseInternalPath(path, workspaceHome);
 
   return (
     <div>
@@ -147,7 +153,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3><FiShoppingBag style={{ verticalAlign: 'middle', marginRight: 6 }} /> Hóa đơn gần đây</h3>
-              <Link to="/admin/invoices" style={{ fontSize: 13, color: '#6366f1', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Link to={toWorkspace('/admin/invoices')} style={{ fontSize: 13, color: '#6366f1', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
                 Xem tất cả <FiArrowRight size={12} />
               </Link>
             </div>
@@ -179,16 +185,16 @@ export default function DashboardPage() {
           <div className="card" style={{ marginBottom: 20 }}>
             <div className="card-header"><h3>⚡ Thao tác nhanh</h3></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Link to="/admin/invoices" className="btn btn-primary" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Link to={toWorkspace('/admin/invoices')} className="btn btn-primary" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <FiShoppingBag /> Tạo hóa đơn mới
               </Link>
-              <Link to="/admin/products" className="btn btn-outline" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Link to={toWorkspace('/admin/products')} className="btn btn-outline" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <FiPackage /> Quản lý sản phẩm
               </Link>
-              <Link to="/admin/imports" className="btn btn-outline" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Link to={toWorkspace('/admin/imports')} className="btn btn-outline" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <FiTruck /> Nhập kho
               </Link>
-              <Link to="/admin/reports" className="btn btn-outline" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Link to={toWorkspace('/admin/reports')} className="btn btn-outline" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <FiCalendar /> Xem báo cáo
               </Link>
             </div>
@@ -198,7 +204,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3><FiAlertTriangle style={{ verticalAlign: 'middle', marginRight: 6, color: '#f59e0b' }} /> Sắp hết hàng</h3>
-              <Link to="/admin/products" style={{ fontSize: 13, color: '#6366f1', fontWeight: 500 }}>Xem tất cả</Link>
+              <Link to={toWorkspace('/admin/products')} style={{ fontSize: 13, color: '#6366f1', fontWeight: 500 }}>Xem tất cả</Link>
             </div>
             <div className="card-body">
               {lowStock.length > 0 ? (

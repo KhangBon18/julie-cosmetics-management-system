@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import useAuth from '../hooks/useAuth';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
+import { getWorkspaceHomePath } from '../utils/workspace';
 
 export default function LoginPage() {
   const { user, login } = useAuth();
@@ -9,9 +10,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const workspaceHome = getWorkspaceHomePath(user);
 
   if (user) {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to={workspaceHome} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -20,7 +22,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await login(username, password);
-      navigate('/admin', { replace: true });
+      navigate(getWorkspaceHomePath(data.user), { replace: true });
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại');
     } finally {

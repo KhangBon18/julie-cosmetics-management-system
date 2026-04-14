@@ -1,10 +1,11 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FiArrowLeft, FiCheck, FiShield, FiTruck, FiUser } from 'react-icons/fi';
 import { CartContext } from '../../context/CartContext';
 import { AuthContext } from '../../context/AuthContext';
 import publicService from '../../services/publicService';
 import { toast } from 'react-toastify';
+import { buildCartSignature, summarizeCartIssues } from '../../utils/cartValidation';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -15,13 +16,14 @@ const PAYMENT_METHODS = [
 ];
 
 export default function CheckoutPage() {
-  const { cart, cartTotal, clearCart } = useContext(CartContext);
+  const { cart, cartTotal, clearCart, replaceCart } = useContext(CartContext);
   const { user } = useContext(AuthContext);
   const [form, setForm] = useState({ customer_name: '', customer_phone: '', customer_email: '', shipping_address: '', note: '' });
   const [payment, setPayment] = useState('cod');
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState(null);
   const [errors, setErrors] = useState({});
+  const lastValidatedSignature = useRef('');
 
   // Auto-fill from customer profile
   useEffect(() => {
@@ -35,6 +37,34 @@ export default function CheckoutPage() {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    const syncCart = async () => {
+      if (!cart.length) {
+        lastValidatedSignature.current = '';
+        return;
+      }
+
+      const currentSignature = buildCartSignature(cart);
+      if (currentSignature === lastValidatedSignature.current) return;
+
+      try {
+        const snapshot = await publicService.validateCart({
+          items: cart.map(item => ({ product_id: item.product_id, quantity: item.quantity }))
+        });
+        lastValidatedSignature.current = buildCartSignature(snapshot.items || []);
+
+        if (snapshot.summary?.changed) {
+          replaceCart(snapshot.items || []);
+          toast.warn(summarizeCartIssues(snapshot.issues));
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    syncCart();
+  }, [cart, replaceCart]);
 
   const shipping = cartTotal >= 500000 ? 0 : 30000;
   const total = cartTotal + shipping;
@@ -54,8 +84,25 @@ export default function CheckoutPage() {
     if (!validate() || submitting) return;
     setSubmitting(true);
     try {
+      const snapshot = await publicService.validateCart({
+        items: cart.map(item => ({ product_id: item.product_id, quantity: item.quantity }))
+      });
+      lastValidatedSignature.current = buildCartSignature(snapshot.items || []);
+
+      if (!snapshot.items?.length) {
+        replaceCart([]);
+        toast.error(snapshot.issues?.[0]?.message || 'Giỏ hàng không còn sản phẩm hợp lệ');
+        return;
+      }
+
+      if (snapshot.summary?.changed) {
+        replaceCart(snapshot.items || []);
+        toast.warn(`${summarizeCartIssues(snapshot.issues)} Vui lòng kiểm tra lại đơn hàng rồi đặt lại.`);
+        return;
+      }
+
       const result = await publicService.checkout({
-        items: cart.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
+        items: snapshot.items.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
         ...form,
         payment_method: payment
       });
@@ -63,7 +110,12 @@ export default function CheckoutPage() {
       clearCart();
       toast.success('Đặt hàng thành công!');
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Đặt hàng thất bại. Vui lòng thử lại.');
+      const snapshot = err?.cart_snapshot;
+      if (snapshot?.items) {
+        replaceCart(snapshot.items);
+        lastValidatedSignature.current = buildCartSignature(snapshot.items);
+      }
+      toast.error(err?.message || 'Đặt hàng thất bại. Vui lòng thử lại.');
     } finally {
       setSubmitting(false);
     }

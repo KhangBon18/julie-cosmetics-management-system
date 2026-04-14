@@ -6,7 +6,8 @@ const leaveTypeLabels = {
   annual: 'Phép năm',
   sick: 'Ốm đau',
   maternity: 'Thai sản',
-  unpaid: 'Nghỉ không lương'
+  unpaid: 'Nghỉ không lương',
+  resignation: 'Nghỉ việc'
 };
 const statusLabels = { pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối' };
 const statusClass = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-danger' };
@@ -70,18 +71,18 @@ export default function MyLeavePage() {
     <div>
       <div className="page-header">
         <div>
-          <h1>Nghỉ phép</h1>
-          <p>{leaves.length} đơn nghỉ phép</p>
+          <h1>Nghỉ phép & Nghỉ việc</h1>
+          <p>{leaves.length} đơn đã gửi</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? '✕ Đóng' : '+ Nộp đơn nghỉ phép'}
+          {showForm ? '✕ Đóng' : '+ Tạo đơn mới'}
         </button>
       </div>
 
       {/* Form nộp đơn */}
       {showForm && (
         <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid #6366f1' }}>
-          <div className="card-header"><h3>📝 Nộp đơn nghỉ phép</h3></div>
+          <div className="card-header"><h3>📝 Tạo đơn nghỉ phép / nghỉ việc</h3></div>
           <div className="card-body">
             <form onSubmit={handleSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -92,11 +93,15 @@ export default function MyLeavePage() {
                     <option value="sick">Ốm đau</option>
                     <option value="maternity">Thai sản</option>
                     <option value="unpaid">Nghỉ không lương</option>
+                    <option value="resignation">Nghỉ việc</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Số ngày: <strong style={{ color: '#6366f1' }}>{calcDays()} ngày</strong></label>
+                  <label>Số ngày ước tính: <strong style={{ color: '#6366f1' }}>{calcDays()} ngày</strong></label>
                   <input className="form-control" disabled value={`${calcDays()} ngày`} />
+                  <small style={{ color: '#64748b', marginTop: 6, display: 'block' }}>
+                    Đây là số ngày preview. Với đơn nghỉ việc, ngày kết thúc sẽ được xem là ngày làm việc cuối cùng.
+                  </small>
                 </div>
                 <div className="form-group">
                   <label>Ngày bắt đầu</label>
@@ -108,11 +113,16 @@ export default function MyLeavePage() {
                 </div>
               </div>
               <div className="form-group">
-                <label>Lý do nghỉ phép</label>
+                <label>{form.leave_type === 'resignation' ? 'Lý do nghỉ việc' : 'Lý do nghỉ phép'}</label>
                 <textarea className="form-control" rows={3} value={form.reason}
                   onChange={e => setForm({ ...form, reason: e.target.value })}
-                  placeholder="Nhập lý do nghỉ phép..." required />
+                  placeholder={form.leave_type === 'resignation' ? 'Nhập lý do nghỉ việc, thời điểm bàn giao...' : 'Nhập lý do nghỉ phép...'} required />
               </div>
+              {form.leave_type === 'resignation' ? (
+                <div style={{ background: '#fff7ed', color: '#9a3412', padding: 12, borderRadius: 8, marginTop: 8, fontSize: 13 }}>
+                  Sau khi quản lý duyệt, hệ thống dùng <strong>ngày kết thúc</strong> làm ngày nghỉ việc chính thức để khóa tài khoản và chuyển hồ sơ sang trạng thái đã nghỉ.
+                </div>
+              ) : null}
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button className="btn btn-primary" type="submit" disabled={submitting}>
                   {submitting ? 'Đang nộp...' : '📋 Nộp đơn'}
@@ -140,10 +150,17 @@ export default function MyLeavePage() {
                   <td style={{ fontWeight: 600 }}>{l.total_days}</td>
                   <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.reason}</td>
                   <td><span className={`badge ${statusClass[l.status]}`}>{statusLabels[l.status]}</span></td>
-                  <td>{l.approved_by_name || '—'}</td>
+                  <td>
+                    <div>{l.approved_by_name || '—'}</div>
+                    {l.status === 'rejected' && l.reject_reason ? (
+                      <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                        Lý do: {l.reject_reason}
+                      </div>
+                    ) : null}
+                  </td>
                 </tr>
               ))}
-              {!leaves.length && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có đơn nghỉ phép nào</td></tr>}
+              {!leaves.length && <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có đơn nghỉ nào</td></tr>}
             </tbody>
           </table>
         </div>

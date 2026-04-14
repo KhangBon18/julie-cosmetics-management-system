@@ -51,6 +51,33 @@ const Loading = () => (
 /* Permission-restricted route shorthand */
 const P = ({ perm, children }) => <ProtectedRoute permission={perm}>{children}</ProtectedRoute>;
 
+const renderInternalWorkspaceRoutes = () => (
+  <>
+    <Route index element={<HomePage />} />
+
+    <Route path="profile" element={<MyProfilePage />} />
+    <Route path="my-leaves" element={<MyLeavePage />} />
+    <Route path="my-salary" element={<MySalaryPage />} />
+
+    <Route path="products" element={<P perm="products.read"><ProductsPage /></P>} />
+    <Route path="invoices" element={<P perm="invoices.read"><InvoicesPage /></P>} />
+    <Route path="customers" element={<P perm="customers.read"><CustomersPage /></P>} />
+    <Route path="leaves" element={<P perm="leaves.read"><LeavesPage /></P>} />
+    <Route path="employees" element={<P perm="employees.read"><EmployeesPage /></P>} />
+    <Route path="brands" element={<P perm="brands.read"><BrandsPage /></P>} />
+    <Route path="categories" element={<P perm="categories.read"><CategoriesPage /></P>} />
+    <Route path="positions" element={<P perm="positions.read"><PositionsPage /></P>} />
+    <Route path="salaries" element={<P perm="salaries.read"><SalariesPage /></P>} />
+    <Route path="reviews" element={<P perm="reviews.read"><ReviewsPage /></P>} />
+    <Route path="reports" element={<P perm="reports.read"><ReportsPage /></P>} />
+    <Route path="suppliers" element={<P perm="suppliers.read"><SuppliersPage /></P>} />
+    <Route path="imports" element={<P perm="imports.read"><ImportsPage /></P>} />
+    <Route path="users" element={<P perm="users.read"><UsersPage /></P>} />
+    <Route path="roles" element={<P perm="roles.read"><RolesPage /></P>} />
+    <Route path="settings" element={<P perm="settings.read"><SettingsPage /></P>} />
+  </>
+);
+
 function App() {
   return (
     <ErrorBoundary>
@@ -72,34 +99,22 @@ function App() {
                 {/* ═══ Admin Dashboard ═══ */}
                 <Route path="/admin/login" element={<LoginPage />} />
                 <Route path="/admin" element={<DashboardLayout />}>
-                  <Route index element={<HomePage />} />
-                  
-                  {/* Cá nhân (Public for all logged in staff/admin) */}
-                  <Route path="profile" element={<MyProfilePage />} />
-                  <Route path="my-leaves" element={<MyLeavePage />} />
-                  <Route path="my-salary" element={<MySalaryPage />} />
-
-                  {/* Permission-protected routes */}
-                  <Route path="products" element={<P perm="products.read"><ProductsPage /></P>} />
-                  <Route path="invoices" element={<P perm="invoices.read"><InvoicesPage /></P>} />
-                  <Route path="customers" element={<P perm="customers.read"><CustomersPage /></P>} />
-                  <Route path="leaves" element={<P perm="leaves.read"><LeavesPage /></P>} />
-                  <Route path="employees" element={<P perm="employees.read"><EmployeesPage /></P>} />
-                  <Route path="brands" element={<P perm="brands.read"><BrandsPage /></P>} />
-                  <Route path="categories" element={<P perm="categories.read"><CategoriesPage /></P>} />
-                  <Route path="positions" element={<P perm="positions.read"><PositionsPage /></P>} />
-                  <Route path="salaries" element={<P perm="salaries.read"><SalariesPage /></P>} />
-                  <Route path="reviews" element={<P perm="reviews.read"><ReviewsPage /></P>} />
-                  <Route path="reports" element={<P perm="reports.read"><ReportsPage /></P>} />
-                  <Route path="suppliers" element={<P perm="suppliers.read"><SuppliersPage /></P>} />
-                  <Route path="imports" element={<P perm="imports.read"><ImportsPage /></P>} />
-                  <Route path="users" element={<P perm="users.read"><UsersPage /></P>} />
-                  <Route path="roles" element={<P perm="roles.read"><RolesPage /></P>} />
-                  <Route path="settings" element={<P perm="settings.read"><SettingsPage /></P>} />
+                  {renderInternalWorkspaceRoutes()}
+                </Route>
+                <Route path="/hr" element={<DashboardLayout />}>
+                  {renderInternalWorkspaceRoutes()}
+                </Route>
+                <Route path="/warehouse" element={<DashboardLayout />}>
+                  {renderInternalWorkspaceRoutes()}
+                </Route>
+                <Route path="/business" element={<DashboardLayout />}>
+                  {renderInternalWorkspaceRoutes()}
+                </Route>
+                <Route path="/staff" element={<DashboardLayout />}>
+                  {renderInternalWorkspaceRoutes()}
                 </Route>
 
-                {/* Root redirects to shop, staff redirects to admin */}
-                <Route path="/staff/*" element={<Navigate to="/admin" replace />} />
+                {/* Root redirects to shop */}
                 <Route path="/" element={<Navigate to="/shop" replace />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

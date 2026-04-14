@@ -30,11 +30,24 @@ const validateImport = [
 ];
 
 // ── Employee ──
-const validateEmployee = [
+const validateEmployeeCreate = [
   body('full_name').trim().notEmpty().withMessage('Họ tên là bắt buộc'),
   body('phone').trim().notEmpty().withMessage('Số điện thoại là bắt buộc'),
+  body('email').isEmail().withMessage('Email không hợp lệ'),
+  body('hire_date').isDate().withMessage('Ngày vào làm không hợp lệ'),
+  body('position_id').isInt({ min: 1 }).withMessage('Chức vụ ban đầu là bắt buộc'),
   body('gender').optional().isIn(['Nam', 'Nữ']).withMessage('Giới tính không hợp lệ'),
   body('base_salary').optional().isFloat({ min: 0 }).withMessage('Lương cơ bản phải >= 0'),
+  handleValidation
+];
+
+const validateEmployeeUpdate = [
+  body('full_name').trim().notEmpty().withMessage('Họ tên là bắt buộc'),
+  body('phone').trim().notEmpty().withMessage('Số điện thoại là bắt buộc'),
+  body('email').isEmail().withMessage('Email không hợp lệ'),
+  body('hire_date').isDate().withMessage('Ngày vào làm không hợp lệ'),
+  body('gender').optional().isIn(['Nam', 'Nữ']).withMessage('Giới tính không hợp lệ'),
+  body('status').optional().isIn(['active', 'inactive']).withMessage('Trạng thái nhân sự không hợp lệ'),
   handleValidation
 ];
 
@@ -91,12 +104,38 @@ const validateUserCreate = [
   handleValidation
 ];
 
+const validateUserUpdate = [
+  body('username').optional().trim().isLength({ min: 3 }).withMessage('Username không hợp lệ'),
+  body('role_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('role_id không hợp lệ'),
+  body('role')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 2 })
+    .withMessage('Role không hợp lệ'),
+  body('employee_id').optional({ values: 'falsy', nullable: true }).isInt({ min: 1 }).withMessage('employee_id không hợp lệ'),
+  body('is_active').optional().isBoolean().withMessage('is_active không hợp lệ'),
+  handleValidation
+];
+
 // ── Leave ──
 const validateLeave = [
-  body('leave_type').isIn(['annual', 'sick', 'maternity', 'unpaid']).withMessage('Loại nghỉ không hợp lệ'),
+  body('employee_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('employee_id không hợp lệ'),
+  body('leave_type').isIn(['annual', 'sick', 'maternity', 'unpaid', 'resignation']).withMessage('Loại nghỉ không hợp lệ'),
   body('start_date').isDate().withMessage('Ngày bắt đầu không hợp lệ'),
   body('end_date').isDate().withMessage('Ngày kết thúc không hợp lệ'),
   body('reason').trim().notEmpty().withMessage('Lý do là bắt buộc'),
+  body('start_date').custom((startDate, { req }) => {
+    if (!req.body.end_date) return true;
+    if (new Date(req.body.end_date) < new Date(startDate)) {
+      throw new Error('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu');
+    }
+    return true;
+  }),
+  handleValidation
+];
+
+const validateLeaveReject = [
+  body('reject_reason').trim().notEmpty().withMessage('Lý do từ chối là bắt buộc'),
   handleValidation
 ];
 
@@ -129,13 +168,16 @@ const validateChangePassword = [
 module.exports = {
   validateInvoice,
   validateImport,
-  validateEmployee,
+  validateEmployeeCreate,
+  validateEmployeeUpdate,
   validateSalaryGenerate,
   validatePositionAssignment,
   validateCustomer,
   validateProduct,
   validateUserCreate,
+  validateUserUpdate,
   validateLeave,
+  validateLeaveReject,
   validateReturn,
   validateLogin,
   validateChangePassword

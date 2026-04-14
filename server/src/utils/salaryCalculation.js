@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const Setting = require('../models/settingModel');
+const { syncApprovedResignations } = require('./employeeLifecycle');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -30,8 +31,8 @@ const formatCurrency = (value) => new Intl.NumberFormat('vi-VN').format(Math.rou
 async function calculateSalary(employeeId, month, year) {
   const targetDate = `${year}-${String(month).padStart(2, '0')}-01`;
   const monthStart = parseSqlDate(targetDate);
-  const monthEnd = parseSqlDate(`${year}-${String(month).padStart(2, '0')}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}`);
-  const monthCalendarDays = diffDaysInclusive(monthStart, monthEnd);
+  const fullMonthEnd = parseSqlDate(`${year}-${String(month).padStart(2, '0')}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}`);
+  const monthCalendarDays = diffDaysInclusive(monthStart, fullMonthEnd);
 
   // 1. Lấy thông tin nhân viên
   const [empRows] = await pool.query(
@@ -44,6 +45,22 @@ async function calculateSalary(employeeId, month, year) {
   if (!empRows.length) throw new Error('Không tìm thấy nhân viên');
   const emp = empRows[0];
 
+  const [resignationRows] = await pool.query(
+    `SELECT MIN(end_date) as resignation_date
+     FROM leave_requests
+     WHERE employee_id = ?
+       AND leave_type = 'resignation'
+       AND status = 'approved'`,
+    [employeeId]
+  );
+
+  const resignationDate = resignationRows[0]?.resignation_date ? parseSqlDate(resignationRows[0].resignation_date) : null;
+  if (resignationDate && resignationDate < monthStart) {
+    throw new Error('Nhân viên đã nghỉ việc trước kỳ lương này');
+  }
+
+  const activePeriodEnd = resignationDate && resignationDate < fullMonthEnd ? resignationDate : fullMonthEnd;
+
   // 2. Lấy lịch sử chức vụ giao với tháng cần tính.
   // Có thể tồn tại overlap lịch sử cũ, nên sẽ normalize lại theo thứ tự effective_date.
   const [positionRows] = await pool.query(
@@ -54,7 +71,7 @@ async function calculateSalary(employeeId, month, year) {
        AND ep.effective_date <= ?
        AND (ep.end_date IS NULL OR ep.end_date >= ?)
      ORDER BY ep.effective_date ASC, ep.id ASC`,
-    [employeeId, formatSqlDate(monthEnd), formatSqlDate(monthStart)]
+    [employeeId, formatSqlDate(activePeriodEnd), formatSqlDate(monthStart)]
   );
 
   const normalizedSegments = [];
@@ -73,7 +90,7 @@ async function calculateSalary(employeeId, month, year) {
 
   for (const row of positionRows) {
     const rawStart = maxDate(parseSqlDate(row.effective_date), monthStart);
-    const rawEnd = minDate(parseSqlDate(row.end_date || formatSqlDate(monthEnd)), monthEnd);
+    const rawEnd = minDate(parseSqlDate(row.end_date || formatSqlDate(activePeriodEnd)), activePeriodEnd);
     if (rawEnd < rawStart) continue;
     if (cursor < rawStart) {
       pushFallbackSegment(cursor, addDays(rawStart, -1));
@@ -91,8 +108,8 @@ async function calculateSalary(employeeId, month, year) {
     cursor = addDays(rawEnd, 1);
   }
 
-  if (cursor <= monthEnd || !normalizedSegments.length) {
-    pushFallbackSegment(cursor <= monthEnd ? cursor : monthStart, monthEnd);
+  if (cursor <= activePeriodEnd || !normalizedSegments.length) {
+    pushFallbackSegment(cursor <= activePeriodEnd ? cursor : monthStart, activePeriodEnd);
   }
 
   // 3. Tính ngày nghỉ không lương (unpaid) đã duyệt rơi vào đúng tháng này.
@@ -109,7 +126,7 @@ async function calculateSalary(employeeId, month, year) {
   const unpaidLeaveDates = new Set();
   for (const leave of leaveRows) {
     let current = maxDate(parseSqlDate(leave.start_date), monthStart);
-    const leaveEnd = minDate(parseSqlDate(leave.end_date), monthEnd);
+    const leaveEnd = minDate(parseSqlDate(leave.end_date), activePeriodEnd);
     while (current <= leaveEnd) {
       unpaidLeaveDates.add(formatSqlDate(current));
       current = addDays(current, 1);
@@ -178,7 +195,9 @@ async function calculateSalary(employeeId, month, year) {
     bonus: 0,
     deductions: 0,
     net_salary: grossSalaryRounded,
-    notes,
+    notes: resignationDate && resignationDate <= fullMonthEnd
+      ? `${notes ? `${notes}. ` : ''}Nhân sự nghỉ việc từ ${formatSqlDate(resignationDate)} nên lương chỉ tính đến hết ngày này.`
+      : notes,
     salary_breakdown: salaryBreakdown
   };
 }
@@ -187,6 +206,8 @@ async function calculateSalary(employeeId, month, year) {
  * Tính lương cho tất cả nhân viên active trong tháng/năm
  */
 async function calculateAllSalaries(month, year) {
+  await syncApprovedResignations();
+
   const [employees] = await pool.query(
     "SELECT employee_id FROM employees WHERE status = 'active'"
   );

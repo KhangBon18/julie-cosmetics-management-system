@@ -4,9 +4,9 @@ const { protect, managerUp } = require('../middleware/authMiddleware');
 
 router.use(protect);
 
-router.get('/', paymentController.getAll);
-router.get('/:id', paymentController.getById);
-router.get('/invoice/:invoiceId', paymentController.getByInvoice);
+router.get('/', managerUp, paymentController.getAll);
+router.get('/:id', managerUp, paymentController.getById);
+router.get('/invoice/:invoiceId', managerUp, paymentController.getByInvoice);
 
 // Manager+ actions
 router.put('/:id/confirm', managerUp, paymentController.confirm);

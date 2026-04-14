@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { syncApprovedResignations } = require('../utils/employeeLifecycle');
 const {
   REALIZED_INVOICE_STATUSES,
   SALES_ANALYTICS_INVOICE_STATUSES,
@@ -22,6 +23,49 @@ const {
 } = require('../utils/salesAnalyticsRules');
 
 const toNumber = (value) => Number(value || 0);
+const resolvePeriodConfig = (groupBy, anchorYear = new Date().getFullYear()) => {
+  const year = Number(anchorYear) || new Date().getFullYear();
+
+  if (groupBy === 'year') {
+    return {
+      groupBy: 'year',
+      periodSelect: `YEAR(i.created_at) as period, YEAR(i.created_at) as label`,
+      importPeriodSelect: `YEAR(created_at) as period, YEAR(created_at) as label`,
+      periods: Array.from({ length: 5 }, (_, index) => year - 4 + index),
+      title: 'năm',
+      dataDateClause: 'YEAR(i.created_at) BETWEEN ? AND ?',
+      dataDateParams: [year - 4, year],
+      importDateClause: 'YEAR(created_at) BETWEEN ? AND ?',
+      importDateParams: [year - 4, year]
+    };
+  }
+
+  if (groupBy === 'quarter') {
+    return {
+      groupBy: 'quarter',
+      periodSelect: `QUARTER(i.created_at) as period, CONCAT('Q', QUARTER(i.created_at)) as label`,
+      importPeriodSelect: `QUARTER(created_at) as period, CONCAT('Q', QUARTER(created_at)) as label`,
+      periods: [1, 2, 3, 4],
+      title: 'quý',
+      dataDateClause: 'YEAR(i.created_at) = ?',
+      dataDateParams: [year],
+      importDateClause: 'YEAR(created_at) = ?',
+      importDateParams: [year]
+    };
+  }
+
+  return {
+    groupBy: 'month',
+    periodSelect: `MONTH(i.created_at) as period, CONCAT('T', MONTH(i.created_at)) as label`,
+    importPeriodSelect: `MONTH(created_at) as period, CONCAT('T', MONTH(created_at)) as label`,
+    periods: Array.from({ length: 12 }, (_, index) => index + 1),
+    title: 'tháng',
+    dataDateClause: 'YEAR(i.created_at) = ?',
+    dataDateParams: [year],
+    importDateClause: 'YEAR(created_at) = ?',
+    importDateParams: [year]
+  };
+};
 
 const reportController = {
   // GET /api/reports/revenue — Doanh thu theo tháng/quý/năm
@@ -29,46 +73,28 @@ const reportController = {
     try {
       const { year, group_by } = req.query; // group_by: month, quarter, year
       const y = year || new Date().getFullYear();
+      const periodConfig = resolvePeriodConfig(group_by, y);
       const invoiceStatusPlaceholders = buildPlaceholders(SALES_ANALYTICS_INVOICE_STATUSES);
       const invoiceRefundSql = buildInvoiceRefundAmountSql({
         invoiceAlias: 'i',
         invoiceReturnsAlias: 'invoice_returns'
       });
 
-      let query;
-      if (group_by === 'quarter') {
-        query = `SELECT
-                   QUARTER(i.created_at) as period,
-                   CONCAT('Q', QUARTER(i.created_at)) as label,
-                   COUNT(*) as invoice_count,
-                   SUM(i.final_total) as gross_revenue,
-                   SUM(${invoiceRefundSql}) as refunded_revenue,
-                   SUM(i.final_total - ${invoiceRefundSql}) as revenue,
-                   SUM(i.discount_amount) as discount_total
-                 FROM invoices i
-                 LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
-                   ON invoice_returns.invoice_id = i.invoice_id
-                 WHERE YEAR(i.created_at) = ? AND i.status IN (${invoiceStatusPlaceholders})
-                 GROUP BY period, label
-                 ORDER BY period`;
-      } else {
-        query = `SELECT
-                   MONTH(i.created_at) as period,
-                   CONCAT('T', MONTH(i.created_at)) as label,
-                   COUNT(*) as invoice_count,
-                   SUM(i.final_total) as gross_revenue,
-                   SUM(${invoiceRefundSql}) as refunded_revenue,
-                   SUM(i.final_total - ${invoiceRefundSql}) as revenue,
-                   SUM(i.discount_amount) as discount_total
-                 FROM invoices i
-                 LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
-                   ON invoice_returns.invoice_id = i.invoice_id
-                 WHERE YEAR(i.created_at) = ? AND i.status IN (${invoiceStatusPlaceholders})
-                 GROUP BY period, label
-                 ORDER BY period`;
-      }
+      const query = `SELECT
+                       ${periodConfig.periodSelect},
+                       COUNT(*) as invoice_count,
+                       SUM(i.final_total) as gross_revenue,
+                       SUM(${invoiceRefundSql}) as refunded_revenue,
+                       SUM(i.final_total - ${invoiceRefundSql}) as revenue,
+                       SUM(i.discount_amount) as discount_total
+                     FROM invoices i
+                     LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+                       ON invoice_returns.invoice_id = i.invoice_id
+                     WHERE ${periodConfig.dataDateClause} AND i.status IN (${invoiceStatusPlaceholders})
+                     GROUP BY period, label
+                     ORDER BY period`;
 
-      const [rows] = await pool.query(query, [y, ...SALES_ANALYTICS_INVOICE_STATUSES]);
+      const [rows] = await pool.query(query, [...periodConfig.dataDateParams, ...SALES_ANALYTICS_INVOICE_STATUSES]);
       const [totalRow] = await pool.query(
         `SELECT
            COUNT(*) as total_invoices,
@@ -121,6 +147,7 @@ const reportController = {
         data: rows,
         summary: totalRow[0],
         year: y,
+        group_by: periodConfig.groupBy,
         meta: {
           scope_rule: SALES_SCOPE_RULE,
           cancelled_invoices: toNumber(metaRow[0]?.cancelled_invoices),
@@ -135,8 +162,9 @@ const reportController = {
   // GET /api/reports/profit — Lợi nhuận = Doanh thu - Giá vốn hàng bán (COGS)
   getProfit: async (req, res, next) => {
     try {
-      const { year } = req.query;
+      const { year, group_by } = req.query;
       const y = year || new Date().getFullYear();
+      const periodConfig = resolvePeriodConfig(group_by, y);
       const invoiceStatusPlaceholders = buildPlaceholders(SALES_ANALYTICS_INVOICE_STATUSES);
       const invoiceRefundSql = buildInvoiceRefundAmountSql({
         invoiceAlias: 'i',
@@ -164,21 +192,22 @@ const reportController = {
 
       const [revenueRows] = await pool.query(
         `SELECT
-           MONTH(i.created_at) as month,
+           ${periodConfig.periodSelect},
            SUM(i.final_total) as gross_revenue,
            SUM(${invoiceRefundSql}) as refunded_revenue,
            SUM(i.final_total - ${invoiceRefundSql}) as revenue
          FROM invoices i
          LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
            ON invoice_returns.invoice_id = i.invoice_id
-         WHERE YEAR(i.created_at) = ? AND i.status IN (${invoiceStatusPlaceholders})
-         GROUP BY MONTH(i.created_at)`,
-        [y, ...SALES_ANALYTICS_INVOICE_STATUSES]
+         WHERE ${periodConfig.dataDateClause} AND i.status IN (${invoiceStatusPlaceholders})
+         GROUP BY period, label
+         ORDER BY period`,
+        [...periodConfig.dataDateParams, ...SALES_ANALYTICS_INVOICE_STATUSES]
       );
 
       const [cogsRows] = await pool.query(
         `SELECT
-            MONTH(i.created_at) as month,
+            ${periodConfig.periodSelect},
             SUM(ii.quantity * ${unitCostSql}) as gross_cogs,
             SUM(${returnedQuantitySql} * ${unitCostSql}) as returned_cogs,
             SUM((ii.quantity - ${returnedQuantitySql}) * ${unitCostSql}) as cogs,
@@ -233,12 +262,13 @@ const reportController = {
          LEFT JOIN (${COMPLETED_RETURN_ITEM_AGGREGATE_SQL}) item_returns
            ON item_returns.invoice_id = i.invoice_id
           AND item_returns.product_id = ii.product_id
-         WHERE YEAR(i.created_at) = ? AND i.status IN (${invoiceStatusPlaceholders})
-         GROUP BY MONTH(i.created_at)`,
+         WHERE ${periodConfig.dataDateClause} AND i.status IN (${invoiceStatusPlaceholders})
+         GROUP BY period, label
+         ORDER BY period`,
         [
           COMPLETED_IMPORT_RECEIPT_STATUS,
           COMPLETED_IMPORT_RECEIPT_STATUS,
-          y,
+          ...periodConfig.dataDateParams,
           ...SALES_ANALYTICS_INVOICE_STATUSES
         ]
       );
@@ -254,9 +284,9 @@ const reportController = {
       let fallbackImportHistoryItems = 0;
       let fallbackCurrentCostItems = 0;
 
-      for (let m = 1; m <= 12; m++) {
-        const rev = revenueRows.find(r => r.month === m);
-        const cgs = cogsRows.find(c => c.month === m);
+      for (const period of periodConfig.periods) {
+        const rev = revenueRows.find(r => Number(r.period) === period);
+        const cgs = cogsRows.find(c => Number(c.period) === period);
         const grossRevenue = parseFloat(rev?.gross_revenue) || 0;
         const refundedRevenue = parseFloat(rev?.refunded_revenue) || 0;
         const revenue = parseFloat(rev?.revenue) || 0;
@@ -273,8 +303,14 @@ const reportController = {
         fallbackImportHistoryItems += parseInt(cgs?.fallback_import_history_items) || 0;
         fallbackCurrentCostItems += parseInt(cgs?.fallback_current_cost_items) || 0;
         data.push({
-          month: m,
-          label: `T${m}`,
+          period,
+          label: rev?.label || cgs?.label || (
+            periodConfig.groupBy === 'quarter'
+              ? `Q${period}`
+              : periodConfig.groupBy === 'year'
+                ? `${period}`
+                : `T${period}`
+          ),
           gross_revenue: grossRevenue,
           refunded_revenue: refundedRevenue,
           revenue,
@@ -288,6 +324,7 @@ const reportController = {
       res.json({
         data,
         year: y,
+        group_by: periodConfig.groupBy,
         summary: {
           gross_revenue: totalGrossRevenue,
           refunded_revenue: totalRefundedRevenue,
@@ -369,8 +406,9 @@ const reportController = {
   // GET /api/reports/inventory — Tồn kho & nhập/xuất
   getInventory: async (req, res, next) => {
     try {
-      const { year } = req.query;
+      const { year, group_by } = req.query;
       const y = year || new Date().getFullYear();
+      const periodConfig = resolvePeriodConfig(group_by, y);
       const invoiceStatusPlaceholders = buildPlaceholders(SALES_ANALYTICS_INVOICE_STATUSES);
       const lineNetRevenueSql = buildLineNetRevenueSql('i', 'ii');
       const refundAmountSql = buildRefundAmountSql({
@@ -416,12 +454,35 @@ const reportController = {
         [y, ...SALES_ANALYTICS_INVOICE_STATUSES]
       );
 
-      const [importMonthly] = await pool.query(
-        `SELECT MONTH(created_at) as month, SUM(total_amount) as total
+      const [importPeriodic] = await pool.query(
+        `SELECT ${periodConfig.importPeriodSelect}, SUM(total_amount) as total
          FROM import_receipts
-         WHERE YEAR(created_at) = ? AND status = ?
-         GROUP BY MONTH(created_at) ORDER BY month`,
-        [y, COMPLETED_IMPORT_RECEIPT_STATUS]
+         WHERE ${periodConfig.importDateClause} AND status = ?
+         GROUP BY period, label
+         ORDER BY period`,
+        [...periodConfig.importDateParams, COMPLETED_IMPORT_RECEIPT_STATUS]
+      );
+
+      const [exportPeriodic] = await pool.query(
+        `SELECT
+            ${periodConfig.periodSelect},
+            SUM(ii.quantity) as gross_exported,
+            SUM(${returnedQuantitySql}) as returned_quantity,
+            SUM(GREATEST(0, ii.quantity - ${returnedQuantitySql})) as total_exported,
+            SUM(${lineNetRevenueSql}) as gross_export_value,
+            SUM(${refundAmountSql}) as refunded_export_value,
+            SUM(GREATEST(0, ${lineNetRevenueSql} - ${refundAmountSql})) as total_export_value
+         FROM invoice_items ii
+         JOIN invoices i ON ii.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+           ON invoice_returns.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_ITEM_AGGREGATE_SQL}) item_returns
+           ON item_returns.invoice_id = i.invoice_id
+          AND item_returns.product_id = ii.product_id
+         WHERE ${periodConfig.dataDateClause} AND i.status IN (${invoiceStatusPlaceholders})
+         GROUP BY period, label
+         ORDER BY period`,
+        [...periodConfig.dataDateParams, ...SALES_ANALYTICS_INVOICE_STATUSES]
       );
 
       const [metaRows] = await pool.query(
@@ -455,8 +516,10 @@ const reportController = {
         low_stock: lowStock,
         import_summary: importStats[0],
         export_summary: exportStats[0],
-        import_monthly: importMonthly,
+        import_periodic: importPeriodic,
+        export_periodic: exportPeriodic,
         year: y,
+        group_by: periodConfig.groupBy,
         meta: {
           scope_rule: INVENTORY_SCOPE_RULE,
           cancelled_invoices: toNumber(metaRows[0]?.cancelled_invoices),
@@ -472,6 +535,7 @@ const reportController = {
   // GET /api/reports/hr — Thống kê nhân sự
   getHRStats: async (req, res, next) => {
     try {
+      await syncApprovedResignations();
       const { year } = req.query;
       const y = year || new Date().getFullYear();
 

@@ -27,9 +27,10 @@ const importController = {
   delete: async (req, res, next) => {
     try {
       const oldImport = await Import.findById(req.params.id);
-      await Import.delete(req.params.id);
-      await logAudit({ userId: req.user.user_id, action: 'DELETE', entityType: 'import_receipt', entityId: req.params.id, oldValues: oldImport, req });
-      res.json({ message: 'Xóa phiếu nhập thành công' });
+      await Import.delete(req.params.id, req.user.user_id);
+      const updatedImport = await Import.findById(req.params.id);
+      await logAudit({ userId: req.user.user_id, action: 'DELETE', entityType: 'import_receipt', entityId: req.params.id, oldValues: oldImport, newValues: updatedImport, req });
+      res.json({ message: 'Hủy phiếu nhập thành công', import_receipt: updatedImport });
     } catch (error) { next(error); }
   }
 };

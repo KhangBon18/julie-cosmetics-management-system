@@ -179,6 +179,16 @@ const MODULES = [
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
   },
+  {
+    key: 'settings',
+    name: 'Cấu hình',
+    section: 'Hệ thống',
+    path: '/admin/settings',
+    icon: 'FiSettings',
+    sortOrder: 43,
+    showInSidebar: true,
+    actions: ['read', 'update'],
+  },
 ];
 
 // ─── Action labels (Vietnamese) ───

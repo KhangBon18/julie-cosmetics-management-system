@@ -3,6 +3,14 @@ const Notification = require('../models/notificationModel');
 const { logAudit } = require('../utils/auditLogger');
 const { pool } = require('../config/db');
 
+const leaveTypeLabel = {
+  annual: 'đơn nghỉ phép',
+  sick: 'đơn nghỉ ốm',
+  maternity: 'đơn nghỉ thai sản',
+  unpaid: 'đơn nghỉ không lương',
+  resignation: 'đơn nghỉ việc'
+};
+
 const leaveController = {
   getAll: async (req, res, next) => {
     try {
@@ -14,7 +22,7 @@ const leaveController = {
   getById: async (req, res, next) => {
     try {
       const item = await Leave.findById(req.params.id);
-      if (!item) return res.status(404).json({ message: 'Không tìm thấy đơn nghỉ phép' });
+      if (!item) return res.status(404).json({ message: 'Không tìm thấy đơn nghỉ' });
 
       // IDOR protection: staff chỉ xem được đơn của mình
       const role = req.user.role;
@@ -27,26 +35,58 @@ const leaveController = {
   },
   create: async (req, res, next) => {
     try {
-      const id = await Leave.create(req.body);
+      const isManagerUp = req.user.role === 'admin' || req.user.role === 'manager';
+      const requestedEmployeeId = req.body.employee_id ? Number(req.body.employee_id) : null;
+      let employeeId = requestedEmployeeId;
+
+      if (req.user.role === 'staff') {
+        if (!req.user.employee_id) {
+          return res.status(400).json({ message: 'Tài khoản không liên kết với nhân viên nào' });
+        }
+        employeeId = req.user.employee_id;
+      } else if (!employeeId) {
+        employeeId = req.user.employee_id || null;
+      }
+
+      if (!employeeId) {
+        return res.status(400).json({ message: isManagerUp ? 'Vui lòng chọn nhân viên cho đơn nghỉ' : 'Không xác định được nhân viên' });
+      }
+
+      if (req.user.role === 'staff' && requestedEmployeeId && requestedEmployeeId !== req.user.employee_id) {
+        return res.status(403).json({ message: 'Nhân viên chỉ được tạo đơn nghỉ cho chính mình' });
+      }
+
+      const id = await Leave.create({
+        employee_id: employeeId,
+        leave_type: req.body.leave_type,
+        start_date: req.body.start_date,
+        end_date: req.body.end_date,
+        reason: req.body.reason
+      });
       const leave = await Leave.findById(id);
       await logAudit({ userId: req.user.user_id, action: 'CREATE', entityType: 'leave_request', entityId: id, newValues: leave, req });
-      res.status(201).json({ message: 'Tạo đơn nghỉ phép thành công', leave });
+      res.status(201).json({ message: leave.leave_type === 'resignation' ? 'Tạo đơn nghỉ việc thành công' : 'Tạo đơn nghỉ phép thành công', leave });
     } catch (error) { next(error); }
   },
   approve: async (req, res, next) => {
     try {
-      await Leave.approve(req.params.id, req.user.user_id);
       const leave = await Leave.findById(req.params.id);
+      if (!leave) return res.status(404).json({ message: 'Không tìm thấy đơn nghỉ' });
+
+      await Leave.approve(req.params.id, req.user.user_id);
       
       // Gửi Notification
       if (leave && leave.employee_id) {
         const [uRows] = await pool.query('SELECT user_id FROM users WHERE employee_id = ? AND is_active = 1', [leave.employee_id]);
         if (uRows.length) {
+          const leaveLabel = leaveTypeLabel[leave.leave_type] || 'đơn nghỉ';
           await Notification.create({
             userId: uRows[0].user_id,
             userType: 'staff',
-            title: 'Đơn nghỉ phép đã được duyệt',
-            message: `Quản lý đã duyệt đơn xin nghỉ phép của bạn (từ ${new Date(leave.start_date).toLocaleDateString()} đến ${new Date(leave.end_date).toLocaleDateString()}).`,
+            title: `${leaveLabel} đã được duyệt`,
+            message: leave.leave_type === 'resignation'
+              ? `Quản lý đã duyệt đơn nghỉ việc của bạn. Ngày làm việc cuối cùng: ${new Date(leave.end_date).toLocaleDateString('vi-VN')}.`
+              : `Quản lý đã duyệt ${leaveLabel} của bạn (từ ${new Date(leave.start_date).toLocaleDateString('vi-VN')} đến ${new Date(leave.end_date).toLocaleDateString('vi-VN')}).`,
             type: 'success',
             link: '/staff/leaves'
           });
@@ -54,24 +94,29 @@ const leaveController = {
       }
       
       await logAudit({ userId: req.user.user_id, action: 'UPDATE', entityType: 'leave_request', entityId: req.params.id, newValues: { status: 'approved' }, req });
-      res.json({ message: 'Đã phê duyệt đơn nghỉ phép' });
+      res.json({ message: leave.leave_type === 'resignation' ? 'Đã phê duyệt đơn nghỉ việc' : 'Đã phê duyệt đơn nghỉ phép' });
     } catch (error) { next(error); }
   },
   reject: async (req, res, next) => {
     try {
       const { reject_reason } = req.body;
-      await Leave.reject(req.params.id, req.user.user_id, reject_reason);
       const leave = await Leave.findById(req.params.id);
+      if (!leave) return res.status(404).json({ message: 'Không tìm thấy đơn nghỉ' });
+
+      await Leave.reject(req.params.id, req.user.user_id, reject_reason);
 
       // Gửi Notification
       if (leave && leave.employee_id) {
         const [uRows] = await pool.query('SELECT user_id FROM users WHERE employee_id = ? AND is_active = 1', [leave.employee_id]);
         if (uRows.length) {
+          const leaveLabel = leaveTypeLabel[leave.leave_type] || 'đơn nghỉ';
           await Notification.create({
             userId: uRows[0].user_id,
             userType: 'staff',
-            title: 'Đơn nghỉ phép bị từ chối',
-            message: `Đơn xin nghỉ phép của bạn (từ ${new Date(leave.start_date).toLocaleDateString()}) đã bị từ chối. Lý do: ${reject_reason || 'Không có'}`,
+            title: `${leaveLabel} bị từ chối`,
+            message: leave.leave_type === 'resignation'
+              ? `Đơn nghỉ việc của bạn đã bị từ chối. Lý do: ${reject_reason || 'Không có'}.`
+              : `${leaveLabel} của bạn (từ ${new Date(leave.start_date).toLocaleDateString('vi-VN')}) đã bị từ chối. Lý do: ${reject_reason || 'Không có'}`,
             type: 'error',
             link: '/staff/leaves'
           });
@@ -79,7 +124,7 @@ const leaveController = {
       }
       
       await logAudit({ userId: req.user.user_id, action: 'UPDATE', entityType: 'leave_request', entityId: req.params.id, newValues: { status: 'rejected', reject_reason }, req });
-      res.json({ message: 'Đã từ chối đơn nghỉ phép' });
+      res.json({ message: leave.leave_type === 'resignation' ? 'Đã từ chối đơn nghỉ việc' : 'Đã từ chối đơn nghỉ phép' });
     } catch (error) { next(error); }
   },
   delete: async (req, res, next) => {

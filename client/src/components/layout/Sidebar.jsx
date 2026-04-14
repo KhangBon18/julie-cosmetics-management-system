@@ -2,11 +2,11 @@ import { NavLink } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import { buildSidebarSections } from '../../config/moduleRegistry';
 
-export default function Sidebar({ isOpen, onClose }) {
+export default function Sidebar({ isOpen, onClose, workspace, basePath }) {
   const { user } = useAuth();
 
   // Build sidebar sections dynamically from module registry + user permissions
-  const sections = buildSidebarSections(user?.permissions || [], user?.role || '');
+  const sections = buildSidebarSections(user?.permissions || [], user?.role || '', basePath);
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`} aria-label="Thanh điều hướng chính">
@@ -14,7 +14,7 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="sidebar-brand-icon" aria-hidden="true">💄</div>
         <div className="sidebar-brand-text">
           Julie Cosmetics
-          <span>Hệ thống quản lý</span>
+          <span>{workspace?.title || 'Hệ thống quản lý'}</span>
         </div>
       </div>
 
@@ -26,7 +26,7 @@ export default function Sidebar({ isOpen, onClose }) {
               <NavLink
                 key={item.path}
                 to={item.path}
-                end={item.path === '/admin'}
+                end={item.path === basePath}
                 onClick={onClose}
                 className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
               >

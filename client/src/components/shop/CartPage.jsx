@@ -1,12 +1,44 @@
-import { useContext } from 'react';
+import { useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { FiMinus, FiPlus, FiTrash2, FiArrowRight, FiShield, FiTruck, FiRefreshCw, FiShoppingBag } from 'react-icons/fi';
 import { CartContext } from '../../context/CartContext';
+import publicService from '../../services/publicService';
+import { toast } from 'react-toastify';
+import { buildCartSignature, summarizeCartIssues } from '../../utils/cartValidation';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity, cartTotal } = useContext(CartContext);
+  const { cart, removeFromCart, updateQuantity, replaceCart, cartTotal } = useContext(CartContext);
+  const lastValidatedSignature = useRef('');
+
+  useEffect(() => {
+    const syncCart = async () => {
+      if (!cart.length) {
+        lastValidatedSignature.current = '';
+        return;
+      }
+
+      const currentSignature = buildCartSignature(cart);
+      if (currentSignature === lastValidatedSignature.current) return;
+
+      try {
+        const snapshot = await publicService.validateCart({
+          items: cart.map(item => ({ product_id: item.product_id, quantity: item.quantity }))
+        });
+        lastValidatedSignature.current = buildCartSignature(snapshot.items || []);
+
+        if (snapshot.summary?.changed) {
+          replaceCart(snapshot.items || []);
+          toast.warn(summarizeCartIssues(snapshot.issues));
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    syncCart();
+  }, [cart, replaceCart]);
 
   if (cart.length === 0) {
     return (

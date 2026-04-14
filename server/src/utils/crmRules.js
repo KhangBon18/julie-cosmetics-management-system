@@ -17,9 +17,19 @@ function calculateLoyaltyPoints(finalTotal, settings = {}) {
   return Math.floor(total / CRM_POINTS_BASE_AMOUNT) * getPointsPerBaseAmount(settings);
 }
 
+function determineMembershipTier(points, settings = {}) {
+  const silverThreshold = Number(settings['crm.silver_threshold'] || 100);
+  const goldThreshold = Number(settings['crm.gold_threshold'] || 500);
+
+  if ((Number(points) || 0) >= goldThreshold) return 'gold';
+  if ((Number(points) || 0) >= silverThreshold) return 'silver';
+  return 'standard';
+}
+
 module.exports = {
   CRM_POINTS_BASE_AMOUNT,
   DEFAULT_POINTS_PER_BASE_AMOUNT,
   getPointsPerBaseAmount,
-  calculateLoyaltyPoints
+  calculateLoyaltyPoints,
+  determineMembershipTier
 };
