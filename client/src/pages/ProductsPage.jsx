@@ -6,6 +6,27 @@ import { toast } from 'react-toastify';
 import usePermission from '../hooks/usePermission';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
+const sanitizePriceInput = (value) => value.replace(/[^\d]/g, '');
+const normalizePriceRange = (minPrice, maxPrice) => {
+  const normalizedMin = sanitizePriceInput(minPrice || '');
+  const normalizedMax = sanitizePriceInput(maxPrice || '');
+
+  if (!normalizedMin && !normalizedMax) {
+    return { min: '', max: '' };
+  }
+
+  if (!normalizedMin) {
+    return { min: '', max: normalizedMax };
+  }
+
+  if (!normalizedMax) {
+    return { min: normalizedMin, max: '' };
+  }
+
+  return Number(normalizedMin) <= Number(normalizedMax)
+    ? { min: normalizedMin, max: normalizedMax }
+    : { min: normalizedMax, max: normalizedMin };
+};
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -32,6 +53,7 @@ export default function ProductsPage() {
   const _canUpdate = canUpdate('products');
   const _canDelete = canDelete('products');
   const _canExport = canExport('products');
+  const normalizedPriceRange = normalizePriceRange(minPrice, maxPrice);
 
   useEffect(() => { loadProducts(); }, [page, search, filterBrand, filterCategory, filterActive, filterStock, minPrice, maxPrice, sort]);
   useEffect(() => {
@@ -51,8 +73,8 @@ export default function ProductsPage() {
         category_id: filterCategory || undefined,
         is_active: filterActive || undefined,
         stock_status: filterStock || undefined,
-        min_price: minPrice || undefined,
-        max_price: maxPrice || undefined,
+        min_price: normalizedPriceRange.min || undefined,
+        max_price: normalizedPriceRange.max || undefined,
         sort: sort || undefined
       });
       setProducts(data.products || []);
@@ -141,8 +163,24 @@ export default function ProductsPage() {
               <option value="low">Sắp hết hàng</option>
               <option value="in_stock">Còn hàng</option>
             </select>
-            <input className="form-control" style={{ width: 120 }} type="number" inputMode="numeric" min="0" placeholder="Giá từ" value={minPrice} onChange={e => { setMinPrice(e.target.value); setPage(1); }} />
-            <input className="form-control" style={{ width: 120 }} type="number" inputMode="numeric" min="0" placeholder="Giá đến" value={maxPrice} onChange={e => { setMaxPrice(e.target.value); setPage(1); }} />
+            <input
+              className="form-control"
+              style={{ width: 140 }}
+              type="text"
+              inputMode="numeric"
+              placeholder="Giá từ"
+              value={minPrice}
+              onChange={e => { setMinPrice(sanitizePriceInput(e.target.value)); setPage(1); }}
+            />
+            <input
+              className="form-control"
+              style={{ width: 140 }}
+              type="text"
+              inputMode="numeric"
+              placeholder="Giá đến"
+              value={maxPrice}
+              onChange={e => { setMaxPrice(sanitizePriceInput(e.target.value)); setPage(1); }}
+            />
             {(search || filterBrand || filterCategory || filterActive || filterStock || minPrice || maxPrice || sort) ? (
               <button
                 className="btn btn-outline"
