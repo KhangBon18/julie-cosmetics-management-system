@@ -1,4 +1,5 @@
 USE julie_cosmetics;
+SET NAMES utf8mb4;
 DELETE FROM settings WHERE setting_key = 'crm.points_per_1000';
 -- ── SETTINGS ──────────────────────────────────────────────────
 INSERT IGNORE INTO settings (setting_key, setting_value, data_type, category, description, is_public) VALUES

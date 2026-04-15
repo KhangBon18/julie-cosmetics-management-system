@@ -4,13 +4,14 @@
 -- ============================================================
 
 USE julie_cosmetics;
+SET NAMES utf8mb4;
 
 -- ── POSITIONS ─────────────────────────────────────────────────
 INSERT INTO positions (position_name, base_salary, description) VALUES
-('Manager',            15000000, 'Quản lý cửa hàng, phê duyệt đơn nghỉ phép, xem báo cáo toàn hệ thống'),
-('Nhân viên Bán hàng',  8000000, 'Tư vấn và bán hàng trực tiếp, lập hóa đơn cho khách hàng'),
-('Thủ kho',             7500000, 'Quản lý nhập/xuất kho, lập phiếu nhập hàng'),
-('Kế toán',             9000000, 'Quản lý tài chính, kiểm tra báo cáo doanh thu');
+('Quản lý cửa hàng',    15000000, 'Điều hành hoạt động cửa hàng, phê duyệt đơn từ nội bộ và theo dõi báo cáo quản trị.'),
+('Nhân viên Bán hàng',   8000000, 'Tư vấn sản phẩm, hỗ trợ bán hàng trực tiếp và lập hóa đơn cho khách hàng.'),
+('Thủ kho',              7500000, 'Quản lý nhập - xuất - tồn kho, lập phiếu nhập và kiểm soát số liệu hàng hóa.'),
+('Kế toán',              9000000, 'Theo dõi tài chính, đối soát chứng từ và kiểm tra báo cáo doanh thu.');
 
 -- ── EMPLOYEES ─────────────────────────────────────────────────
 INSERT INTO employees (full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary, status) VALUES
@@ -23,13 +24,13 @@ INSERT INTO employees (full_name, email, phone, address, gender, date_of_birth, 
 
 -- ── EMPLOYEE POSITIONS ────────────────────────────────────────
 INSERT INTO employee_positions (employee_id, position_id, effective_date, end_date, salary_at_time, note) VALUES
-(1, 1, '2022-01-01', NULL,         15000000, 'Quản lý cửa hàng từ ngày thành lập'),
-(2, 2, '2022-03-15', '2023-06-30', 7500000,  'Vào với vị trí nhân viên thử việc'),
-(2, 2, '2023-07-01', NULL,         8000000,  'Tăng lương sau khi chính thức'),
-(3, 2, '2022-06-01', NULL,         8000000,  'Nhân viên bán hàng'),
-(4, 3, '2022-04-01', NULL,         7500000,  'Thủ kho'),
-(5, 2, '2023-01-10', NULL,         8000000,  'Nhân viên bán hàng'),
-(6, 1, '2021-09-01', '2023-12-31', 14000000, 'Đã nghỉ việc cuối năm 2023');
+(1, 1, '2022-01-01', NULL,         15000000, 'Đảm nhiệm vai trò quản lý cửa hàng kể từ ngày thành lập.'),
+(2, 2, '2022-03-15', '2023-06-30', 7500000,  'Tiếp nhận ở vị trí nhân viên bán hàng trong giai đoạn thử việc.'),
+(2, 2, '2023-07-01', NULL,         8000000,  'Điều chỉnh mức lương sau khi hoàn thành thử việc và ký hợp đồng chính thức.'),
+(3, 2, '2022-06-01', NULL,         8000000,  'Phụ trách công tác bán hàng tại cửa hàng.'),
+(4, 3, '2022-04-01', NULL,         7500000,  'Phụ trách quản lý kho và điều phối nhập - xuất hàng hóa.'),
+(5, 2, '2023-01-10', NULL,         8000000,  'Phụ trách công tác bán hàng tại cửa hàng.'),
+(6, 1, '2021-09-01', '2023-12-31', 14000000, 'Kết thúc hợp đồng lao động vào cuối năm 2023.');
 
 -- ── USERS ─────────────────────────────────────────────────────
 -- Password hash cho 'admin123', 'manager123', 'staff123', 'warehouse123'
@@ -63,9 +64,9 @@ INSERT INTO categories (category_name, description) VALUES
 
 -- ── SUPPLIERS ─────────────────────────────────────────────────
 INSERT INTO suppliers (supplier_name, contact_person, phone, email, address) VALUES
-('Công ty TNHH Mỹ Phẩm Châu Âu',    'Anh Hoàng',    '0281234567', 'supply@chauau.vn',   '10 Đinh Tiên Hoàng, Q1, TP.HCM'),
-('Phân phối Mỹ Phẩm Hàn Quốc K-Beauty', 'Chị Linh', '0282345678', 'kbeauty@kpham.vn',  '25 Lý Tự Trọng, Q1, TP.HCM'),
-('Beauty World Distribution',         'Mr. Minh',     '0283456789', 'bwd@beautyworld.vn', '50 Nguyễn Đình Chiểu, Q3, TP.HCM');
+('Công ty TNHH Mỹ Phẩm Châu Âu',         'Nguyễn Hoàng Anh', '0281234567', 'supply@chauau.vn',    '10 Đinh Tiên Hoàng, Q1, TP.HCM'),
+('Phân phối Mỹ Phẩm Hàn Quốc K-Beauty',  'Trần Mỹ Linh',    '0282345678', 'kbeauty@kpham.vn',   '25 Lý Tự Trọng, Q1, TP.HCM'),
+('Beauty World Distribution',            'Lê Quang Minh',   '0283456789', 'bwd@beautyworld.vn', '50 Nguyễn Đình Chiểu, Q3, TP.HCM');
 
 -- ── PRODUCTS ──────────────────────────────────────────────────
 INSERT INTO products (product_name, brand_id, category_id, description, skin_type, volume, import_price, sell_price, stock_quantity) VALUES
@@ -106,9 +107,9 @@ INSERT INTO customers (full_name, phone, email, address, gender, date_of_birth, 
 
 -- ── IMPORT RECEIPTS ───────────────────────────────────────────
 INSERT INTO import_receipts (supplier_id, created_by, total_amount, note, created_at) VALUES
-(2, 5, 4850000,  'Nhập hàng Hàn Quốc tháng 3/2026',  '2026-03-01 09:00:00'),
-(1, 5, 2750000,  'Nhập hàng Châu Âu tháng 3/2026',    '2026-03-10 10:30:00'),
-(3, 5, 3600000,  'Nhập bổ sung hàng makeup tháng 3',  '2026-03-20 14:00:00');
+(2, 5, 4850000,  'Nhập hàng định kỳ từ nhà cung cấp Hàn Quốc - kỳ tháng 3/2026.', '2026-03-01 09:00:00'),
+(1, 5, 2750000,  'Nhập hàng định kỳ từ nhà cung cấp Châu Âu - kỳ tháng 3/2026.',   '2026-03-10 10:30:00'),
+(3, 5, 3600000,  'Nhập bổ sung nhóm hàng trang điểm - kỳ tháng 3/2026.',            '2026-03-20 14:00:00');
 
 INSERT INTO import_receipt_items (receipt_id, product_id, quantity, unit_price) VALUES
 (1, 3,  20, 85000),   -- Toner Innisfree
@@ -159,27 +160,27 @@ INSERT INTO invoice_items (invoice_id, product_id, quantity, unit_price, subtota
 
 -- ── REVIEWS ───────────────────────────────────────────────────
 INSERT INTO reviews (product_id, customer_id, rating, comment) VALUES
-(1, 1, 5, 'Kem dưỡng tuyệt vời, da mình hết khô sau 1 tuần dùng!'),
-(2, 6, 4, 'Serum hiệu quả, dùng được 2 tuần thấy da mịn hơn'),
-(3, 2, 5, 'Toner Innisfree yêu thích, mùi trà xanh dễ chịu lắm'),
-(4, 1, 5, 'Mặt nạ ngủ Laneige cực xịn, sáng dậy da căng mướt'),
-(9, 3, 4, 'Son bền màu thật, đi ăn không cần touch up'),
-(7, 4, 3, 'Mascara ok, nhưng hơi khó tẩy trang');
+(1, 1, 5, 'Khả năng dưỡng ẩm tốt, da cải thiện rõ sau khoảng một tuần sử dụng.'),
+(2, 6, 4, 'Sản phẩm cho hiệu quả tích cực sau khoảng hai tuần sử dụng.'),
+(3, 2, 5, 'Toner dịu nhẹ, mùi trà xanh dễ chịu và phù hợp dùng hằng ngày.'),
+(4, 1, 5, 'Mặt nạ ngủ cấp ẩm tốt, sáng hôm sau da mềm và căng hơn.'),
+(9, 3, 4, 'Màu son đẹp, độ bám ổn và phù hợp dùng hằng ngày.'),
+(7, 4, 3, 'Hiệu quả làm dài mi khá tốt, tuy nhiên cần tẩy trang kỹ.');
 
 -- ── LEAVE REQUESTS ────────────────────────────────────────────
 INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, total_days, reason, status, approved_by, approved_at) VALUES
-(2, 'annual',  '2026-03-10', '2026-03-11', 2, 'Nghỉ phép năm đã đăng ký từ đầu năm',      'approved', 1, '2026-03-05 09:00:00'),
-(3, 'sick',    '2026-03-15', '2026-03-15', 1, 'Bị sốt cảm, có giấy bác sĩ',               'approved', 1, '2026-03-15 08:00:00'),
-(5, 'annual',  '2026-04-05', '2026-04-07', 3, 'Du lịch gia đình đã lên kế hoạch trước',   'pending',  NULL, NULL),
-(4, 'unpaid',  '2026-03-28', '2026-03-28', 1, 'Có việc gia đình đột xuất',                 'rejected', 1, '2026-03-25 10:00:00');
+(2, 'annual',  '2026-03-10', '2026-03-11', 2, 'Nghỉ phép năm theo kế hoạch đã đăng ký từ đầu năm.',              'approved', 1, '2026-03-05 09:00:00'),
+(3, 'sick',    '2026-03-15', '2026-03-15', 1, 'Nghỉ ốm để theo dõi sức khỏe, có xác nhận khám bệnh.',             'approved', 1, '2026-03-15 08:00:00'),
+(5, 'annual',  '2026-04-05', '2026-04-07', 3, 'Nghỉ phép để giải quyết việc gia đình theo kế hoạch đã sắp xếp trước.', 'pending',  NULL, NULL),
+(4, 'unpaid',  '2026-03-28', '2026-03-28', 1, 'Xin nghỉ không lương do phát sinh việc gia đình cần trực tiếp xử lý.', 'rejected', 1, '2026-03-25 10:00:00');
 
 -- ── SALARIES (tháng 2/2026) ───────────────────────────────────
 INSERT INTO salaries (employee_id, month, year, work_days_standard, work_days_actual, unpaid_leave_days, base_salary, gross_salary, bonus, deductions, net_salary, notes, generated_by) VALUES
-(1, 2, 2026, 22, 22, 0, 15000000, 15000000, 2000000, 0, 17000000, 'Thưởng doanh số tháng 2', 1),
+(1, 2, 2026, 22, 22, 0, 15000000, 15000000, 2000000, 0, 17000000, 'Thưởng doanh số theo kết quả bán hàng tháng 2.', 1),
 (2, 2, 2026, 22, 22, 0,  8000000,  8000000,        0, 0,  8000000, '', 1),
-(3, 2, 2026, 22, 21, 0,  8000000,  7636364,        0, 0,  7636364, 'Nghỉ 1 ngày phép năm', 1),
+(3, 2, 2026, 22, 21, 0,  8000000,  7636364,        0, 0,  7636364, 'Phát sinh 1 ngày nghỉ phép năm trong tháng.', 1),
 (4, 2, 2026, 22, 22, 0,  7500000,  7500000,        0, 0,  7500000, '', 1),
-(5, 2, 2026, 22, 20, 1,  8000000,  7272727,        0, 0,  7272727, 'Nghỉ 2 ngày (1 phép + 1 không phép)', 1);
+(5, 2, 2026, 22, 20, 1,  8000000,  7272727,        0, 0,  7272727, 'Phát sinh 2 ngày nghỉ trong tháng, gồm 1 ngày phép năm và 1 ngày nghỉ không lương.', 1);
 -- ── SETTINGS ──────────────────────────────────────────────────
 INSERT INTO settings (setting_key, setting_value, data_type, category, description, is_public) VALUES
 ('work_days_standard', '22', 'number', 'hr', 'Số ngày công chuẩn trong tháng để tính lương', FALSE),

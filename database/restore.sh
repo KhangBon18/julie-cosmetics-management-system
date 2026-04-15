@@ -47,9 +47,9 @@ fi
 
 # Thực hiện restore
 if [ -z "$DB_PASS" ]; then
-  mysql -u "$DB_USER" "$DB_NAME" < "$SQL_FILE"
+  mysql --default-character-set=utf8mb4 -u "$DB_USER" "$DB_NAME" < "$SQL_FILE"
 else
-  mysql -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$SQL_FILE"
+  mysql --default-character-set=utf8mb4 -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$SQL_FILE"
 fi
 
 if [ $? -eq 0 ]; then
