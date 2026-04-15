@@ -4,6 +4,7 @@
 -- ============================================================
 
 USE julie_cosmetics;
+SET NAMES utf8mb4;
 
 -- Đảm bảo schema users tương thích RBAC ngay cả khi schema.sql chưa có role_id
 SET @add_role_id_sql = (

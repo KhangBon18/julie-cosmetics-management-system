@@ -4,6 +4,7 @@
 -- ============================================================
 
 USE julie_cosmetics;
+SET NAMES utf8mb4;
 
 -- Add parent_id for subcategory support
 ALTER TABLE categories

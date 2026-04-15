@@ -38,3 +38,5 @@ server/uploads/*
 !docs/project-assignments/*.rtf
 !docs/project-assignments/*.zip
 database/backups/
+docs/project-assignments/~
+docs/project-assignments/24.docx

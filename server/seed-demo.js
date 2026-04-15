@@ -33,6 +33,7 @@ async function seed() {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'julie_cosmetics',
+    charset: 'utf8mb4_unicode_ci',
     waitForConnections: true
   });
 
@@ -93,11 +94,11 @@ async function seed() {
     // ══════════════════════════════════════════════
     console.log('📥 Creating import receipts...');
     const importMonths = [
-      { month: '2026-01-05', note: 'Nhập hàng đầu năm' },
-      { month: '2026-01-20', note: 'Bổ sung hàng Tết' },
-      { month: '2026-02-10', note: 'Nhập hàng tháng 2' },
-      { month: '2026-03-01', note: 'Nhập hàng tháng 3' },
-      { month: '2026-03-15', note: 'Bổ sung tồn kho' },
+      { month: '2026-01-05', note: 'Nhập hàng bổ sung đầu năm' },
+      { month: '2026-01-20', note: 'Bổ sung hàng phục vụ cao điểm Tết' },
+      { month: '2026-02-10', note: 'Nhập hàng định kỳ tháng 2/2026' },
+      { month: '2026-03-01', note: 'Nhập hàng định kỳ tháng 3/2026' },
+      { month: '2026-03-15', note: 'Bổ sung tồn kho cho nhóm hàng bán chạy' },
     ];
 
     for (const imp of importMonths) {
@@ -227,18 +228,18 @@ async function seed() {
     // ══════════════════════════════════════════════
     console.log('\n⭐ Creating reviews...');
     const reviewComments = [
-      'Sản phẩm rất tốt, da mình mịn hẳn sau 2 tuần sử dụng!',
-      'Mùi hương dễ chịu, thấm nhanh, không nhớt.',
-      'Đã mua lần 3 rồi, rất hài lòng.',
-      'Giao hàng nhanh, đóng gói cẩn thận.',
-      'Chất lượng tuyệt vời, xứng đáng với giá tiền.',
-      'Sản phẩm okay, nhưng hơi đắt.',
-      'Dùng rất phù hợp với da dầu, cảm ơn shop!',
-      'Lần đầu thử, thấy khá ổn. Sẽ mua thêm.',
-      'Da mình nhạy cảm nhưng dùng không bị kích ứng.',
-      'Son lên màu chuẩn, giữ màu lâu, mua nữa!',
-      'Kem chống nắng dùng rất thích, không trôi.',
-      'Sản phẩm chính hãng, yên tâm dùng.',
+      'Khả năng dưỡng tốt, da cải thiện rõ sau khoảng hai tuần sử dụng.',
+      'Kết cấu thấm nhanh, mùi hương dễ chịu và không gây bết dính.',
+      'Đã mua lại nhiều lần, chất lượng ổn định và đáng tin cậy.',
+      'Giao hàng đúng hẹn, đóng gói cẩn thận và chuyên nghiệp.',
+      'Chất lượng tốt, phù hợp với mức giá.',
+      'Sản phẩm đáp ứng kỳ vọng, tuy nhiên giá bán hơi cao so với nhu cầu cá nhân.',
+      'Phù hợp với làn da dầu, trải nghiệm sử dụng tích cực.',
+      'Lần đầu sử dụng nhưng cảm nhận khá tốt, sẽ tiếp tục theo dõi.',
+      'Da nhạy cảm vẫn dùng ổn, không ghi nhận dấu hiệu kích ứng.',
+      'Màu son đẹp, độ bám tốt và phù hợp dùng hằng ngày.',
+      'Khả năng chống nắng ổn, chất kem dễ tán và không để lại vệt trắng.',
+      'Sản phẩm chính hãng, thông tin rõ ràng và yên tâm sử dụng.',
     ];
 
     const reviewProducts = [...freshProducts].sort(() => Math.random() - 0.5).slice(0, 12);

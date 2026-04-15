@@ -11,6 +11,7 @@ const {
   buildPlaceholders,
   buildReturnedQuantitySql
 } = require('../utils/salesAnalyticsRules');
+const { normalizePriceRange } = require('../utils/priceRange');
 
 const normalizeCartItems = (items = []) => {
   const merged = new Map();
@@ -117,12 +118,13 @@ const resolveCartSnapshot = async (items = []) => {
 router.get('/products', async (req, res, next) => {
   try {
     const { page, limit, category_id, brand_id, search, sort, min_price, max_price } = req.query;
+    const { min, max } = normalizePriceRange(min_price, max_price);
     const result = await Product.findAll({
       page: parseInt(page) || 1,
       limit: parseInt(limit) || 12,
       category_id, brand_id, search, sort,
-      min_price: min_price ? parseFloat(min_price) : undefined,
-      max_price: max_price ? parseFloat(max_price) : undefined,
+      min_price: min,
+      max_price: max,
       is_public: true
     });
     res.json(result);

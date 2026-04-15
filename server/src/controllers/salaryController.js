@@ -6,7 +6,14 @@ const salaryController = {
   getAll: async (req, res, next) => {
     try {
       const { page, limit, month, year, employee_id } = req.query;
-      const result = await Salary.findAll({ page: parseInt(page) || 1, limit: parseInt(limit) || 10, month, year, employee_id });
+      const normalizedLimit = limit === 'all' ? 'all' : (parseInt(limit, 10) || 10);
+      const result = await Salary.findAll({
+        page: parseInt(page, 10) || 1,
+        limit: normalizedLimit,
+        month,
+        year,
+        employee_id
+      });
       res.json(result);
     } catch (error) { next(error); }
   },

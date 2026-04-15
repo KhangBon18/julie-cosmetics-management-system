@@ -25,7 +25,7 @@ export default function TopHeader({ title, subtitle, toggleSidebar }) {
         </button>
         <div>
           <h2>{title}</h2>
-          {subtitle ? <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>{subtitle}</div> : null}
+          {subtitle ? <div className="top-header-subtitle">{subtitle}</div> : null}
         </div>
       </div>
       <div className="top-header-right">

@@ -5,6 +5,46 @@ import api from '../services/api';
 import usePermission from '../hooks/usePermission';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
+const monthLabel = (value) => `Tháng ${value}`;
+
+const openPrintWindow = (html, title) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    throw new Error('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup để tiếp tục.');
+  }
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body{font-family:'Segoe UI',sans-serif;padding:28px;color:#1e293b}
+          h1{text-align:center;color:#4f46e5;margin-bottom:4px}
+          h2{text-align:center;color:#64748b;font-weight:500;margin-top:0;margin-bottom:24px}
+          .meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:20px}
+          .meta-card{border:1px solid #dbeafe;background:#f8fbff;border-radius:12px;padding:14px 16px}
+          .meta-label{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+          .meta-value{font-size:18px;font-weight:700;color:#1e3a8a;margin-top:4px}
+          .section-title{margin:28px 0 10px;font-size:18px;font-weight:700;color:#1e293b}
+          table{width:100%;border-collapse:collapse;margin-top:8px}
+          th,td{border:1px solid #cbd5e1;padding:10px 12px;font-size:13px}
+          th{background:#eef2ff;font-weight:700;text-align:center}
+          td{text-align:right;vertical-align:top}
+          td.text-left{text-align:left}
+          td.text-center{text-align:center}
+          .subtotal-row td{background:#f8fafc;font-weight:700}
+          .grand-total td{background:#e0f2fe;font-weight:800}
+          .note{font-size:11px;color:#64748b;line-height:1.5;margin-top:4px}
+          .footer{margin-top:28px;text-align:center;color:#94a3b8;font-size:12px}
+        </style>
+      </head>
+      <body>${html}</body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+};
 
 export default function SalariesPage() {
   const [salaries, setSalaries] = useState([]);
@@ -46,42 +86,169 @@ export default function SalariesPage() {
   };
 
   const handlePrintAll = () => {
-    const printWindow = window.open('', '_blank');
-    const filterLabel = month ? `Tháng ${month}/${year}` : `Năm ${year}`;
-    const totalNet = salaries.reduce((s, r) => s + parseFloat(r.net_salary || 0), 0);
-    printWindow.document.write(`
-      <html><head><title>Bảng lương - Julie Cosmetics</title>
-      <style>
-        body{font-family:'Segoe UI',sans-serif;padding:30px;color:#1e293b}
-        h1{text-align:center;color:#6366f1;margin-bottom:4px}
-        h2{text-align:center;color:#64748b;font-weight:400;margin-top:0}
-        table{width:100%;border-collapse:collapse;margin-top:20px}
-        th,td{border:1px solid #cbd5e1;padding:10px 12px;text-align:right;font-size:13px}
-        th{background:#f1f5f9;font-weight:600;text-align:center}
-        .total-row{background:#eff6ff;font-weight:700}
-        .footer{margin-top:30px;text-align:center;color:#94a3b8;font-size:12px}
-      </style></head><body>
-        <h1>💄 JULIE COSMETICS</h1>
-        <h2>BẢNG LƯƠNG TỔNG HỢP — ${filterLabel}</h2>
-        <table><thead><tr><th>STT</th><th>Nhân viên</th><th>Tháng/Năm</th><th>Ngày công</th><th>Lương CB</th><th>Lương thực</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th></tr></thead>
-        <tbody>
-          ${salaries.map((s, i) => `<tr>
-            <td style="text-align:center">${i + 1}</td>
-            <td style="text-align:left;font-weight:600">${s.employee_name}</td>
-            <td style="text-align:center">${s.month}/${s.year}</td>
-            <td style="text-align:center">${s.work_days_actual}/${s.work_days_standard}</td>
-            <td>${fmt(s.base_salary)}đ</td>
-            <td>${fmt(s.gross_salary)}đ</td>
-            <td>${s.bonus > 0 ? '+' + fmt(s.bonus) + 'đ' : '—'}</td>
-            <td>${s.deductions > 0 ? '-' + fmt(s.deductions) + 'đ' : '—'}</td>
-            <td style="font-weight:bold;color:#2563eb">${fmt(s.net_salary)}đ</td>
-          </tr>`).join('')}
-          <tr class="total-row"><td colspan="8" style="text-align:right">TỔNG CỘNG:</td><td style="color:#059669">${fmt(totalNet)}đ</td></tr>
-        </tbody></table>
-        <div class="footer"><p>Xuất bởi hệ thống Julie Cosmetics — ${new Date().toLocaleString('vi-VN')}</p></div>
-      </body></html>`);
-    printWindow.document.close();
-    printWindow.print();
+    handlePrintYearReport();
+  };
+
+  const fetchPrintableSalaries = async (filters) => {
+    const response = await salaryService.getAll({
+      limit: 'all',
+      year: filters.year,
+      month: filters.month,
+      employee_id: filters.employee_id
+    });
+    return response.salaries || [];
+  };
+
+  const renderSalaryRows = (rows, startIndex = 1) => rows.map((salary, index) => `
+    <tr>
+      <td class="text-center">${startIndex + index}</td>
+      <td class="text-left">
+        <div style="font-weight:700">${salary.employee_name}</div>
+        ${salary.notes ? `<div class="note">${salary.notes}</div>` : ''}
+      </td>
+      <td class="text-center">${salary.month}/${salary.year}</td>
+      <td class="text-center">${salary.work_days_actual}/${salary.work_days_standard}</td>
+      <td>${fmt(salary.base_salary)}đ</td>
+      <td>${fmt(salary.gross_salary)}đ</td>
+      <td>${salary.bonus > 0 ? `+${fmt(salary.bonus)}đ` : '—'}</td>
+      <td>${salary.deductions > 0 ? `-${fmt(salary.deductions)}đ` : '—'}</td>
+      <td style="font-weight:700;color:#2563eb">${fmt(salary.net_salary)}đ</td>
+    </tr>
+  `).join('');
+
+  const handlePrintMonthReport = async () => {
+    if (!month) {
+      toast.info('Vui lòng chọn tháng trước khi in bảng lương theo tháng.');
+      return;
+    }
+
+    try {
+      const printableRows = await fetchPrintableSalaries({ month, year });
+      if (!printableRows.length) {
+        toast.info(`Chưa có bảng lương cho tháng ${month}/${year}.`);
+        return;
+      }
+
+      const totalNet = printableRows.reduce((sum, row) => sum + Number(row.net_salary || 0), 0);
+      const totalBonus = printableRows.reduce((sum, row) => sum + Number(row.bonus || 0), 0);
+      const totalDeductions = printableRows.reduce((sum, row) => sum + Number(row.deductions || 0), 0);
+
+      openPrintWindow(`
+        <h1>JULIE COSMETICS</h1>
+        <h2>Bảng lương tháng ${month}/${year}</h2>
+        <div class="meta">
+          <div class="meta-card">
+            <div class="meta-label">Số nhân sự</div>
+            <div class="meta-value">${printableRows.length}</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Tổng thưởng</div>
+            <div class="meta-value">${fmt(totalBonus)}đ</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Tổng khấu trừ</div>
+            <div class="meta-value">${fmt(totalDeductions)}đ</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>STT</th><th>Nhân viên</th><th>Tháng/Năm</th><th>Ngày công</th><th>Lương cơ bản</th><th>Lương thực tế</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th></tr>
+          </thead>
+          <tbody>
+            ${renderSalaryRows(printableRows)}
+            <tr class="grand-total">
+              <td colspan="8" class="text-right" style="text-align:right">Tổng thực nhận tháng ${month}/${year}</td>
+              <td>${fmt(totalNet)}đ</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="footer">Xuất bởi hệ thống Julie Cosmetics — ${new Date().toLocaleString('vi-VN')}</div>
+      `, `Bang luong thang ${month}-${year}`);
+    } catch (error) {
+      toast.error(error.message || 'Không thể in bảng lương theo tháng.');
+    }
+  };
+
+  const handlePrintYearReport = async () => {
+    if (!year) {
+      toast.info('Vui lòng chọn năm trước khi in bảng lương theo năm.');
+      return;
+    }
+
+    try {
+      const printableRows = await fetchPrintableSalaries({ year });
+      if (!printableRows.length) {
+        toast.info(`Chưa có bảng lương cho năm ${year}.`);
+        return;
+      }
+
+      const monthGroups = printableRows.reduce((acc, row) => {
+        const key = Number(row.month);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(row);
+        return acc;
+      }, {});
+
+      const sortedMonths = Object.keys(monthGroups).map(Number).sort((a, b) => a - b);
+      const annualTotal = printableRows.reduce((sum, row) => sum + Number(row.net_salary || 0), 0);
+      const annualBonus = printableRows.reduce((sum, row) => sum + Number(row.bonus || 0), 0);
+      const annualDeductions = printableRows.reduce((sum, row) => sum + Number(row.deductions || 0), 0);
+
+      let runningIndex = 1;
+      const monthSections = sortedMonths.map((monthValue) => {
+        const rows = monthGroups[monthValue];
+        const monthTotal = rows.reduce((sum, row) => sum + Number(row.net_salary || 0), 0);
+        const currentIndex = runningIndex;
+        runningIndex += rows.length;
+
+        return `
+          <div class="section-title">${monthLabel(monthValue)} năm ${year}</div>
+          <table>
+            <thead>
+              <tr><th>STT</th><th>Nhân viên</th><th>Tháng/Năm</th><th>Ngày công</th><th>Lương cơ bản</th><th>Lương thực tế</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th></tr>
+            </thead>
+            <tbody>
+              ${renderSalaryRows(rows, currentIndex)}
+              <tr class="subtotal-row">
+                <td colspan="8" style="text-align:right">Tổng thực nhận ${monthLabel(monthValue).toLowerCase()}/${year}</td>
+                <td>${fmt(monthTotal)}đ</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      }).join('');
+
+      openPrintWindow(`
+        <h1>JULIE COSMETICS</h1>
+        <h2>Bảng lương tổng hợp năm ${year}</h2>
+        <div class="meta">
+          <div class="meta-card">
+            <div class="meta-label">Số bản ghi</div>
+            <div class="meta-value">${printableRows.length}</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Tổng thưởng năm</div>
+            <div class="meta-value">${fmt(annualBonus)}đ</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Tổng khấu trừ năm</div>
+            <div class="meta-value">${fmt(annualDeductions)}đ</div>
+          </div>
+        </div>
+        ${monthSections}
+        <table style="margin-top:20px">
+          <tbody>
+            <tr class="grand-total">
+              <td style="text-align:right;width:85%">Tổng thực nhận năm ${year}</td>
+              <td style="width:15%">${fmt(annualTotal)}đ</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="footer">Xuất bởi hệ thống Julie Cosmetics — ${new Date().toLocaleString('vi-VN')}</div>
+      `, `Bang luong nam ${year}`);
+    } catch (error) {
+      toast.error(error.message || 'Không thể in bảng lương theo năm.');
+    }
   };
 
   return (
@@ -95,7 +262,10 @@ export default function SalariesPage() {
             </button>
           )}
           {(_canExport && salaries.length > 0) && (
-            <button className="btn btn-outline" onClick={handlePrintAll}>🖨️ In bảng lương</button>
+            <>
+              <button className="btn btn-outline" onClick={handlePrintMonthReport}>🖨️ In theo tháng</button>
+              <button className="btn btn-outline" onClick={handlePrintAll}>🖨️ In theo năm</button>
+            </>
           )}
         </div>
       </div>
