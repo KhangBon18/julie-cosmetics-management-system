@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { normalizePriceRange } = require('../utils/priceRange');
 
 const Product = {
   findAll: async ({
@@ -14,6 +15,8 @@ const Product = {
     stock_status,
     is_public = false
   }) => {
+    const normalizedPriceRange = normalizePriceRange(min_price, max_price);
+
     let query = `SELECT p.*, c.category_name, b.brand_name,
                         pc.category_name as parent_category_name, pc.category_id as parent_category_id
                  FROM products p
@@ -64,18 +67,18 @@ const Product = {
       countParams.push(searchTerms);
     }
 
-    if (min_price !== undefined) {
+    if (normalizedPriceRange.min !== undefined) {
       query += ' AND p.sell_price >= ?';
       countQuery += ' AND p.sell_price >= ?';
-      params.push(min_price);
-      countParams.push(min_price);
+      params.push(normalizedPriceRange.min);
+      countParams.push(normalizedPriceRange.min);
     }
 
-    if (max_price !== undefined) {
+    if (normalizedPriceRange.max !== undefined) {
       query += ' AND p.sell_price <= ?';
       countQuery += ' AND p.sell_price <= ?';
-      params.push(max_price);
-      countParams.push(max_price);
+      params.push(normalizedPriceRange.max);
+      countParams.push(normalizedPriceRange.max);
     }
 
     if (stock_status === 'out') {

@@ -29,9 +29,14 @@ const Salary = {
       countParams.push(employee_id);
     }
 
-    const offset = (page - 1) * limit;
-    query += ' ORDER BY s.year DESC, s.month DESC, e.full_name ASC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    query += ' ORDER BY s.year DESC, s.month DESC, e.full_name ASC';
+
+    if (limit !== 'all') {
+      const numericLimit = Number(limit) || 10;
+      const offset = (page - 1) * numericLimit;
+      query += ' LIMIT ? OFFSET ?';
+      params.push(numericLimit, offset);
+    }
 
     const [rows] = await pool.query(query, params);
     const [countResult] = await pool.query(countQuery, countParams);

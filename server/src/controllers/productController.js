@@ -1,11 +1,13 @@
 const Product = require('../models/productModel');
 const { logAudit } = require('../utils/auditLogger');
+const { normalizePriceRange } = require('../utils/priceRange');
 
 const productController = {
   // GET /api/products
   getAll: async (req, res, next) => {
     try {
       const { page, limit, category_id, brand_id, search, sort, min_price, max_price, is_active, stock_status } = req.query;
+      const { min, max } = normalizePriceRange(min_price, max_price);
       const result = await Product.findAll({
         page: parseInt(page) || 1,
         limit: parseInt(limit) || 12,
@@ -13,8 +15,8 @@ const productController = {
         brand_id,
         search,
         sort,
-        min_price: min_price !== undefined && min_price !== '' ? Number(min_price) : undefined,
-        max_price: max_price !== undefined && max_price !== '' ? Number(max_price) : undefined,
+        min_price: min,
+        max_price: max,
         is_active,
         stock_status
       });

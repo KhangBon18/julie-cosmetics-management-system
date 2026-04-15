@@ -11,6 +11,14 @@ const leaveTypeLabel = {
   resignation: 'đơn nghỉ việc'
 };
 
+const toSentenceCase = (value = '') => value.charAt(0).toUpperCase() + value.slice(1);
+const normalizeRejectReason = (value = '') => value.trim().replace(/\.+$/, '') || 'Không có ghi chú bổ sung';
+const formatLeaveRange = (leave) => {
+  const start = new Date(leave.start_date).toLocaleDateString('vi-VN');
+  const end = new Date(leave.end_date).toLocaleDateString('vi-VN');
+  return start === end ? `ngày ${start}` : `từ ${start} đến ${end}`;
+};
+
 const leaveController = {
   getAll: async (req, res, next) => {
     try {
@@ -83,10 +91,10 @@ const leaveController = {
           await Notification.create({
             userId: uRows[0].user_id,
             userType: 'staff',
-            title: `${leaveLabel} đã được duyệt`,
+            title: `${toSentenceCase(leaveLabel)} đã được duyệt`,
             message: leave.leave_type === 'resignation'
               ? `Quản lý đã duyệt đơn nghỉ việc của bạn. Ngày làm việc cuối cùng: ${new Date(leave.end_date).toLocaleDateString('vi-VN')}.`
-              : `Quản lý đã duyệt ${leaveLabel} của bạn (từ ${new Date(leave.start_date).toLocaleDateString('vi-VN')} đến ${new Date(leave.end_date).toLocaleDateString('vi-VN')}).`,
+              : `${toSentenceCase(leaveLabel)} của bạn ${formatLeaveRange(leave)} đã được phê duyệt.`,
             type: 'success',
             link: '/staff/leaves'
           });
@@ -110,13 +118,14 @@ const leaveController = {
         const [uRows] = await pool.query('SELECT user_id FROM users WHERE employee_id = ? AND is_active = 1', [leave.employee_id]);
         if (uRows.length) {
           const leaveLabel = leaveTypeLabel[leave.leave_type] || 'đơn nghỉ';
+          const normalizedReason = normalizeRejectReason(reject_reason || '');
           await Notification.create({
             userId: uRows[0].user_id,
             userType: 'staff',
-            title: `${leaveLabel} bị từ chối`,
+            title: `${toSentenceCase(leaveLabel)} chưa được phê duyệt`,
             message: leave.leave_type === 'resignation'
-              ? `Đơn nghỉ việc của bạn đã bị từ chối. Lý do: ${reject_reason || 'Không có'}.`
-              : `${leaveLabel} của bạn (từ ${new Date(leave.start_date).toLocaleDateString('vi-VN')}) đã bị từ chối. Lý do: ${reject_reason || 'Không có'}`,
+              ? `Đơn nghỉ việc của bạn chưa được phê duyệt. Lý do: ${normalizedReason}.`
+              : `${toSentenceCase(leaveLabel)} của bạn ${formatLeaveRange(leave)} chưa được phê duyệt. Lý do: ${normalizedReason}.`,
             type: 'error',
             link: '/staff/leaves'
           });

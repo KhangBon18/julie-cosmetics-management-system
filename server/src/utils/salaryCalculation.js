@@ -179,8 +179,8 @@ async function calculateSalary(employeeId, month, year) {
   const baseSalary = Math.round(baseSalaryEquivalent);
   const grossSalaryRounded = Math.round(grossSalary);
   const notes = salaryBreakdown.length > 1
-    ? `Lương được prorate theo ${salaryBreakdown.length} giai đoạn chức vụ: ${salaryBreakdown.map((segment) => `${segment.start_date}→${segment.end_date} ${segment.position_name} (${formatCurrency(segment.salary_at_time)}đ)`).join(' | ')}`
-    : (unpaidLeaveDays > 0 ? `Có ${unpaidLeaveDays} ngày nghỉ không lương trong tháng.` : null);
+    ? `Lương tháng được phân bổ theo ${salaryBreakdown.length} giai đoạn chức vụ: ${salaryBreakdown.map((segment) => `${segment.start_date} đến ${segment.end_date} - ${segment.position_name} (${formatCurrency(segment.salary_at_time)}đ)`).join('; ')}.`
+    : (unpaidLeaveDays > 0 ? `Phát sinh ${unpaidLeaveDays} ngày nghỉ không lương trong tháng.` : null);
 
   return {
     employee_id: employeeId,
@@ -196,7 +196,7 @@ async function calculateSalary(employeeId, month, year) {
     deductions: 0,
     net_salary: grossSalaryRounded,
     notes: resignationDate && resignationDate <= fullMonthEnd
-      ? `${notes ? `${notes}. ` : ''}Nhân sự nghỉ việc từ ${formatSqlDate(resignationDate)} nên lương chỉ tính đến hết ngày này.`
+      ? `${notes ? `${notes} ` : ''}Hệ thống chỉ tính lương đến hết ngày ${formatSqlDate(resignationDate)} do nhân sự nghỉ việc từ thời điểm này.`
       : notes,
     salary_breakdown: salaryBreakdown
   };
