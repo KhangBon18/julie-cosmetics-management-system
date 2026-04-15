@@ -162,7 +162,7 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
 
         <div className="card">
           {loading ? (
-            <div style={{textAlign:'center', padding: 40, color: '#94a3b8'}}>Đang tải...</div>
+            <div className="crud-loading">Đang tải...</div>
           ) : (
             <div className="table-container">
               <table>
@@ -183,18 +183,18 @@ export function createCrudPage({ title, service, idField, columns, formFields, n
                       )}
                     </tr>
                   ))}
-                  {items.length === 0 ? <tr><td colSpan={columns.length + (_canUpdate || _canDelete ? 1 : 0)} style={{textAlign:'center',padding:40,color:'#94a3b8'}}>{search ? 'Không tìm thấy kết quả' : 'Chưa có dữ liệu'}</td></tr> : null}
+                  {items.length === 0 ? <tr><td colSpan={columns.length + (_canUpdate || _canDelete ? 1 : 0)} className="crud-empty">{search ? 'Không tìm thấy kết quả' : 'Chưa có dữ liệu'}</td></tr> : null}
                 </tbody>
               </table>
             </div>
           )}
           {/* Pagination */}
           {totalPages > 1 && (
-            <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:12,padding:'16px 0'}}>
+            <div className="crud-pagination">
               <button className="btn btn-sm btn-outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
                 <FiChevronLeft /> Trước
               </button>
-              <span style={{fontSize:14,color:'#64748b'}}>Trang {page} / {totalPages}</span>
+              <span className="crud-pagination-text">Trang {page} / {totalPages}</span>
               <button className="btn btn-sm btn-outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
                 Sau <FiChevronRight />
               </button>
