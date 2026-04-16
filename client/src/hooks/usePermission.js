@@ -17,7 +17,7 @@ const usePermission = () => {
     return new Set(user.permissions);
   }, [user?.permissions]);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role_name === 'admin';
 
   /**
    * Check nếu user có permission cụ thể.

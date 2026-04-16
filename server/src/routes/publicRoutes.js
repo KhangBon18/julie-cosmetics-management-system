@@ -281,6 +281,24 @@ router.post('/checkout', validateCheckout, async (req, res, next) => {
       return res.status(400).json({ message: 'Dữ liệu không hợp lệ', errors: errors.array() });
     }
 
+    // ── Extract customer from JWT (required) ──
+    const jwt = require('jsonwebtoken');
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: 'Vui lòng đăng nhập tài khoản khách hàng để đặt hàng' });
+    }
+
+    let customerId = null;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.type !== 'customer') {
+        return res.status(403).json({ message: 'Chỉ tài khoản khách hàng mới được đặt hàng qua cửa hàng online' });
+      }
+      customerId = decoded.id;
+    } catch {
+      return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.' });
+    }
+
     const { items, customer_name, customer_phone, customer_email, shipping_address, payment_method, note, promotion_code } = req.body;
     const cartSnapshot = await resolveCartSnapshot(items);
 
@@ -315,9 +333,9 @@ router.post('/checkout', validateCheckout, async (req, res, next) => {
       unit_price: item.sell_price
     }));
 
-    // Create invoice via existing model (handles transactions, stock, CRM, payment)
+    // Create invoice with customer_id for CRM tracking (discount + loyalty points)
     const invoiceId = await Invoice.create({
-      customer_id: null,
+      customer_id: customerId,
       created_by: null,
       payment_method: payment_method === 'cod' ? 'cash' : payment_method,
       promotion_id: promotionId,

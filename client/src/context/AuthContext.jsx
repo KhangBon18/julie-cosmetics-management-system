@@ -3,83 +3,105 @@ import authService from '../services/authService';
 
 export const AuthContext = createContext(null);
 
+/**
+ * AuthProvider tách biệt hoàn toàn 2 session:
+ * - Staff/Admin: localStorage key "staff_token" → state "user"
+ * - Customer:    localStorage key "customer_token" → state "customerUser"
+ *
+ * Login staff không ảnh hưởng customer và ngược lại.
+ */
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null);             // Staff/Admin
+  const [customerUser, setCustomerUser] = useState(null); // Customer
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userType = localStorage.getItem('userType'); // 'staff' or 'customer'
-    if (token) {
-      loadUser(userType || 'staff');
-    } else {
-      setLoading(false);
-    }
+    let pending = 0;
+    const done = () => { pending--; if (pending <= 0) setLoading(false); };
+
+    const staffToken = localStorage.getItem('staff_token');
+    const customerToken = localStorage.getItem('customer_token');
+
+    if (staffToken) pending++;
+    if (customerToken) pending++;
+    if (pending === 0) { setLoading(false); return; }
+
+    if (staffToken) loadStaffUser().finally(done);
+    if (customerToken) loadCustomerUser().finally(done);
   }, []);
 
-  const loadUser = async (type = 'staff') => {
+  // ── Load staff profile ──
+  const loadStaffUser = async () => {
     try {
-      if (type === 'customer') {
-        const userData = await authService.customerProfile();
-        setUser({ ...userData, role: 'customer' });
-      } else {
-        const userData = await authService.getProfile();
-        // Profile response now includes permissions array
-        setUser(userData);
-      }
+      const userData = await authService.getProfile();
+      setUser(userData);
     } catch {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userType');
-    } finally {
-      setLoading(false);
+      localStorage.removeItem('staff_token');
+      setUser(null);
     }
   };
 
-  // Staff/admin login
+  // ── Load customer profile ──
+  const loadCustomerUser = async () => {
+    try {
+      const userData = await authService.customerProfile();
+      setCustomerUser({ ...userData, role: 'customer' });
+    } catch {
+      localStorage.removeItem('customer_token');
+      setCustomerUser(null);
+    }
+  };
+
+  // ── Staff/admin login ──
   const login = async (username, password) => {
     const data = await authService.login({ username, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('userType', 'staff');
-    // data.user now includes permissions array
+    localStorage.setItem('staff_token', data.token);
     setUser(data.user);
     return data;
   };
 
-  // Customer login (phone + password)
+  // ── Customer login (phone + password) ──
   const customerLogin = async (phone, password) => {
     const data = await authService.customerLogin({ phone, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('userType', 'customer');
-    setUser(data.user);
+    localStorage.setItem('customer_token', data.token);
+    setCustomerUser(data.user);
     return data;
   };
 
-  // Customer register
+  // ── Customer register ──
   const customerRegister = async (formData) => {
     const data = await authService.customerRegister(formData);
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('userType', 'customer');
-    setUser(data.user);
+    localStorage.setItem('customer_token', data.token);
+    setCustomerUser(data.user);
     return data;
   };
 
+  // ── Staff logout (only clears staff session) ──
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userType');
+    localStorage.removeItem('staff_token');
     setUser(null);
   };
 
-  /**
-   * Reload user data (e.g. after permission changes).
-   * Also called when admin changes a user's role.
-   */
+  // ── Customer logout (only clears customer session) ──
+  const customerLogout = () => {
+    localStorage.removeItem('customer_token');
+    setCustomerUser(null);
+  };
+
+  // ── Refresh staff user data ──
   const refreshUser = async () => {
-    const userType = localStorage.getItem('userType') || 'staff';
-    await loadUser(userType);
+    if (localStorage.getItem('staff_token')) {
+      await loadStaffUser();
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, customerLogin, customerRegister, logout, loadUser, refreshUser }}>
+    <AuthContext.Provider value={{
+      user, customerUser, loading,
+      login, customerLogin, customerRegister,
+      logout, customerLogout,
+      loadUser: loadStaffUser, refreshUser
+    }}>
       {children}
     </AuthContext.Provider>
   );

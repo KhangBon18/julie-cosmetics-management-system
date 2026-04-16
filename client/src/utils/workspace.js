@@ -1,7 +1,8 @@
 export const resolveWorkspaceMeta = (user) => {
   const permissions = new Set(user?.permissions || []);
+  const isAdmin = user?.role === 'admin' || user?.role_name === 'admin';
 
-  if (user?.role === 'admin') {
+  if (isAdmin) {
     return {
       key: 'admin',
       title: 'Khu Quản trị Admin',

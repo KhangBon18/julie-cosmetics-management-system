@@ -17,7 +17,7 @@ const PAYMENT_METHODS = [
 
 export default function CheckoutPage() {
   const { cart, cartTotal, clearCart, replaceCart } = useContext(CartContext);
-  const { user } = useContext(AuthContext);
+  const { customerUser } = useContext(AuthContext);
   const [form, setForm] = useState({ customer_name: '', customer_phone: '', customer_email: '', shipping_address: '', note: '' });
   const [payment, setPayment] = useState('cod');
   const [submitting, setSubmitting] = useState(false);
@@ -27,16 +27,16 @@ export default function CheckoutPage() {
 
   // Auto-fill from customer profile
   useEffect(() => {
-    if (user && user.role === 'customer') {
+    if (customerUser) {
       setForm(prev => ({
         ...prev,
-        customer_name: user.full_name || prev.customer_name,
-        customer_phone: user.phone || prev.customer_phone,
-        customer_email: user.email || prev.customer_email,
-        shipping_address: user.address || prev.shipping_address
+        customer_name: customerUser.full_name || prev.customer_name,
+        customer_phone: customerUser.phone || prev.customer_phone,
+        customer_email: customerUser.email || prev.customer_email,
+        shipping_address: customerUser.address || prev.shipping_address
       }));
     }
-  }, [user]);
+  }, [customerUser]);
 
   useEffect(() => {
     const syncCart = async () => {
@@ -146,14 +146,14 @@ export default function CheckoutPage() {
     );
   }
 
-  // ═══ LOGIN REQUIRED ═══
-  if (!user) {
+  // ═══ LOGIN REQUIRED (must be customer) ═══
+  if (!customerUser) {
     return (
       <div className="shop-container">
         <div className="cart-empty">
           <div className="cart-empty-icon"><FiUser size={48} style={{ color: 'var(--shop-primary-dark)' }} /></div>
           <h2>Đăng nhập để đặt hàng</h2>
-          <p>Bạn cần đăng nhập hoặc tạo tài khoản để tiến hành thanh toán.</p>
+          <p>Bạn cần đăng nhập hoặc tạo tài khoản khách hàng để tiến hành thanh toán.</p>
           <Link to="/shop/auth?redirect=/shop/checkout" className="btn-section" style={{ marginTop: 16 }}>
             Đăng nhập / Đăng ký
           </Link>

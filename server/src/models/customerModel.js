@@ -2,27 +2,36 @@ const { pool } = require('../config/db');
 
 const Customer = {
   findAll: async ({ page = 1, limit = 10, search, membership_tier }) => {
-    let query = 'SELECT * FROM customers WHERE deleted_at IS NULL';
+    let query = `SELECT c.*,
+                   (c.password_hash IS NOT NULL) as has_account,
+                   COALESCE(oc.order_count, 0) as order_count
+                 FROM customers c
+                 LEFT JOIN (
+                   SELECT customer_id, COUNT(*) as order_count
+                   FROM invoices WHERE status NOT IN ('cancelled')
+                   GROUP BY customer_id
+                 ) oc ON oc.customer_id = c.customer_id
+                 WHERE c.deleted_at IS NULL`;
     let countQuery = 'SELECT COUNT(*) as total FROM customers WHERE deleted_at IS NULL';
     const params = [];
     const countParams = [];
 
     if (search) {
-      query += ' AND (full_name LIKE ? OR phone LIKE ? OR email LIKE ?)';
+      query += ' AND (c.full_name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)';
       countQuery += ' AND (full_name LIKE ? OR phone LIKE ? OR email LIKE ?)';
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
       countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     if (membership_tier) {
-      query += ' AND membership_tier = ?';
+      query += ' AND c.membership_tier = ?';
       countQuery += ' AND membership_tier = ?';
       params.push(membership_tier);
       countParams.push(membership_tier);
     }
 
     const offset = (page - 1) * limit;
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    query += ' ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
     const [rows] = await pool.query(query, params);
@@ -32,8 +41,44 @@ const Customer = {
   },
 
   findById: async (id) => {
-    const [rows] = await pool.query('SELECT * FROM customers WHERE customer_id = ? AND deleted_at IS NULL', [id]);
+    const [rows] = await pool.query(
+      `SELECT c.*, (c.password_hash IS NOT NULL) as has_account
+       FROM customers c WHERE c.customer_id = ? AND c.deleted_at IS NULL`, [id]
+    );
     return rows[0];
+  },
+
+  // Get full customer profile with recent orders (for admin detail view)
+  findByIdWithOrders: async (id) => {
+    const [custRows] = await pool.query(
+      `SELECT c.*,
+              (c.password_hash IS NOT NULL) as has_account,
+              COALESCE(oc.order_count, 0) as order_count
+       FROM customers c
+       LEFT JOIN (
+         SELECT customer_id, COUNT(*) as order_count
+         FROM invoices WHERE status NOT IN ('cancelled')
+         GROUP BY customer_id
+       ) oc ON oc.customer_id = c.customer_id
+       WHERE c.customer_id = ? AND c.deleted_at IS NULL`, [id]
+    );
+    if (!custRows[0]) return null;
+
+    // Get recent orders (last 20)
+    const [orders] = await pool.query(
+      `SELECT i.invoice_id, i.subtotal, i.discount_percent, i.discount_amount,
+              i.final_total, i.points_earned, i.payment_method, i.status,
+              i.created_at,
+              COUNT(ii.item_id) as item_count
+       FROM invoices i
+       LEFT JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
+       WHERE i.customer_id = ?
+       GROUP BY i.invoice_id
+       ORDER BY i.created_at DESC
+       LIMIT 20`, [id]
+    );
+
+    return { ...custRows[0], orders };
   },
 
   findByPhone: async (phone) => {
@@ -62,6 +107,24 @@ const Customer = {
   delete: async (id) => {
     const [result] = await pool.query(
       'UPDATE customers SET deleted_at = NOW() WHERE customer_id = ? AND deleted_at IS NULL',
+      [id]
+    );
+    return result.affectedRows;
+  },
+
+  // Admin: Reset customer password
+  resetPassword: async (id, hashedPassword) => {
+    const [result] = await pool.query(
+      'UPDATE customers SET password_hash = ? WHERE customer_id = ?',
+      [hashedPassword, id]
+    );
+    return result.affectedRows;
+  },
+
+  // Admin: Remove customer's password (effectively locking their online account)
+  removePassword: async (id) => {
+    const [result] = await pool.query(
+      'UPDATE customers SET password_hash = NULL WHERE customer_id = ?',
       [id]
     );
     return result.affectedRows;

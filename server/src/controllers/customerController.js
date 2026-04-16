@@ -1,4 +1,5 @@
 const Customer = require('../models/customerModel');
+const bcrypt = require('bcryptjs');
 
 const customerController = {
   getAll: async (req, res, next) => {
@@ -11,6 +12,14 @@ const customerController = {
   getById: async (req, res, next) => {
     try {
       const item = await Customer.findById(req.params.id);
+      if (!item) return res.status(404).json({ message: 'Không tìm thấy khách hàng' });
+      res.json(item);
+    } catch (error) { next(error); }
+  },
+  // Get full customer detail with order history (admin detail view)
+  getDetail: async (req, res, next) => {
+    try {
+      const item = await Customer.findByIdWithOrders(req.params.id);
       if (!item) return res.status(404).json({ message: 'Không tìm thấy khách hàng' });
       res.json(item);
     } catch (error) { next(error); }
@@ -38,6 +47,37 @@ const customerController = {
     try {
       await Customer.delete(req.params.id);
       res.json({ message: 'Xóa khách hàng thành công' });
+    } catch (error) { next(error); }
+  },
+  // Admin: Reset customer password
+  resetPassword: async (req, res, next) => {
+    try {
+      const { password } = req.body;
+      if (!password || password.length < 6) {
+        return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+      }
+      const customer = await Customer.findById(req.params.id);
+      if (!customer) return res.status(404).json({ message: 'Không tìm thấy khách hàng' });
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      await Customer.resetPassword(req.params.id, hashedPassword);
+      res.json({ message: `Đã đặt lại mật khẩu cho khách hàng "${customer.full_name}"` });
+    } catch (error) { next(error); }
+  },
+  // Admin: Lock/unlock customer account (remove or restore password)
+  toggleAccountLock: async (req, res, next) => {
+    try {
+      const customer = await Customer.findById(req.params.id);
+      if (!customer) return res.status(404).json({ message: 'Không tìm thấy khách hàng' });
+
+      if (customer.has_account) {
+        // Lock account by removing password
+        await Customer.removePassword(req.params.id);
+        res.json({ message: `Đã khóa tài khoản online của "${customer.full_name}"`, has_account: false });
+      } else {
+        return res.status(400).json({ message: 'Khách hàng chưa có tài khoản online. Không thể khóa.' });
+      }
     } catch (error) { next(error); }
   }
 };
