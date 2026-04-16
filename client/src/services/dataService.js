@@ -28,7 +28,10 @@ export const supplierService = createService('/suppliers');
 export const importService = createService('/imports');
 export const customerService = {
   ...createService('/customers'),
-  findByPhone: (phone) => api.get(`/customers/phone/${phone}`)
+  findByPhone: (phone) => api.get(`/customers/phone/${phone}`),
+  getDetail: (id) => api.get(`/customers/${id}/detail`),
+  resetPassword: (id, password) => api.put(`/customers/${id}/reset-password`, { password }),
+  toggleLock: (id) => api.put(`/customers/${id}/toggle-lock`)
 };
 export const invoiceService = {
   ...createService('/invoices'),

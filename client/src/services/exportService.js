@@ -3,7 +3,7 @@
  * Uses raw fetch with Bearer token to bypass axios response interceptor.
  */
 export async function downloadCSV(endpoint, filename) {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('staff_token');
   const baseURL = import.meta.env.VITE_API_URL || '/api';
   const url = `${baseURL}${endpoint}`;
 

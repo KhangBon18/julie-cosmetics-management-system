@@ -129,7 +129,7 @@ const MODULES = [
   },
   {
     key: 'leaves',
-    name: 'Nghỉ phép',
+    name: 'Duyệt nghỉ phép',
     section: 'Nhân sự',
     path: '/admin/leaves',
     icon: 'FiCalendar',

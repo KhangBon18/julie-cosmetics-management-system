@@ -1,14 +1,13 @@
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useContext, useState, useEffect, useRef } from 'react';
-import { FiShoppingBag, FiUser, FiChevronDown, FiLogOut, FiPackage } from 'react-icons/fi';
+import { FiShoppingBag, FiUser, FiChevronDown, FiLogOut } from 'react-icons/fi';
 import { CartContext } from '../../context/CartContext';
 import { AuthContext } from '../../context/AuthContext';
 import publicService from '../../services/publicService';
-import { getWorkspaceHomePath } from '../../utils/workspace';
 
 export default function ShopLayout() {
   const { cartCount } = useContext(CartContext);
-  const { user, logout } = useContext(AuthContext);
+  const { customerUser, customerLogout } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
   const [categoriesTree, setCategoriesTree] = useState([]);
@@ -115,34 +114,27 @@ export default function ShopLayout() {
               {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
             </Link>
 
-            {user ? (
-              user.role === 'customer' ? (
-                /* ── Customer account dropdown ── */
-                <div className="shop-user-menu" ref={userMenuRef}>
-                  <button className="shop-cart-btn" onClick={() => setUserMenuOpen(!userMenuOpen)} title={user.full_name}>
-                    <FiUser size={18} />
-                  </button>
-                  {userMenuOpen && (
-                    <div className="shop-user-dropdown">
-                      <div className="shop-user-info">
-                        <div className="shop-user-name">{user.full_name}</div>
-                        <div className="shop-user-phone">{user.phone}</div>
-                        {user.membership_tier && user.membership_tier !== 'standard' && (
-                          <span className="shop-user-tier">{user.membership_tier}</span>
-                        )}
-                      </div>
-                      <button onClick={() => { setUserMenuOpen(false); logout(); navigate('/shop'); }} className="shop-user-logout">
-                        <FiLogOut size={14} /> Đăng xuất
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* ── Staff/Admin dashboard link ── */
-                <Link to={getWorkspaceHomePath(user)} className="shop-cart-btn" title="Dashboard">
+            {customerUser ? (
+              /* ── Customer account dropdown ── */
+              <div className="shop-user-menu" ref={userMenuRef}>
+                <button className="shop-cart-btn" onClick={() => setUserMenuOpen(!userMenuOpen)} title={customerUser.full_name}>
                   <FiUser size={18} />
-                </Link>
-              )
+                </button>
+                {userMenuOpen && (
+                  <div className="shop-user-dropdown">
+                    <div className="shop-user-info">
+                      <div className="shop-user-name">{customerUser.full_name}</div>
+                      <div className="shop-user-phone">{customerUser.phone}</div>
+                      {customerUser.membership_tier && customerUser.membership_tier !== 'standard' && (
+                        <span className="shop-user-tier">{customerUser.membership_tier}</span>
+                      )}
+                    </div>
+                    <button onClick={() => { setUserMenuOpen(false); customerLogout(); navigate('/shop'); }} className="shop-user-logout">
+                      <FiLogOut size={14} /> Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               /* ── Not logged in — go to shop auth ── */
               <Link to="/shop/auth" className="shop-cart-btn" title="Đăng nhập">

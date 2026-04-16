@@ -170,7 +170,7 @@ const MODULES = [
   },
   {
     key: 'leaves',
-    name: 'Nghỉ phép',
+    name: 'Duyệt nghỉ phép',
     section: 'Nhân sự',
     path: '/admin/leaves',
     icon: FiCalendar,
@@ -258,8 +258,9 @@ export const buildSidebarSections = (userPermissions = [], userRole = '', basePa
     // Hide 'Cá nhân' section for admin accounts
     if (isAdmin && mod.section === 'Cá nhân') continue;
 
-    // Admin sees everything; public modules always visible; others need module.read permission
-    const isVisible = isAdmin || mod.isPublic || permSet.has(`${mod.key}.read`);
+    // Admin sees everything; public modules always visible; others need any module permission
+    const hasAnyAction = mod.actions?.some(action => permSet.has(`${mod.key}.${action}`));
+    const isVisible = isAdmin || mod.isPublic || permSet.has(`${mod.key}.read`) || hasAnyAction;
     if (!isVisible) continue;
 
     if (!sectionMap.has(mod.section)) {

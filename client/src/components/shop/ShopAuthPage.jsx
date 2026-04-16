@@ -5,7 +5,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 
 export default function ShopAuthPage() {
-  const { user, customerLogin, customerRegister } = useContext(AuthContext);
+  const { customerUser, customerLogin, customerRegister } = useContext(AuthContext);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect') || '/shop';
@@ -22,7 +22,7 @@ export default function ShopAuthPage() {
   const [regForm, setRegForm] = useState({ full_name: '', phone: '', email: '', password: '', password_confirm: '' });
 
   // If already logged in as customer, redirect
-  if (user && user.role === 'customer') {
+  if (customerUser) {
     navigate(redirect, { replace: true });
     return null;
   }

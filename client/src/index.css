@@ -274,7 +274,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 /* Sidebar scroll fade indicator */
-.sidebar::before {
+.sidebar::after {
   content: '';
   position: sticky;
   bottom: 0;
