@@ -144,4 +144,29 @@ router.get('/profile', async (req, res, next) => {
   }
 });
 
+// GET /api/customer-auth/orders (protected)
+router.get('/orders', async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Vui lòng đăng nhập' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.type !== 'customer') {
+      return res.status(401).json({ message: 'Token không hợp lệ' });
+    }
+
+    // We can use the Customer model's findByIdWithOrders which fetches the last 20 orders
+    const Customer = require('../models/customerModel');
+    const customer = await Customer.findByIdWithOrders(decoded.id);
+    if (!customer) return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
+
+    res.json(customer.orders || []);
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn' });
+    }
+    next(error);
+  }
+});
+
 module.exports = router;

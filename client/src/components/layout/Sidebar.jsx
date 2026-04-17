@@ -6,7 +6,12 @@ export default function Sidebar({ isOpen, onClose, workspace, basePath }) {
   const { user } = useAuth();
 
   // Build sidebar sections dynamically from module registry + user permissions
-  const sections = buildSidebarSections(user?.permissions || [], user?.role_name || user?.role || '', basePath);
+  const sections = buildSidebarSections(
+    user?.permissions || [],
+    user?.role_name || user?.role || '',
+    basePath,
+    workspace?.key || 'admin'
+  );
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`} aria-label="Thanh điều hướng chính">

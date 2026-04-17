@@ -136,6 +136,7 @@ WHERE r.role_name = 'warehouse'
     p.module = 'imports'
     OR (p.module = 'products' AND p.action IN ('read', 'update'))
     OR (p.module IN ('brands', 'categories', 'suppliers') AND p.action = 'read')
+    OR (p.module = 'reports' AND p.action = 'read')
     OR (p.module = 'leaves' AND p.action IN ('read', 'create'))
   );
 

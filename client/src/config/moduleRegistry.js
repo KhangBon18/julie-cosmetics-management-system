@@ -26,6 +26,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
+    workspaceKeys: ['admin', 'staff'],
   },
 
   // ─── Cá nhân ───
@@ -39,6 +40,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
+    workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
   {
     key: 'my_leaves',
@@ -50,6 +52,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
+    workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
   {
     key: 'my_salary',
@@ -61,6 +64,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
+    workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
 
   // ─── Bán hàng ───
@@ -73,6 +77,7 @@ const MODULES = [
     sortOrder: 10,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete', 'export'],
+    workspaceKeys: ['admin', 'business'],
   },
   {
     key: 'customers',
@@ -83,6 +88,7 @@ const MODULES = [
     sortOrder: 11,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete', 'export'],
+    workspaceKeys: ['admin', 'business'],
   },
   {
     key: 'reviews',
@@ -93,6 +99,7 @@ const MODULES = [
     sortOrder: 12,
     showInSidebar: true,
     actions: ['read', 'update', 'delete'],
+    workspaceKeys: ['admin', 'business'],
   },
 
   // ─── Kho hàng ───
@@ -105,6 +112,7 @@ const MODULES = [
     sortOrder: 20,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete', 'export'],
+    workspaceKeys: ['admin', 'warehouse'],
   },
   {
     key: 'brands',
@@ -115,6 +123,7 @@ const MODULES = [
     sortOrder: 21,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    workspaceKeys: ['admin', 'warehouse'],
   },
   {
     key: 'categories',
@@ -125,6 +134,7 @@ const MODULES = [
     sortOrder: 22,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    workspaceKeys: ['admin', 'warehouse'],
   },
   {
     key: 'suppliers',
@@ -135,6 +145,7 @@ const MODULES = [
     sortOrder: 23,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    workspaceKeys: ['admin', 'warehouse'],
   },
   {
     key: 'imports',
@@ -145,6 +156,7 @@ const MODULES = [
     sortOrder: 24,
     showInSidebar: true,
     actions: ['read', 'create', 'delete'],
+    workspaceKeys: ['admin', 'warehouse'],
   },
 
   // ─── Nhân sự ───
@@ -157,6 +169,7 @@ const MODULES = [
     sortOrder: 30,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete', 'export'],
+    workspaceKeys: ['admin', 'hr'],
   },
   {
     key: 'positions',
@@ -167,6 +180,7 @@ const MODULES = [
     sortOrder: 31,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    workspaceKeys: ['admin', 'hr'],
   },
   {
     key: 'leaves',
@@ -177,6 +191,7 @@ const MODULES = [
     sortOrder: 32,
     showInSidebar: true,
     actions: ['read', 'create', 'update'],
+    workspaceKeys: ['admin', 'hr'],
   },
   {
     key: 'salaries',
@@ -187,6 +202,7 @@ const MODULES = [
     sortOrder: 33,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete', 'export'],
+    workspaceKeys: ['admin', 'hr'],
   },
 
   // ─── Hệ thống ───
@@ -199,6 +215,7 @@ const MODULES = [
     sortOrder: 40,
     showInSidebar: true,
     actions: ['read', 'export'],
+    workspaceKeys: ['admin', 'hr', 'warehouse', 'business'],
   },
   {
     key: 'users',
@@ -209,6 +226,7 @@ const MODULES = [
     sortOrder: 41,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    workspaceKeys: ['admin'],
   },
   {
     key: 'roles',
@@ -219,6 +237,7 @@ const MODULES = [
     sortOrder: 42,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    workspaceKeys: ['admin'],
   },
   {
     key: 'settings',
@@ -229,6 +248,7 @@ const MODULES = [
     sortOrder: 43,
     showInSidebar: true,
     actions: ['read', 'update'],
+    workspaceKeys: ['admin'],
   },
 ];
 
@@ -247,13 +267,14 @@ export const ACTION_LABELS = {
  * @param {string} userRole — user's role ENUM ('admin', 'manager', 'staff', etc.)
  * @returns {Array<{title, items[]}>}
  */
-export const buildSidebarSections = (userPermissions = [], userRole = '', basePath = '/admin') => {
+export const buildSidebarSections = (userPermissions = [], userRole = '', basePath = '/admin', workspaceKey = 'admin') => {
   const isAdmin = userRole === 'admin';
   const permSet = new Set(userPermissions);
   const sectionMap = new Map();
 
   for (const mod of MODULES) {
     if (!mod.showInSidebar) continue;
+    if (mod.workspaceKeys?.length && !mod.workspaceKeys.includes(workspaceKey)) continue;
 
     // Hide 'Cá nhân' section for admin accounts
     if (isAdmin && mod.section === 'Cá nhân') continue;

@@ -21,7 +21,12 @@ export const leaveService = {
   approve: (id) => api.put(`/leaves/${id}/approve`),
   reject: (id, data) => api.put(`/leaves/${id}/reject`, data)
 };
-export const salaryService = createService('/salaries');
+export const salaryService = {
+  ...createService('/salaries'),
+  getBonuses: (params) => api.get('/salaries/bonuses', { params }),
+  upsertBonus: (data) => api.post('/salaries/bonuses', data),
+  deleteBonus: (id) => api.delete(`/salaries/bonuses/${id}`)
+};
 export const brandService = createService('/brands');
 export const categoryService = createService('/categories');
 export const supplierService = createService('/suppliers');

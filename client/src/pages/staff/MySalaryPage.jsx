@@ -3,6 +3,19 @@ import { toast } from 'react-toastify';
 import staffService from '../../services/staffService';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
+const normalizeNote = (value) => String(value || '').trim();
+const getSupplementalNotes = (salary) => {
+  const notes = [];
+  const mainNote = normalizeNote(salary.notes);
+  const bonusReason = normalizeNote(salary.bonus_reason);
+
+  if (mainNote) notes.push({ text: mainNote, tone: 'default' });
+  if (bonusReason && bonusReason !== mainNote) {
+    notes.push({ text: `Thưởng: ${bonusReason}`, tone: 'bonus' });
+  }
+
+  return notes;
+};
 
 export default function MySalaryPage() {
   const [salaries, setSalaries] = useState([]);
@@ -48,6 +61,8 @@ export default function MySalaryPage() {
           th { background: #f1f5f9; font-weight: 600; text-align: center; }
           td:first-child { text-align: center; }
           .total-row { background: #eff6ff; font-weight: 700; }
+          .note { display:block; margin-top:4px; font-size:11px; color:#64748b; text-align:left; }
+          .note.bonus { color:#059669; }
           .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 12px; }
         </style>
       </head>
@@ -62,7 +77,10 @@ export default function MySalaryPage() {
           <tbody>
             ${salaries.map(s => `
               <tr>
-                <td>${s.month}/${s.year}</td>
+                <td>
+                  ${s.month}/${s.year}
+                  ${getSupplementalNotes(s).map(note => `<span class="note${note.tone === 'bonus' ? ' bonus' : ''}">${note.text}</span>`).join('')}
+                </td>
                 <td>${s.work_days_actual}/${s.work_days_standard}</td>
                 <td>${fmt(s.base_salary)}đ</td>
                 <td>${fmt(s.gross_salary)}đ</td>
@@ -119,13 +137,14 @@ export default function MySalaryPage() {
           <div class="info"><span class="label">Lương cơ bản:</span><span class="value">${fmt(salary.base_salary)}đ</span></div>
           <div class="info"><span class="label">Lương thực tế:</span><span class="value">${fmt(salary.gross_salary)}đ</span></div>
           <div class="info"><span class="label">Thưởng:</span><span class="value" style="color:#059669">${salary.bonus > 0 ? '+' + fmt(salary.bonus) + 'đ' : '—'}</span></div>
+          ${normalizeNote(salary.bonus_reason) && normalizeNote(salary.bonus_reason) !== normalizeNote(salary.notes) ? `<div class="info"><span class="label">Lý do thưởng:</span><span class="value">${salary.bonus_reason}</span></div>` : ''}
           <div class="info"><span class="label">Khấu trừ:</span><span class="value" style="color:#ef4444">${salary.deductions > 0 ? '-' + fmt(salary.deductions) + 'đ' : '—'}</span></div>
         </div>
         <div class="total">
           <div style="font-size:14px;color:#64748b;margin-bottom:4px">THỰC NHẬN</div>
           <strong>${fmt(salary.net_salary)}đ</strong>
         </div>
-        ${salary.notes ? `<p style="margin-top:16px;color:#64748b"><em>Ghi chú: ${salary.notes}</em></p>` : ''}
+        ${getSupplementalNotes(salary).length ? `<div style="margin-top:16px;color:#64748b">${getSupplementalNotes(salary).map(note => `<p style="margin:6px 0;color:${note.tone === 'bonus' ? '#059669' : '#64748b'}"><em>${note.text}</em></p>`).join('')}</div>` : ''}
         <div class="footer">
           <p>Xuất bởi hệ thống Julie Cosmetics — ${new Date().toLocaleString('vi-VN')}</p>
         </div>
@@ -194,7 +213,14 @@ export default function MySalaryPage() {
                 <tr key={s.salary_id}>
                   <td style={{ fontWeight: 600 }}>
                     <div>{s.month}/{s.year}</div>
-                    {s.notes && <div style={{ fontSize: 12, color: '#64748b', fontWeight: 400, marginTop: 4 }}>{s.notes}</div>}
+                    {getSupplementalNotes(s).map(note => (
+                      <div
+                        key={`${s.salary_id}-${note.tone}-${note.text}`}
+                        style={{ fontSize: 12, color: note.tone === 'bonus' ? '#059669' : '#64748b', fontWeight: 400, marginTop: 4 }}
+                      >
+                        {note.text}
+                      </div>
+                    ))}
                   </td>
                   <td>{s.work_days_actual}/{s.work_days_standard}</td>
                   <td>{fmt(s.base_salary)}đ</td>

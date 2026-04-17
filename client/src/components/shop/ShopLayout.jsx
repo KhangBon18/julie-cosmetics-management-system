@@ -129,6 +129,9 @@ export default function ShopLayout() {
                         <span className="shop-user-tier">{customerUser.membership_tier}</span>
                       )}
                     </div>
+                    <Link to="/shop/profile" className="shop-user-link" onClick={() => setUserMenuOpen(false)} style={{ display: 'block', padding: '10px 16px', color: 'var(--shop-text)', textDecoration: 'none', borderBottom: '1px solid var(--shop-border-light)' }}>
+                      📝 Quản lý hồ sơ
+                    </Link>
                     <button onClick={() => { setUserMenuOpen(false); customerLogout(); navigate('/shop'); }} className="shop-user-logout">
                       <FiLogOut size={14} /> Đăng xuất
                     </button>

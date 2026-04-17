@@ -20,6 +20,7 @@ export default function ShopAuthPage() {
 
   // Register form
   const [regForm, setRegForm] = useState({ full_name: '', phone: '', email: '', password: '', password_confirm: '' });
+  const [joinMember, setJoinMember] = useState(true);
 
   // If already logged in as customer, redirect
   if (customerUser) {
@@ -136,7 +137,27 @@ export default function ShopAuthPage() {
               <label>Xác nhận mật khẩu *</label>
               <input type="password" placeholder="Nhập lại mật khẩu" value={regForm.password_confirm} onChange={onRegChange('password_confirm')} required />
             </div>
-            <button type="submit" className="btn-place-order" disabled={loading} style={{ width: '100%', marginTop: 8 }}>
+            <div className="checkout-form-group" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 16 }}>
+              <input type="checkbox" id="joinMember" checked={joinMember} onChange={(e) => setJoinMember(e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              <label htmlFor="joinMember" style={{ margin: 0, fontSize: 13, cursor: 'pointer', lineHeight: 1.4 }}>
+                Tham gia chương trình <strong>Khách hàng thân thiết</strong> để tích điểm, nhận ưu đãi độc quyền.
+              </label>
+            </div>
+            
+            {!joinMember && (
+              <div style={{ padding: 12, borderRadius: 8, background: 'var(--shop-bg-light)', border: '1px solid var(--shop-border-light)', marginBottom: 16 }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--shop-text-muted)' }}>
+                  Nếu không muốn đăng ký tài khoản, bạn luôn có thể mua hàng trực tiếp tại phần Giỏ hàng.
+                </p>
+                <div style={{ marginTop: 12 }}>
+                  <Link to="/shop/cart" className="btn-section" style={{ display: 'inline-block', width: '100%', textAlign: 'center', padding: '10px' }}>
+                    Quay lại Giỏ hàng
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            <button type="submit" className="btn-place-order" disabled={loading || !joinMember} style={{ width: '100%', marginTop: 8, opacity: !joinMember ? 0.5 : 1 }}>
               {loading ? 'Đang tạo tài khoản…' : 'Tạo tài khoản'}
             </button>
           </form>

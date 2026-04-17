@@ -69,11 +69,9 @@ const Customer = {
       `SELECT i.invoice_id, i.subtotal, i.discount_percent, i.discount_amount,
               i.final_total, i.points_earned, i.payment_method, i.status,
               i.created_at,
-              COUNT(ii.item_id) as item_count
+              (SELECT COUNT(*) FROM invoice_items ii WHERE ii.invoice_id = i.invoice_id) as item_count
        FROM invoices i
-       LEFT JOIN invoice_items ii ON ii.invoice_id = i.invoice_id
        WHERE i.customer_id = ?
-       GROUP BY i.invoice_id
        ORDER BY i.created_at DESC
        LIMIT 20`, [id]
     );

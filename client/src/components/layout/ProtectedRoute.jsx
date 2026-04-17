@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { getWorkspaceHomePath } from '../../utils/workspace';
+import { getWorkspaceHomePath, resolveWorkspaceKey } from '../../utils/workspace';
 
 /**
  * ProtectedRoute — kiểm tra quyền trước khi render.
@@ -12,7 +12,7 @@ import { getWorkspaceHomePath } from '../../utils/workspace';
  *
  * Ưu tiên: permission > allowedRoles
  */
-export default function ProtectedRoute({ allowedRoles, permission, children }) {
+export default function ProtectedRoute({ allowedRoles, permission, workspaceKeys, children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -24,12 +24,17 @@ export default function ProtectedRoute({ allowedRoles, permission, children }) {
     return <Navigate to="/admin/login" replace />;
   }
 
-  const workspaceHome = getWorkspaceHomePath(user, location.pathname);
+  const workspaceHome = getWorkspaceHomePath(user);
+  const workspaceKey = resolveWorkspaceKey(user);
+
+  if (workspaceKeys?.length && workspaceKey !== 'admin' && !workspaceKeys.includes(workspaceKey)) {
+    return <Navigate to={workspaceHome} replace />;
+  }
 
   // Permission-based check (new system)
   if (permission) {
     // Admin always passes
-    if (user.role === 'admin') return children;
+    if (workspaceKey === 'admin') return children;
 
     const userPerms = new Set(user.permissions || []);
     if (userPerms.has(permission)) return children;

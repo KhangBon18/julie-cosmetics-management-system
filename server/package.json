@@ -8,6 +8,8 @@
     "dev": "nodemon server.js",
     "seed:demo": "node seed-demo.js",
     "seed:demo:force": "node seed-demo.js --force",
+    "demo:reset-users": "node scripts/resetDemoUsers.js",
+    "demo:smoke": "node scripts/demo-smoke.js",
     "fix:text": "node scripts/fixDemoTextEncoding.js --apply",
     "smoke:ci": "node scripts/ci-smoke.js"
   },

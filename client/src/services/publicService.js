@@ -11,7 +11,8 @@ const publicService = {
   getRelatedProducts: (id, params) => api.get(`/public/products/${id}/related`, { params }),
   getProductReviews: (id, params) => api.get(`/public/products/${id}/reviews`, { params }),
   validateCart: (data) => api.post('/public/cart/validate', data),
-  checkout: (data) => api.post('/public/checkout', data)
+  checkout: (data) => api.post('/public/checkout', data),
+  getSettings: () => api.get('/public/settings')
 };
 
 export default publicService;

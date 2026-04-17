@@ -112,6 +112,25 @@ CREATE TABLE salaries (
   INDEX idx_salaries_year_month (year, month)
 ) ENGINE=InnoDB COMMENT='Bảng lương tháng';
 
+CREATE TABLE salary_bonus_adjustments (
+  bonus_id            INT            AUTO_INCREMENT PRIMARY KEY,
+  employee_id         INT            NOT NULL,
+  month               TINYINT        NOT NULL CHECK (month BETWEEN 1 AND 12),
+  year                YEAR           NOT NULL,
+  amount              DECIMAL(12,2)  NOT NULL DEFAULT 0,
+  reason              VARCHAR(255)   NOT NULL,
+  created_by          INT            NULL,
+  updated_by          INT            NULL,
+  created_at          TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_bonus_employee_period (employee_id, month, year),
+  CONSTRAINT chk_bonus_amount_non_negative CHECK (amount >= 0),
+  CONSTRAINT fk_bonus_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE RESTRICT,
+  FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+  FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_bonus_year_month (year, month)
+) ENGINE=InnoDB COMMENT='Thiết lập thưởng theo kỳ lương';
+
 -- ── 2. NHÓM KHO & SẢN PHẨM ───────────────────────────────────
 
 CREATE TABLE brands (
@@ -610,7 +629,7 @@ CREATE TRIGGER trg_invoice_after_insert
 AFTER INSERT ON invoices
 FOR EACH ROW
 BEGIN
-  IF NEW.customer_id IS NOT NULL THEN
+  IF NEW.customer_id IS NOT NULL AND NEW.status IN ('paid', 'completed') THEN
     UPDATE customers
     SET total_points = total_points + NEW.points_earned,
         total_spent  = total_spent  + NEW.final_total,
@@ -628,7 +647,7 @@ CREATE TRIGGER trg_invoice_before_delete
 BEFORE DELETE ON invoices
 FOR EACH ROW
 BEGIN
-  IF OLD.customer_id IS NOT NULL THEN
+  IF OLD.customer_id IS NOT NULL AND OLD.status IN ('paid', 'completed') THEN
     UPDATE customers
     SET total_points = GREATEST(0, total_points - OLD.points_earned),
         total_spent  = GREATEST(0, total_spent - OLD.final_total),
@@ -653,7 +672,7 @@ BEGIN
     SET p.stock_quantity = p.stock_quantity + ii.quantity
     WHERE ii.invoice_id = NEW.invoice_id;
 
-    IF NEW.customer_id IS NOT NULL THEN
+    IF NEW.customer_id IS NOT NULL AND OLD.status IN ('paid', 'completed') THEN
       UPDATE customers
       SET total_points = GREATEST(0, total_points - OLD.points_earned),
           total_spent  = GREATEST(0, total_spent - OLD.final_total),
@@ -664,14 +683,24 @@ BEGIN
           END
       WHERE customer_id = NEW.customer_id;
     END IF;
-  END IF;
-  
-  IF OLD.status = 'cancelled' AND (NEW.status = 'paid' OR NEW.status = 'completed') THEN
+  ELSEIF OLD.status = 'cancelled' AND (NEW.status = 'paid' OR NEW.status = 'completed') THEN
     UPDATE products p
     JOIN invoice_items ii ON p.product_id = ii.product_id
     SET p.stock_quantity = p.stock_quantity - ii.quantity
     WHERE ii.invoice_id = NEW.invoice_id;
 
+    IF NEW.customer_id IS NOT NULL THEN
+      UPDATE customers
+      SET total_points = total_points + NEW.points_earned,
+          total_spent  = total_spent + NEW.final_total,
+          membership_tier = CASE
+            WHEN (total_points + NEW.points_earned) >= 500 THEN 'gold'
+            WHEN (total_points + NEW.points_earned) >= 100 THEN 'silver'
+            ELSE 'standard'
+          END
+      WHERE customer_id = NEW.customer_id;
+    END IF;
+  ELSEIF OLD.status NOT IN ('paid', 'completed') AND (NEW.status = 'paid' OR NEW.status = 'completed') THEN
     IF NEW.customer_id IS NOT NULL THEN
       UPDATE customers
       SET total_points = total_points + NEW.points_earned,

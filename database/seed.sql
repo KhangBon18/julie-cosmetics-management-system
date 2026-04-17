@@ -181,6 +181,10 @@ INSERT INTO salaries (employee_id, month, year, work_days_standard, work_days_ac
 (3, 2, 2026, 22, 21, 0,  8000000,  7636364,        0, 0,  7636364, 'Phát sinh 1 ngày nghỉ phép năm trong tháng.', 1),
 (4, 2, 2026, 22, 22, 0,  7500000,  7500000,        0, 0,  7500000, '', 1),
 (5, 2, 2026, 22, 20, 1,  8000000,  7272727,        0, 0,  7272727, 'Phát sinh 2 ngày nghỉ trong tháng, gồm 1 ngày phép năm và 1 ngày nghỉ không lương.', 1);
+
+INSERT INTO salary_bonus_adjustments (employee_id, month, year, amount, reason, created_by, updated_by) VALUES
+(1, 2, 2026, 2000000, 'Thưởng doanh số theo kết quả bán hàng tháng 2.', 1, 1);
+
 -- ── SETTINGS ──────────────────────────────────────────────────
 INSERT INTO settings (setting_key, setting_value, data_type, category, description, is_public) VALUES
 ('work_days_standard', '22', 'number', 'hr', 'Số ngày công chuẩn trong tháng để tính lương', FALSE),
