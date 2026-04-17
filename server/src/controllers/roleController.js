@@ -3,6 +3,24 @@ const { logAudit } = require('../utils/auditLogger');
 const { clearPermissionCache } = require('../middleware/authMiddleware');
 const { MODULES, ACTION_LABELS } = require('../config/moduleRegistry');
 
+const SYSTEM_ONLY_MODULE_KEYS = new Set(
+  MODULES.filter(moduleItem => moduleItem.systemOnly).map(moduleItem => moduleItem.key)
+);
+
+const sanitizePermissionIdsForRole = async (roleName, permissionIds = []) => {
+  const normalizedRoleName = String(roleName || '').trim().toLowerCase();
+  if (normalizedRoleName === 'admin') return permissionIds;
+
+  const permissions = await Role.getAllPermissions();
+  const allowedIds = new Set(
+    permissions
+      .filter(permission => !SYSTEM_ONLY_MODULE_KEYS.has(permission.module))
+      .map(permission => permission.permission_id)
+  );
+
+  return permissionIds.filter(id => allowedIds.has(id));
+};
+
 const roleController = {
   // GET /api/roles — danh sách nhóm quyền kèm user_count
   getAll: async (req, res) => {
@@ -85,7 +103,8 @@ const roleController = {
 
       if (permission_ids && permission_ids.length > 0) {
         const validIds = permission_ids.filter(id => Number.isInteger(id) && id > 0);
-        await Role.setPermissions(roleId, validIds);
+        const sanitizedIds = await sanitizePermissionIdsForRole(role_name.trim(), validIds);
+        await Role.setPermissions(roleId, sanitizedIds);
       }
 
       const role = await Role.findById(roleId);
@@ -139,7 +158,8 @@ const roleController = {
       // Safety check: admin không tự khóa permissions quan trọng
       if (permission_ids && Array.isArray(permission_ids)) {
         const validIds = permission_ids.filter(id => Number.isInteger(id) && id > 0);
-        const safety = await Role.checkAdminSafety(roleId, validIds);
+        const sanitizedIds = await sanitizePermissionIdsForRole(role_name?.trim() || currentRole.role_name, validIds);
+        const safety = await Role.checkAdminSafety(roleId, sanitizedIds);
         if (!safety.safe) {
           return res.status(400).json({ message: safety.reason });
         }
@@ -156,7 +176,8 @@ const roleController = {
       // Update permissions
       if (permission_ids && Array.isArray(permission_ids)) {
         const validIds = permission_ids.filter(id => Number.isInteger(id) && id > 0);
-        await Role.setPermissions(roleId, validIds);
+        const sanitizedIds = await sanitizePermissionIdsForRole(role_name?.trim() || currentRole.role_name, validIds);
+        await Role.setPermissions(roleId, sanitizedIds);
 
         // Clear permission cache cho tất cả user thuộc role này
         clearPermissionCache(); // clear all — safe & simple
@@ -204,18 +225,23 @@ const roleController = {
       }
 
       const validIds = permission_ids.filter(id => Number.isInteger(id) && id > 0);
+      const role = await Role.findById(roleId);
+      if (!role) {
+        return res.status(404).json({ message: 'Không tìm thấy nhóm quyền' });
+      }
+      const sanitizedIds = await sanitizePermissionIdsForRole(role.role_name, validIds);
 
       // Safety check
-      const safety = await Role.checkAdminSafety(roleId, validIds);
+      const safety = await Role.checkAdminSafety(roleId, sanitizedIds);
       if (!safety.safe) {
         return res.status(400).json({ message: safety.reason });
       }
 
-      await Role.setPermissions(roleId, validIds);
+      await Role.setPermissions(roleId, sanitizedIds);
       clearPermissionCache();
 
-      const role = await Role.findById(roleId);
-      res.json(role);
+      const updatedRole = await Role.findById(roleId);
+      res.json(updatedRole);
     } catch (error) {
       res.status(500).json({ message: 'Lỗi khi cập nhật quyền', error: error.message });
     }

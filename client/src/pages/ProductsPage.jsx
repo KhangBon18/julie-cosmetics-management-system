@@ -164,21 +164,21 @@ export default function ProductsPage() {
               <option value="in_stock">Còn hàng</option>
             </select>
             <input
-              className="form-control"
+              className="form-control input-number"
               style={{ width: 140 }}
               type="text"
               inputMode="numeric"
               placeholder="Giá từ"
-              value={minPrice}
+              value={minPrice ? fmt(minPrice) : ''}
               onChange={e => { setMinPrice(sanitizePriceInput(e.target.value)); setPage(1); }}
             />
             <input
-              className="form-control"
+              className="form-control input-number"
               style={{ width: 140 }}
               type="text"
               inputMode="numeric"
               placeholder="Giá đến"
-              value={maxPrice}
+              value={maxPrice ? fmt(maxPrice) : ''}
               onChange={e => { setMaxPrice(sanitizePriceInput(e.target.value)); setPage(1); }}
             />
             {(search || filterBrand || filterCategory || filterActive || filterStock || minPrice || maxPrice || sort) ? (
@@ -253,7 +253,7 @@ export default function ProductsPage() {
                   <div className="form-group"><label htmlFor="prd-cat">Danh mục *</label><select id="prd-cat" className="form-control" required value={form.category_id || ''} onChange={e => setForm({...form, category_id: e.target.value})}><option value="">Chọn…</option>{categories.map(c => <option key={c.category_id} value={c.category_id}>{c.category_name}</option>)}</select></div>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label htmlFor="prd-sell">Giá bán *</label><input id="prd-sell" className="form-control" type="number" inputMode="numeric" required value={form.sell_price || ''} onChange={e => setForm({...form, sell_price: e.target.value})} autoComplete="off" /></div>
+                  <div className="form-group"><label htmlFor="prd-sell">Giá bán *</label><input id="prd-sell" className="form-control input-number" type="text" inputMode="numeric" required value={form.sell_price ? fmt(form.sell_price) : ''} onChange={e => { const num = parseInt(e.target.value.replace(/\D/g, ''), 10); setForm({...form, sell_price: isNaN(num) ? '' : num}); }} autoComplete="off" /></div>
                   <div className="form-group">
                     <label>Giá nhập hiện tại</label>
                     <input className="form-control" disabled value={editing ? `${fmt(form.import_price || 0)}đ` : 'Sẽ được cập nhật từ phiếu nhập kho'} />

@@ -702,41 +702,80 @@ table tbody tr:last-child td {
 
 /* ─── FORMS ─── */
 .form-group {
-  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px; /* Tăng khoảng cách */
 }
 
 .form-group label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .form-control {
   width: 100%;
-  padding: 9px 12px;
+  padding: 10px 14px; /* Rộng rãi hơn */
+  min-height: 42px; /* Tối ưu click target */
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  font-size: 13px;
+  font-size: 14px; /* Dễ đọc hơn */
   color: var(--text-primary);
   background: var(--bg-card);
-  transition: border-color var(--transition-speed) var(--transition-ease), box-shadow var(--transition-speed) var(--transition-ease);
+  transition: all var(--transition-speed) var(--transition-ease);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
 }
 
 .form-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15), inset 0 1px 2px rgba(0,0,0,0.02);
+  outline: none;
 }
 
-.form-control::placeholder { color: var(--text-muted); }
+.form-control:disabled, .form-control[readonly] {
+  background: var(--bg-body) !important;
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  border-color: var(--border-color-light);
+  box-shadow: none;
+}
 
-select.form-control { appearance: none; cursor: pointer; }
+/* Tối ưu riêng cho input số / tiền */
+input[type="number"].form-control,
+.form-control.input-number {
+  font-variant-numeric: tabular-nums;
+  font-family: 'Inter', monospace;
+  text-align: right;
+  padding-right: 16px;
+}
+
+/* Tối ưu riêng cho date */
+input[type="date"].form-control {
+  color: var(--text-primary);
+  position: relative;
+}
+
+.form-control::placeholder { color: var(--text-muted); opacity: 0.8; }
+
+select.form-control { 
+  appearance: none; 
+  cursor: pointer; 
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  padding-right: 36px;
+}
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0 20px;
+  align-items: start;
 }
 
 .form-actions {

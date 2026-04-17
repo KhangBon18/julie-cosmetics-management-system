@@ -226,6 +226,7 @@ const MODULES = [
     sortOrder: 41,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    systemOnly: true,
     workspaceKeys: ['admin'],
   },
   {
@@ -237,6 +238,7 @@ const MODULES = [
     sortOrder: 42,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    systemOnly: true,
     workspaceKeys: ['admin'],
   },
   {
@@ -248,6 +250,7 @@ const MODULES = [
     sortOrder: 43,
     showInSidebar: true,
     actions: ['read', 'update'],
+    systemOnly: true,
     workspaceKeys: ['admin'],
   },
 ];
@@ -274,7 +277,8 @@ export const buildSidebarSections = (userPermissions = [], userRole = '', basePa
 
   for (const mod of MODULES) {
     if (!mod.showInSidebar) continue;
-    if (mod.workspaceKeys?.length && !mod.workspaceKeys.includes(workspaceKey)) continue;
+    const mustStayInWorkspace = mod.isPublic || mod.systemOnly;
+    if (mustStayInWorkspace && mod.workspaceKeys?.length && !mod.workspaceKeys.includes(workspaceKey)) continue;
 
     // Hide 'Cá nhân' section for admin accounts
     if (isAdmin && mod.section === 'Cá nhân') continue;

@@ -518,12 +518,14 @@ export default function SalariesPage() {
                   <div className="form-group">
                     <label>Số tiền thưởng</label>
                     <input
-                      className="form-control"
-                      type="number"
-                      min="0"
+                      className="form-control input-number"
+                      type="text"
                       required
-                      value={bonusForm.amount}
-                      onChange={event => setBonusForm({ ...bonusForm, amount: event.target.value })}
+                      value={bonusForm.amount ? fmt(bonusForm.amount) : ''}
+                      onChange={event => {
+                        const num = parseInt(event.target.value.replace(/\D/g, ''), 10);
+                        setBonusForm({ ...bonusForm, amount: isNaN(num) ? '' : num });
+                      }}
                     />
                   </div>
 

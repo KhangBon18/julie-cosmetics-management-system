@@ -196,8 +196,12 @@ export default function ImportsPage() {
                       <tr key={item.product_id}>
                         <td style={{ fontWeight: 600 }}>{item.product_name}</td>
                         <td>
-                          <input type="number" className="form-control" style={{ width: 120 }} value={item.unit_price}
-                            onChange={e => updateItem(item.product_id, 'unit_price', parseFloat(e.target.value) || 0)} />
+                          <input type="text" className="form-control input-number" style={{ width: 120 }} value={fmt(item.unit_price)}
+                            onChange={e => {
+                              const strVal = e.target.value.replace(/\D/g, '');
+                              const num = parseInt(strVal, 10);
+                              updateItem(item.product_id, 'unit_price', isNaN(num) ? 0 : num);
+                            }} />
                         </td>
                         <td>
                           <input type="number" className="form-control" style={{ width: 80 }} value={item.quantity} min={1}

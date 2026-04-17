@@ -166,11 +166,14 @@ export default function EmployeesPage() {
                   <div className="form-group">
                     <label>{editing ? 'Lương cơ bản' : 'Lương tại thời điểm nhận chức vụ'}</label>
                     <input
-                      className="form-control"
-                      type="number"
-                      value={form.base_salary||''}
+                      className="form-control input-number"
+                      type="text"
+                      value={form.base_salary ? fmt(form.base_salary) : ''}
                       disabled={!!editing}
-                      onChange={e => setForm({...form, base_salary: e.target.value})}
+                      onChange={e => {
+                        const num = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                        setForm({...form, base_salary: isNaN(num) ? '' : num});
+                      }}
                     />
                     {editing && (
                       <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
@@ -271,7 +274,10 @@ export default function EmployeesPage() {
                 <div className="form-row">
                   <div className="form-group">
                     <label>Lương tại thời điểm nhận chức vụ *</label>
-                    <input className="form-control" type="number" min="0" required value={positionForm.salary_at_time || 0} onChange={e => setPositionForm({ ...positionForm, salary_at_time: e.target.value })} />
+                    <input className="form-control input-number" type="text" required value={positionForm.salary_at_time ? fmt(positionForm.salary_at_time) : ''} onChange={e => {
+                      const num = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                      setPositionForm({ ...positionForm, salary_at_time: isNaN(num) ? 0 : num });
+                    }} />
                   </div>
                   <div className="form-group">
                     <label>Ghi chú</label>

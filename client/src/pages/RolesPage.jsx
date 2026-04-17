@@ -27,7 +27,7 @@ function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
 }
 
 // ─── Permission Matrix Component ───
-function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
+function PermissionMatrix({ allPermissions, selectedIds, onChange, lockSystemModules }) {
   const modules = getPermissionModules();
 
   // Build a lookup: module_key + action → permission_id
@@ -45,6 +45,9 @@ function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
   };
 
   const toggle = (moduleKey, action) => {
+    const mod = modules.find(item => item.key === moduleKey);
+    if (lockSystemModules && mod?.systemOnly) return;
+
     const pid = permLookup[`${moduleKey}.${action}`];
     if (!pid) return;
 
@@ -79,12 +82,14 @@ function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
   const toggleColumn = (action) => {
     const newSet = new Set(selectedSet);
     const allChecked = modules.every(mod => {
+      if (lockSystemModules && mod.systemOnly) return true;
       if (!mod.actions.includes(action)) return true;
       const pid = permLookup[`${mod.key}.${action}`];
       return pid ? newSet.has(pid) : true;
     });
 
     for (const mod of modules) {
+      if (lockSystemModules && mod.systemOnly) continue;
       if (!mod.actions.includes(action)) continue;
       const pid = permLookup[`${mod.key}.${action}`];
       if (!pid) continue;
@@ -118,6 +123,7 @@ function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
     const newSet = new Set(selectedSet);
     const mod = modules.find(m => m.key === moduleKey);
     if (!mod) return;
+    if (lockSystemModules && mod.systemOnly) return;
 
     const allChecked = mod.actions.every(action => {
       const pid = permLookup[`${moduleKey}.${action}`];
@@ -143,6 +149,7 @@ function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
 
   const isColumnAllChecked = (action) => {
     return modules.every(mod => {
+      if (lockSystemModules && mod.systemOnly) return true;
       if (!mod.actions.includes(action)) return true;
       const pid = permLookup[`${mod.key}.${action}`];
       return pid ? selectedSet.has(pid) : true;
@@ -190,10 +197,15 @@ function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
                 </td>
               </tr>
               {mods.map(mod => (
-                <tr key={mod.key} className="perm-matrix-row">
+                <tr
+                  key={mod.key}
+                  className="perm-matrix-row"
+                  style={lockSystemModules && mod.systemOnly ? { opacity: 0.55 } : undefined}
+                >
                   <td className="perm-matrix-module-name">
                     <mod.icon className="perm-matrix-module-icon" />
                     {mod.name}
+                    {mod.systemOnly ? <span style={{ marginLeft: 8, fontSize: 11, color: '#b45309' }}>(Chỉ admin)</span> : null}
                   </td>
                   {MATRIX_ACTIONS.map(action => (
                     <td key={action} className="perm-matrix-cell">
@@ -203,6 +215,7 @@ function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
                             type="checkbox"
                             className="perm-checkbox"
                             checked={isChecked(mod.key, action)}
+                            disabled={lockSystemModules && mod.systemOnly}
                             onChange={() => toggle(mod.key, action)}
                           />
                           <span className="perm-checkbox-custom">
@@ -220,6 +233,7 @@ function PermissionMatrix({ allPermissions, selectedIds, onChange }) {
                         type="checkbox"
                         className="perm-checkbox"
                         checked={isRowAllChecked(mod.key)}
+                        disabled={lockSystemModules && mod.systemOnly}
                         onChange={() => toggleRow(mod.key)}
                       />
                       <span className="perm-checkbox-custom perm-checkbox-all">
@@ -254,6 +268,28 @@ export default function RolesPage() {
   const _canCreate = canCreate('roles');
   const _canUpdate = canUpdate('roles');
   const _canDelete = canDelete('roles');
+  const normalizedEditingRole = String(editing?.role_name || form.role_name || '').trim().toLowerCase();
+  const lockSystemModules = normalizedEditingRole !== 'admin';
+
+  useEffect(() => {
+    if (!lockSystemModules || !allPermissions.length) return;
+
+    const systemModuleKeys = new Set(
+      getPermissionModules()
+        .filter(moduleItem => moduleItem.systemOnly)
+        .map(moduleItem => moduleItem.key)
+    );
+    const blockedPermissionIds = new Set(
+      allPermissions
+        .filter(permission => systemModuleKeys.has(permission.module))
+        .map(permission => permission.permission_id)
+    );
+
+    setSelectedPermIds((current) => {
+      const next = current.filter(id => !blockedPermissionIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [lockSystemModules, allPermissions]);
 
   // Load data
   const loadData = useCallback(async () => {
@@ -492,10 +528,16 @@ export default function RolesPage() {
                   <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
                     Chọn các quyền truy cập cho nhóm này. Tick "Xem" để hiện module trên menu.
                   </p>
+                  {lockSystemModules ? (
+                    <p style={{ fontSize: 12, color: '#b45309', marginBottom: 12 }}>
+                      Các module hệ thống (`Tài khoản`, `Nhóm quyền`, `Cấu hình`) được khóa riêng cho admin để tránh lộ sai khi cấp quyền linh động cho role khác.
+                    </p>
+                  ) : null}
                   <PermissionMatrix
                     allPermissions={allPermissions}
                     selectedIds={selectedPermIds}
                     onChange={setSelectedPermIds}
+                    lockSystemModules={lockSystemModules}
                   />
                 </div>
 
