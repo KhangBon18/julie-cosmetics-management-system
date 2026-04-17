@@ -168,6 +168,7 @@ const MODULES = [
     sortOrder: 41,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    systemOnly: true,
   },
   {
     key: 'roles',
@@ -178,6 +179,7 @@ const MODULES = [
     sortOrder: 42,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete'],
+    systemOnly: true,
   },
   {
     key: 'settings',
@@ -188,6 +190,7 @@ const MODULES = [
     sortOrder: 43,
     showInSidebar: true,
     actions: ['read', 'update'],
+    systemOnly: true,
   },
 ];
 
