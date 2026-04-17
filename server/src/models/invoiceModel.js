@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 const { logInventoryMovement } = require('../utils/inventoryLogger');
-const { calculateLoyaltyPoints, determineMembershipTier } = require('../utils/crmRules');
+const { calculateLoyaltyPoints } = require('../utils/crmRules');
 const {
   SALES_ANALYTICS_INVOICE_STATUSES,
   COMPLETED_RETURN_INVOICE_AGGREGATE_SQL,
@@ -238,27 +238,6 @@ const Invoice = {
         [invoiceId, finalTotal, pmMethod, paymentStatus, paymentStatus === 'confirmed' ? new Date() : null]
       );
 
-      if (customer_id && invoiceStatus === 'confirmed') {
-        const [customerRows] = await connection.query(
-          'SELECT total_points, total_spent FROM customers WHERE customer_id = ? FOR UPDATE',
-          [customer_id]
-        );
-
-        if (customerRows.length) {
-          const currentPoints = Number(customerRows[0].total_points || 0);
-          const currentSpent = Number(customerRows[0].total_spent || 0);
-          const nextPoints = Math.max(0, currentPoints - pointsEarned);
-          const nextSpent = Math.max(0, currentSpent - finalTotal);
-
-          await connection.query(
-            `UPDATE customers
-             SET total_points = ?, total_spent = ?, membership_tier = ?
-             WHERE customer_id = ?`,
-            [nextPoints, nextSpent, determineMembershipTier(nextPoints, settings), customer_id]
-          );
-        }
-      }
-
       // Insert chi tiết hóa đơn (trigger sẽ trừ tồn kho)
       for (const item of resolvedItems) {
         // Log inventory movement BEFORE trigger fires
@@ -331,6 +310,19 @@ const Invoice = {
         "UPDATE invoices SET status = 'cancelled' WHERE invoice_id = ? AND status NOT IN ('cancelled', 'refunded')",
         [id]
       );
+      if (result.affectedRows) {
+        await connection.query(
+          `UPDATE payment_transactions
+           SET status = 'failed',
+               note = CONCAT(
+                 COALESCE(note, ''),
+                 CASE WHEN COALESCE(note, '') = '' THEN '' ELSE '\n' END,
+                 'Invoice cancelled before payment confirmation'
+               )
+           WHERE invoice_id = ? AND status = 'pending'`,
+          [id]
+        );
+      }
       await connection.commit();
       return result.affectedRows;
     } catch (error) {

@@ -1,6 +1,7 @@
 const Employee = require('../models/employeeModel');
 const Salary = require('../models/salaryModel');
 const Leave = require('../models/leaveModel');
+const SalaryBonus = require('../models/salaryBonusModel');
 const { pool } = require('../config/db');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -63,11 +64,24 @@ const staffController = {
         return res.status(400).json({ message: 'Tài khoản không liên kết với nhân viên nào' });
       }
       const { month, year } = req.query;
-      let query = `SELECT s.salary_id, s.month, s.year,
-                          s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
-                          s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary, s.notes
-                   FROM salaries s
-                   WHERE s.employee_id = ?`;
+      const bonusTableReady = await SalaryBonus.hasTable();
+      let query = bonusTableReady
+        ? `SELECT s.salary_id, s.month, s.year,
+                  s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
+                  s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary, s.notes,
+                  sba.reason as bonus_reason
+           FROM salaries s
+           LEFT JOIN salary_bonus_adjustments sba
+             ON sba.employee_id = s.employee_id
+            AND sba.month = s.month
+            AND sba.year = s.year
+           WHERE s.employee_id = ?`
+        : `SELECT s.salary_id, s.month, s.year,
+                  s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
+                  s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary, s.notes,
+                  NULL as bonus_reason
+           FROM salaries s
+           WHERE s.employee_id = ?`;
       const params = [req.user.employee_id];
       if (month) { query += ' AND s.month = ?'; params.push(month); }
       if (year) { query += ' AND s.year = ?'; params.push(year); }
@@ -75,11 +89,11 @@ const staffController = {
 
       const [rows] = await pool.query(query, params);
 
-      const headers = ['Mã Lương', 'Tháng', 'Năm', 'Ngày công chuẩn', 'Ngày công thực tế', 'Nghỉ không lương', 'Lương cơ bản', 'Lương Gross', 'Thưởng', 'Khấu trừ', 'Thực nhận', 'Ghi chú'];
+      const headers = ['Mã Lương', 'Tháng', 'Năm', 'Ngày công chuẩn', 'Ngày công thực tế', 'Nghỉ không lương', 'Lương cơ bản', 'Lương Gross', 'Thưởng', 'Lý do thưởng', 'Khấu trừ', 'Thực nhận', 'Ghi chú'];
       const csvRows = rows.map(r => [
         r.salary_id, r.month, r.year,
         r.work_days_standard, r.work_days_actual, r.unpaid_leave_days,
-        r.base_salary, r.gross_salary, r.bonus, r.deductions, r.net_salary, r.notes || ''
+        r.base_salary, r.gross_salary, r.bonus, r.bonus_reason || '', r.deductions, r.net_salary, r.notes || ''
       ]);
 
       const csv = '\uFEFF' + [headers, ...csvRows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');

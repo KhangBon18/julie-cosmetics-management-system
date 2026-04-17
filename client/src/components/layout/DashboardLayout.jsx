@@ -3,7 +3,11 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopHeader from './TopHeader';
 import useAuth from '../../hooks/useAuth';
-import { resolveWorkspaceBasePath, resolveWorkspaceMeta } from '../../utils/workspace';
+import {
+  getWorkspaceBaseFromPath,
+  getPreferredWorkspaceBasePath,
+  resolveWorkspaceMeta
+} from '../../utils/workspace';
 
 export default function DashboardLayout() {
   const { user, loading } = useAuth();
@@ -21,8 +25,8 @@ export default function DashboardLayout() {
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
   const closeSidebar = () => setSidebarOpen(false);
   const workspace = resolveWorkspaceMeta(user);
-  const basePath = resolveWorkspaceBasePath(user, location.pathname);
-  const preferredBasePath = workspace.defaultBasePath;
+  const basePath = getWorkspaceBaseFromPath(location.pathname) || getPreferredWorkspaceBasePath(user);
+  const preferredBasePath = getPreferredWorkspaceBasePath(user);
 
   if (basePath !== preferredBasePath) {
     const redirectedPathname = location.pathname.replace(/^\/(admin|hr|warehouse|business|staff)/, preferredBasePath);

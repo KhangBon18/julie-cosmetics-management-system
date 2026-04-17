@@ -36,6 +36,7 @@ const ProductDetailPage = lazy(() => import('./components/shop/ProductDetailPage
 const CartPage = lazy(() => import('./components/shop/CartPage'));
 const CheckoutPage = lazy(() => import('./components/shop/CheckoutPage'));
 const ShopAuthPage = lazy(() => import('./components/shop/ShopAuthPage'));
+const CustomerProfilePage = lazy(() => import('./components/shop/CustomerProfilePage'));
 const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'));
 const MyProfilePage = lazy(() => import('./pages/staff/MyProfilePage'));
 const MyLeavePage = lazy(() => import('./pages/staff/MyLeavePage'));
@@ -49,7 +50,11 @@ const Loading = () => (
 );
 
 /* Permission-restricted route shorthand */
-const P = ({ perm, children }) => <ProtectedRoute permission={perm}>{children}</ProtectedRoute>;
+const P = ({ perm, workspaceKeys, children }) => (
+  <ProtectedRoute permission={perm} workspaceKeys={workspaceKeys}>
+    {children}
+  </ProtectedRoute>
+);
 
 const renderInternalWorkspaceRoutes = () => (
   <>
@@ -59,22 +64,22 @@ const renderInternalWorkspaceRoutes = () => (
     <Route path="my-leaves" element={<MyLeavePage />} />
     <Route path="my-salary" element={<MySalaryPage />} />
 
-    <Route path="products" element={<P perm="products.read"><ProductsPage /></P>} />
-    <Route path="invoices" element={<P perm="invoices.read"><InvoicesPage /></P>} />
-    <Route path="customers" element={<P perm="customers.read"><CustomersPage /></P>} />
-    <Route path="leaves" element={<P perm="leaves.read"><LeavesPage /></P>} />
-    <Route path="employees" element={<P perm="employees.read"><EmployeesPage /></P>} />
-    <Route path="brands" element={<P perm="brands.read"><BrandsPage /></P>} />
-    <Route path="categories" element={<P perm="categories.read"><CategoriesPage /></P>} />
-    <Route path="positions" element={<P perm="positions.read"><PositionsPage /></P>} />
-    <Route path="salaries" element={<P perm="salaries.read"><SalariesPage /></P>} />
-    <Route path="reviews" element={<P perm="reviews.read"><ReviewsPage /></P>} />
-    <Route path="reports" element={<P perm="reports.read"><ReportsPage /></P>} />
-    <Route path="suppliers" element={<P perm="suppliers.read"><SuppliersPage /></P>} />
-    <Route path="imports" element={<P perm="imports.read"><ImportsPage /></P>} />
-    <Route path="users" element={<P perm="users.read"><UsersPage /></P>} />
-    <Route path="roles" element={<P perm="roles.read"><RolesPage /></P>} />
-    <Route path="settings" element={<P perm="settings.read"><SettingsPage /></P>} />
+    <Route path="products" element={<P perm="products.read" workspaceKeys={['admin', 'warehouse']}><ProductsPage /></P>} />
+    <Route path="invoices" element={<P perm="invoices.read" workspaceKeys={['admin', 'business']}><InvoicesPage /></P>} />
+    <Route path="customers" element={<P perm="customers.read" workspaceKeys={['admin', 'business']}><CustomersPage /></P>} />
+    <Route path="leaves" element={<P perm="leaves.read" workspaceKeys={['admin', 'hr']}><LeavesPage /></P>} />
+    <Route path="employees" element={<P perm="employees.read" workspaceKeys={['admin', 'hr']}><EmployeesPage /></P>} />
+    <Route path="brands" element={<P perm="brands.read" workspaceKeys={['admin', 'warehouse']}><BrandsPage /></P>} />
+    <Route path="categories" element={<P perm="categories.read" workspaceKeys={['admin', 'warehouse']}><CategoriesPage /></P>} />
+    <Route path="positions" element={<P perm="positions.read" workspaceKeys={['admin', 'hr']}><PositionsPage /></P>} />
+    <Route path="salaries" element={<P perm="salaries.read" workspaceKeys={['admin', 'hr']}><SalariesPage /></P>} />
+    <Route path="reviews" element={<P perm="reviews.read" workspaceKeys={['admin', 'business']}><ReviewsPage /></P>} />
+    <Route path="reports" element={<P perm="reports.read" workspaceKeys={['admin', 'hr', 'warehouse', 'business']}><ReportsPage /></P>} />
+    <Route path="suppliers" element={<P perm="suppliers.read" workspaceKeys={['admin', 'warehouse']}><SuppliersPage /></P>} />
+    <Route path="imports" element={<P perm="imports.read" workspaceKeys={['admin', 'warehouse']}><ImportsPage /></P>} />
+    <Route path="users" element={<P perm="users.read" workspaceKeys={['admin']}><UsersPage /></P>} />
+    <Route path="roles" element={<P perm="roles.read" workspaceKeys={['admin']}><RolesPage /></P>} />
+    <Route path="settings" element={<P perm="settings.read" workspaceKeys={['admin']}><SettingsPage /></P>} />
   </>
 );
 
@@ -94,6 +99,7 @@ function App() {
                   <Route path="cart" element={<CartPage />} />
                   <Route path="checkout" element={<CheckoutPage />} />
                   <Route path="auth" element={<ShopAuthPage />} />
+                  <Route path="profile" element={<CustomerProfilePage />} />
                 </Route>
 
                 {/* ═══ Admin Dashboard ═══ */}

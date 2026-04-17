@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const Setting = require('../models/settingModel');
+const SalaryBonus = require('../models/salaryBonusModel');
 const { syncApprovedResignations } = require('./employeeLifecycle');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -178,6 +179,8 @@ async function calculateSalary(employeeId, month, year) {
   const workDaysActual = Math.max(0, workDaysStandard - unpaidLeaveDays);
   const baseSalary = Math.round(baseSalaryEquivalent);
   const grossSalaryRounded = Math.round(grossSalary);
+  const bonusAdjustment = await SalaryBonus.findByPeriod(employeeId, month, year);
+  const bonusAmount = Number(bonusAdjustment?.amount || 0);
   const notes = salaryBreakdown.length > 1
     ? `Lương tháng được phân bổ theo ${salaryBreakdown.length} giai đoạn chức vụ: ${salaryBreakdown.map((segment) => `${segment.start_date} đến ${segment.end_date} - ${segment.position_name} (${formatCurrency(segment.salary_at_time)}đ)`).join('; ')}.`
     : (unpaidLeaveDays > 0 ? `Phát sinh ${unpaidLeaveDays} ngày nghỉ không lương trong tháng.` : null);
@@ -192,9 +195,10 @@ async function calculateSalary(employeeId, month, year) {
     unpaid_leave_days: unpaidLeaveDays,
     base_salary: baseSalary,
     gross_salary: grossSalaryRounded,
-    bonus: 0,
+    bonus: bonusAmount,
+    bonus_reason: bonusAdjustment?.reason || null,
     deductions: 0,
-    net_salary: grossSalaryRounded,
+    net_salary: grossSalaryRounded + bonusAmount,
     notes: resignationDate && resignationDate <= fullMonthEnd
       ? `${notes ? `${notes} ` : ''}Hệ thống chỉ tính lương đến hết ngày ${formatSqlDate(resignationDate)} do nhân sự nghỉ việc từ thời điểm này.`
       : notes,

@@ -3,8 +3,8 @@
  * Run: cd server && node seed-demo.js
  */
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 require('dotenv').config({ path: path.join(__dirname, '.env') });
-require('dotenv').config({ path: path.join(__dirname, '..', '.env'), override: true });
 const mysql = require('mysql2/promise');
 const { calculateLoyaltyPoints } = require('./src/utils/crmRules');
 const { logInventoryMovement } = require('./src/utils/inventoryLogger');
@@ -269,7 +269,10 @@ async function seed() {
     console.log('\n📊 Updating customer stats...');
     const [custStats] = await conn.query(`
       SELECT customer_id, SUM(final_total) as total, SUM(points_earned) as pts, COUNT(*) as cnt
-      FROM invoices WHERE customer_id IS NOT NULL GROUP BY customer_id
+      FROM invoices
+      WHERE customer_id IS NOT NULL
+        AND status IN ('paid', 'completed')
+      GROUP BY customer_id
     `);
     for (const s of custStats) {
       const total = parseFloat(s.total) || 0;

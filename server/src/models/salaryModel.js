@@ -1,11 +1,22 @@
 const { pool } = require('../config/db');
+const SalaryBonus = require('./salaryBonusModel');
 
 const Salary = {
   findAll: async ({ page = 1, limit = 10, month, year, employee_id }) => {
-    let query = `SELECT s.*, e.full_name as employee_name
-                 FROM salaries s
-                 JOIN employees e ON s.employee_id = e.employee_id
-                 WHERE 1=1`;
+    const bonusTableReady = await SalaryBonus.hasTable();
+    let query = bonusTableReady
+      ? `SELECT s.*, e.full_name as employee_name, sba.reason as bonus_reason
+         FROM salaries s
+         JOIN employees e ON s.employee_id = e.employee_id
+         LEFT JOIN salary_bonus_adjustments sba
+           ON sba.employee_id = s.employee_id
+          AND sba.month = s.month
+          AND sba.year = s.year
+         WHERE 1=1`
+      : `SELECT s.*, e.full_name as employee_name, NULL as bonus_reason
+         FROM salaries s
+         JOIN employees e ON s.employee_id = e.employee_id
+         WHERE 1=1`;
     let countQuery = 'SELECT COUNT(*) as total FROM salaries WHERE 1=1';
     const params = [];
     const countParams = [];
@@ -45,11 +56,21 @@ const Salary = {
   },
 
   findById: async (id) => {
+    const bonusTableReady = await SalaryBonus.hasTable();
     const [rows] = await pool.query(
-      `SELECT s.*, e.full_name as employee_name
-       FROM salaries s
-       JOIN employees e ON s.employee_id = e.employee_id
-       WHERE s.salary_id = ?`,
+      bonusTableReady
+        ? `SELECT s.*, e.full_name as employee_name, sba.reason as bonus_reason
+           FROM salaries s
+           JOIN employees e ON s.employee_id = e.employee_id
+           LEFT JOIN salary_bonus_adjustments sba
+             ON sba.employee_id = s.employee_id
+            AND sba.month = s.month
+            AND sba.year = s.year
+           WHERE s.salary_id = ?`
+        : `SELECT s.*, e.full_name as employee_name, NULL as bonus_reason
+           FROM salaries s
+           JOIN employees e ON s.employee_id = e.employee_id
+           WHERE s.salary_id = ?`,
       [id]
     );
     return rows[0];

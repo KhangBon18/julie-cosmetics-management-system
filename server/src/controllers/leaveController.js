@@ -96,7 +96,7 @@ const leaveController = {
               ? `Quản lý đã duyệt đơn nghỉ việc của bạn. Ngày làm việc cuối cùng: ${new Date(leave.end_date).toLocaleDateString('vi-VN')}.`
               : `${toSentenceCase(leaveLabel)} của bạn ${formatLeaveRange(leave)} đã được phê duyệt.`,
             type: 'success',
-            link: '/staff/leaves'
+            link: '/admin/my-leaves'
           });
         }
       }
@@ -127,7 +127,7 @@ const leaveController = {
               ? `Đơn nghỉ việc của bạn chưa được phê duyệt. Lý do: ${normalizedReason}.`
               : `${toSentenceCase(leaveLabel)} của bạn ${formatLeaveRange(leave)} chưa được phê duyệt. Lý do: ${normalizedReason}.`,
             type: 'error',
-            link: '/staff/leaves'
+            link: '/admin/my-leaves'
           });
         }
       }

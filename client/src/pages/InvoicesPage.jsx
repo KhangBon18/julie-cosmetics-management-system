@@ -137,6 +137,9 @@ export default function InvoicesPage() {
   const finalTotal = subtotal - discountAmount;
   const pointsEarned = customerInfo ? calculateLoyaltyPoints(finalTotal, crmSettings) : 0;
   const pointsRuleLabel = formatPointsRule(crmSettings);
+  const pointsPreviewLabel = paymentMethod === 'cash'
+    ? `+${pointsEarned} điểm sẽ được cộng ngay khi lưu hóa đơn`
+    : `+${pointsEarned} điểm sẽ được cộng sau khi xác nhận thanh toán`;
 
   const handleSubmit = async () => {
     if (!cartItems.length) return toast.error('Vui lòng thêm sản phẩm');
@@ -338,7 +341,7 @@ export default function InvoicesPage() {
                 </div>
                 {customerInfo && (
                   <div style={{ textAlign: 'right', fontSize: 13, color: '#059669', marginTop: 4 }}>
-                    +{pointsEarned} điểm tích lũy
+                    {pointsPreviewLabel}
                     <div style={{ color: '#64748b', marginTop: 2 }}>Quy tắc CRM: {pointsRuleLabel}</div>
                   </div>
                 )}

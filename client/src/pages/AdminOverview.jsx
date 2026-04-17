@@ -4,7 +4,7 @@ import { FiUsers, FiPackage, FiShoppingBag, FiDollarSign, FiTag, FiTruck, FiArro
 import { productService, customerService, invoiceService, employeeService, brandService } from '../services/dataService';
 import api from '../services/api';
 import useAuth from '../hooks/useAuth';
-import { getWorkspaceHomePath, rebaseInternalPath } from '../utils/workspace';
+import { getPreferredWorkspaceBasePath, rebaseInternalPath } from '../utils/workspace';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -50,8 +50,8 @@ export default function DashboardPage() {
 
   // Calculate max revenue for chart bar heights
   const maxRevenue = Math.max(...monthlyRevenue.map(m => parseFloat(m.revenue) || 0), 1);
-  const workspaceHome = getWorkspaceHomePath(user, location.pathname);
-  const toWorkspace = (path) => rebaseInternalPath(path, workspaceHome);
+  const workspaceBasePath = getPreferredWorkspaceBasePath(user);
+  const toWorkspace = (path) => rebaseInternalPath(path, workspaceBasePath);
 
   return (
     <div>

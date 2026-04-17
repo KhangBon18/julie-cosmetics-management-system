@@ -23,7 +23,12 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState(null);
   const [errors, setErrors] = useState({});
+  const [settings, setSettings] = useState({});
   const lastValidatedSignature = useRef('');
+
+  useEffect(() => {
+    publicService.getSettings().then(setSettings).catch(console.error);
+  }, []);
 
   // Auto-fill from customer profile
   useEffect(() => {
@@ -66,8 +71,18 @@ export default function CheckoutPage() {
     syncCart();
   }, [cart, replaceCart]);
 
-  const shipping = cartTotal >= 500000 ? 0 : 30000;
-  const total = cartTotal + shipping;
+  const silverDiscount = settings['crm.silver_discount'] || 2;
+  const goldDiscount = settings['crm.gold_discount'] || 5;
+  let discountPct = 0;
+  if (customerUser) {
+    if (customerUser.membership_tier === 'gold') discountPct = goldDiscount;
+    else if (customerUser.membership_tier === 'silver') discountPct = silverDiscount;
+  }
+  
+  const discountAmount = Math.round(cartTotal * discountPct / 100);
+  const totalAfterDiscount = cartTotal - discountAmount;
+  const shipping = totalAfterDiscount >= 500000 ? 0 : 30000;
+  const total = totalAfterDiscount + shipping;
 
   const validate = () => {
     const e = {};
@@ -146,24 +161,7 @@ export default function CheckoutPage() {
     );
   }
 
-  // ═══ LOGIN REQUIRED (must be customer) ═══
-  if (!customerUser) {
-    return (
-      <div className="shop-container">
-        <div className="cart-empty">
-          <div className="cart-empty-icon"><FiUser size={48} style={{ color: 'var(--shop-primary-dark)' }} /></div>
-          <h2>Đăng nhập để đặt hàng</h2>
-          <p>Bạn cần đăng nhập hoặc tạo tài khoản khách hàng để tiến hành thanh toán.</p>
-          <Link to="/shop/auth?redirect=/shop/checkout" className="btn-section" style={{ marginTop: 16 }}>
-            Đăng nhập / Đăng ký
-          </Link>
-          <Link to="/shop/cart" className="back-link" style={{ marginTop: 12, display: 'inline-flex' }}>
-            <FiArrowLeft /> Quay lại giỏ hàng
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // (Guest checkout is now allowed, so no login blocker here)
 
   // ═══ EMPTY CART REDIRECT ═══
   if (cart.length === 0) {
@@ -265,6 +263,17 @@ export default function CheckoutPage() {
                   {shipping === 0 ? 'Miễn phí' : `${fmt(shipping)}đ`}
                 </span>
               </div>
+              {discountAmount > 0 && customerUser && (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--shop-bg-light)', borderRadius: 6, border: '1px solid var(--shop-border-light)' }}>
+                  <div className="cart-summary-row" style={{ marginBottom: 4 }}>
+                    <span style={{ color: 'var(--shop-primary-dark)', fontSize: 13, fontWeight: 600 }}>Cấp bậc thành viên</span>
+                    <span style={{ color: 'var(--shop-primary-dark)', fontWeight: 600 }}>−{fmt(discountAmount)}đ</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--shop-text-muted)', lineHeight: 1.4 }}>
+                    Áp dụng mức giảm <strong>{discountPct}%</strong> dành cho thành viên <strong>{customerUser.membership_tier === 'gold' ? 'Vàng (Gold)' : customerUser.membership_tier === 'silver' ? 'Bạc (Silver)' : 'Tiêu chuẩn'}</strong>.
+                  </div>
+                </div>
+              )}
               <div className="cart-summary-row cart-summary-total">
                 <span>Tổng cộng</span>
                 <span style={{ color: 'var(--shop-primary-dark)' }}>{fmt(total)}đ</span>

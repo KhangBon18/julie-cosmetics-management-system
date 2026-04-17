@@ -58,6 +58,15 @@ const validateSalaryGenerate = [
   handleValidation
 ];
 
+const validateSalaryBonus = [
+  body('employee_id').isInt({ min: 1 }).withMessage('employee_id là bắt buộc'),
+  body('month').isInt({ min: 1, max: 12 }).withMessage('Tháng phải từ 1-12'),
+  body('year').isInt({ min: 2000, max: 2100 }).withMessage('Năm không hợp lệ'),
+  body('amount').isFloat({ min: 0 }).withMessage('Thưởng phải là số >= 0'),
+  body('reason').trim().notEmpty().withMessage('Lý do thưởng là bắt buộc').isLength({ max: 255 }).withMessage('Lý do thưởng tối đa 255 ký tự'),
+  handleValidation
+];
+
 const validatePositionAssignment = [
   body('position_id').isInt({ min: 1 }).withMessage('position_id là bắt buộc'),
   body('effective_date').isDate().withMessage('effective_date không hợp lệ'),
@@ -171,6 +180,7 @@ module.exports = {
   validateEmployeeCreate,
   validateEmployeeUpdate,
   validateSalaryGenerate,
+  validateSalaryBonus,
   validatePositionAssignment,
   validateCustomer,
   validateProduct,

@@ -8,7 +8,8 @@ const authService = {
   // Customer auth
   customerLogin: (data) => api.post('/customer-auth/login', data),
   customerRegister: (data) => api.post('/customer-auth/register', data),
-  customerProfile: () => api.get('/customer-auth/profile')
+  customerProfile: () => api.get('/customer-auth/profile'),
+  customerOrders: () => api.get('/customer-auth/orders')
 };
 
 export default authService;

@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }) => {
       user, customerUser, loading,
       login, customerLogin, customerRegister,
       logout, customerLogout,
-      loadUser: loadStaffUser, refreshUser
+      loadUser: loadStaffUser, refreshUser, refreshCustomer: loadCustomerUser
     }}>
       {children}
     </AuthContext.Provider>

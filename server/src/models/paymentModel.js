@@ -1,7 +1,4 @@
 const { pool } = require('../config/db');
-const SettingsCache = require('../utils/settingsCache');
-const { determineMembershipTier } = require('../utils/crmRules');
-
 const Payment = {
   findByInvoice: async (invoiceId) => {
     const [rows] = await pool.query(
@@ -70,7 +67,7 @@ const Payment = {
 
       const [txRows] = await connection.query(
         `SELECT pt.transaction_id, pt.invoice_id, pt.status,
-                i.customer_id, i.final_total, i.points_earned
+                i.status as invoice_status
          FROM payment_transactions pt
          JOIN invoices i ON i.invoice_id = pt.invoice_id
          WHERE pt.transaction_id = ?
@@ -79,7 +76,7 @@ const Payment = {
       );
 
       const tx = txRows[0];
-      if (!tx || tx.status !== 'pending') {
+      if (!tx || tx.status !== 'pending' || tx.invoice_status !== 'confirmed') {
         await connection.rollback();
         return 0;
       }
@@ -91,34 +88,16 @@ const Payment = {
         [confirmedBy, transactionId]
       );
 
-      await connection.query(
+      const [invoiceResult] = await connection.query(
         `UPDATE invoices
          SET status = 'paid'
          WHERE invoice_id = ?
            AND status = 'confirmed'`,
         [tx.invoice_id]
       );
-
-      if (tx.customer_id) {
-        const settings = await SettingsCache.getAll();
-        const [customerRows] = await connection.query(
-          'SELECT total_points, total_spent FROM customers WHERE customer_id = ? FOR UPDATE',
-          [tx.customer_id]
-        );
-
-        if (customerRows.length) {
-          const currentPoints = Number(customerRows[0].total_points || 0);
-          const currentSpent = Number(customerRows[0].total_spent || 0);
-          const nextPoints = currentPoints + Number(tx.points_earned || 0);
-          const nextSpent = currentSpent + Number(tx.final_total || 0);
-
-          await connection.query(
-            `UPDATE customers
-             SET total_points = ?, total_spent = ?, membership_tier = ?
-             WHERE customer_id = ?`,
-            [nextPoints, nextSpent, determineMembershipTier(nextPoints, settings), tx.customer_id]
-          );
-        }
+      if (!invoiceResult.affectedRows) {
+        await connection.rollback();
+        return 0;
       }
 
       await connection.commit();
@@ -137,15 +116,16 @@ const Payment = {
       await connection.beginTransaction();
 
       const [txRows] = await connection.query(
-        `SELECT transaction_id, invoice_id, status
-         FROM payment_transactions
+        `SELECT pt.transaction_id, pt.invoice_id, pt.status, i.status as invoice_status
+         FROM payment_transactions pt
+         JOIN invoices i ON i.invoice_id = pt.invoice_id
          WHERE transaction_id = ?
          FOR UPDATE`,
         [transactionId]
       );
 
       const tx = txRows[0];
-      if (!tx || tx.status !== 'pending') {
+      if (!tx || tx.status !== 'pending' || tx.invoice_status !== 'confirmed') {
         await connection.rollback();
         return 0;
       }
@@ -157,13 +137,17 @@ const Payment = {
         [note || 'Payment failed', transactionId]
       );
 
-      await connection.query(
+      const [invoiceResult] = await connection.query(
         `UPDATE invoices
          SET status = 'cancelled'
          WHERE invoice_id = ?
            AND status = 'confirmed'`,
         [tx.invoice_id]
       );
+      if (!invoiceResult.affectedRows) {
+        await connection.rollback();
+        return 0;
+      }
 
       await connection.commit();
       return result.affectedRows;

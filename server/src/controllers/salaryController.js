@@ -1,6 +1,8 @@
 const Salary = require('../models/salaryModel');
+const SalaryBonus = require('../models/salaryBonusModel');
 const { calculateSalary, calculateAllSalaries } = require('../utils/salaryCalculation');
 const { pool } = require('../config/db');
+const { logAudit } = require('../utils/auditLogger');
 
 const salaryController = {
   getAll: async (req, res, next) => {
@@ -50,6 +52,60 @@ const salaryController = {
     } catch (error) { next(error); }
   },
 
+  getBonuses: async (req, res, next) => {
+    try {
+      const bonusFeatureEnabled = await SalaryBonus.hasTable();
+      const bonuses = await SalaryBonus.findAll(req.query);
+      res.json({ bonuses, bonus_feature_enabled: bonusFeatureEnabled });
+    } catch (error) { next(error); }
+  },
+
+  upsertBonus: async (req, res, next) => {
+    try {
+      const previous = await SalaryBonus.findByPeriod(req.body.employee_id, req.body.month, req.body.year);
+      const bonus = await SalaryBonus.upsert({
+        ...req.body,
+        amount: Number(req.body.amount || 0),
+        user_id: req.user.user_id
+      });
+
+      await logAudit({
+        userId: req.user.user_id,
+        action: previous ? 'UPDATE' : 'CREATE',
+        entityType: 'salary_bonus_adjustment',
+        entityId: bonus?.bonus_id,
+        oldValues: previous,
+        newValues: bonus,
+        req
+      });
+
+      res.status(previous ? 200 : 201).json({
+        message: previous ? 'Cập nhật thưởng kỳ lương thành công' : 'Tạo thưởng kỳ lương thành công',
+        bonus
+      });
+    } catch (error) { next(error); }
+  },
+
+  deleteBonus: async (req, res, next) => {
+    try {
+      const bonus = await SalaryBonus.delete(req.params.id);
+      if (!bonus) {
+        return res.status(404).json({ message: 'Không tìm thấy cấu hình thưởng' });
+      }
+
+      await logAudit({
+        userId: req.user.user_id,
+        action: 'DELETE',
+        entityType: 'salary_bonus_adjustment',
+        entityId: req.params.id,
+        oldValues: bonus,
+        req
+      });
+
+      res.json({ message: 'Đã xóa thưởng kỳ lương', bonus });
+    } catch (error) { next(error); }
+  },
+
   // POST /api/salaries/calculate — Tính lương cho 1 NV
   calculate: async (req, res, next) => {
     try {
@@ -65,7 +121,7 @@ const salaryController = {
   // POST /api/salaries/generate — Tính lương tất cả NV và lưu vào DB
   generateAll: async (req, res, next) => {
     try {
-      const { month, year, bonus_map } = req.body; // bonus_map: { employee_id: bonus_amount }
+      const { month, year } = req.body;
       if (!month || !year) {
         return res.status(400).json({ message: 'Vui lòng cung cấp month và year' });
       }
@@ -76,11 +132,6 @@ const salaryController = {
 
       for (const s of salaries) {
         try {
-          // Áp dụng bonus nếu có
-          const bonus = (bonus_map && bonus_map[s.employee_id]) || 0;
-          s.bonus = bonus;
-          s.net_salary = s.gross_salary + bonus - s.deductions;
-
           await Salary.create({ ...s, generated_by: req.user.user_id });
           created++;
         } catch (err) {
@@ -102,12 +153,26 @@ const salaryController = {
   exportSalaries: async (req, res, next) => {
     try {
       const { month, year } = req.query;
-      let query = `SELECT s.salary_id, e.full_name as employee_name, s.month, s.year,
-                          s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
-                          s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary, s.notes
-                   FROM salaries s
-                   JOIN employees e ON s.employee_id = e.employee_id
-                   WHERE 1=1`;
+      const bonusTableReady = await SalaryBonus.hasTable();
+      let query = bonusTableReady
+        ? `SELECT s.salary_id, e.full_name as employee_name, s.month, s.year,
+                  s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
+                  s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary, s.notes,
+                  sba.reason as bonus_reason
+           FROM salaries s
+           JOIN employees e ON s.employee_id = e.employee_id
+           LEFT JOIN salary_bonus_adjustments sba
+             ON sba.employee_id = s.employee_id
+            AND sba.month = s.month
+            AND sba.year = s.year
+           WHERE 1=1`
+        : `SELECT s.salary_id, e.full_name as employee_name, s.month, s.year,
+                  s.work_days_standard, s.work_days_actual, s.unpaid_leave_days,
+                  s.base_salary, s.gross_salary, s.bonus, s.deductions, s.net_salary, s.notes,
+                  NULL as bonus_reason
+           FROM salaries s
+           JOIN employees e ON s.employee_id = e.employee_id
+           WHERE 1=1`;
       const params = [];
       if (month) { query += ' AND s.month = ?'; params.push(month); }
       if (year) { query += ' AND s.year = ?'; params.push(year); }
@@ -115,11 +180,11 @@ const salaryController = {
 
       const [rows] = await pool.query(query, params);
 
-      const headers = ['Mã Lương', 'Nhân viên', 'Tháng', 'Năm', 'Ngày công chuẩn', 'Ngày công thực tế', 'Nghỉ không lương', 'Lương cơ bản', 'Lương Gross', 'Thưởng', 'Khấu trừ', 'Thực nhận', 'Ghi chú'];
+      const headers = ['Mã Lương', 'Nhân viên', 'Tháng', 'Năm', 'Ngày công chuẩn', 'Ngày công thực tế', 'Nghỉ không lương', 'Lương cơ bản', 'Lương Gross', 'Thưởng', 'Lý do thưởng', 'Khấu trừ', 'Thực nhận', 'Ghi chú'];
       const csvRows = rows.map(r => [
         r.salary_id, r.employee_name, r.month, r.year,
         r.work_days_standard, r.work_days_actual, r.unpaid_leave_days,
-        r.base_salary, r.gross_salary, r.bonus, r.deductions, r.net_salary, r.notes || ''
+        r.base_salary, r.gross_salary, r.bonus, r.bonus_reason || '', r.deductions, r.net_salary, r.notes || ''
       ]);
 
       const csv = '\uFEFF' + [headers, ...csvRows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
