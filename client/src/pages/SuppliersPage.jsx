@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { FiEdit2, FiPlus, FiSearch, FiTrash2 } from 'react-icons/fi';
+import { useEffect, useMemo, useState } from 'react';
+import { FiEdit2, FiPackage, FiPlus, FiSearch, FiTrash2 } from 'react-icons/fi';
 import { supplierService } from '../services/dataService';
 import { toast } from 'react-toastify';
 import usePermission from '../hooks/usePermission';
@@ -14,6 +14,11 @@ export default function SuppliersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [mappingSupplier, setMappingSupplier] = useState(null);
+  const [mappingData, setMappingData] = useState(null);
+  const [mappingLoading, setMappingLoading] = useState(false);
+  const [mappingSearch, setMappingSearch] = useState('');
+  const [mappingBusyProductId, setMappingBusyProductId] = useState(null);
   const [form, setForm] = useState({
     supplier_name: '',
     contact_person: '',
@@ -24,7 +29,7 @@ export default function SuppliersPage() {
   });
   const limit = 10;
 
-  const { canCreate, canUpdate, canDelete } = usePermission();
+  const { canCreate, canUpdate, canDelete, isAdmin } = usePermission();
   const _canCreate = canCreate('suppliers');
   const _canUpdate = canUpdate('suppliers');
   const _canDelete = canDelete('suppliers');
@@ -46,6 +51,97 @@ export default function SuppliersPage() {
       toast.error(error.message);
     }
   };
+
+  const loadProductMappings = async (supplierId, { silent = false } = {}) => {
+    try {
+      if (!silent) setMappingLoading(true);
+      const data = await supplierService.getProductMappings(supplierId);
+      setMappingData(data);
+      return data;
+    } catch (error) {
+      toast.error(error.message);
+      throw error;
+    } finally {
+      if (!silent) setMappingLoading(false);
+    }
+  };
+
+  const openMappingManager = async (supplier) => {
+    setMappingSupplier(supplier);
+    setMappingSearch('');
+    setMappingData(null);
+    try {
+      await loadProductMappings(supplier.supplier_id);
+    } catch {
+      setMappingSupplier(null);
+    }
+  };
+
+  const closeMappingManager = () => {
+    setMappingSupplier(null);
+    setMappingData(null);
+    setMappingSearch('');
+    setMappingBusyProductId(null);
+  };
+
+  const handleAddMapping = async (productId) => {
+    if (!mappingSupplier) return;
+    try {
+      setMappingBusyProductId(productId);
+      const response = await supplierService.addProductMapping(mappingSupplier.supplier_id, productId);
+      setMappingData(response);
+      toast.success(response.message || 'Đã thêm sản phẩm vào danh mục của nhà cung cấp');
+      await loadSuppliers();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setMappingBusyProductId(null);
+    }
+  };
+
+  const handleRemoveMapping = async (productId, productName) => {
+    if (!mappingSupplier) return;
+    const confirmed = window.confirm(`Gỡ "${productName}" khỏi danh mục nhập của ${mappingSupplier.supplier_name}?`);
+    if (!confirmed) return;
+
+    try {
+      setMappingBusyProductId(productId);
+      const response = await supplierService.removeProductMapping(mappingSupplier.supplier_id, productId);
+      setMappingData(response);
+      toast.success(response.message || 'Đã gỡ sản phẩm khỏi danh mục của nhà cung cấp');
+      await loadSuppliers();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setMappingBusyProductId(null);
+    }
+  };
+
+  const normalizedMappingSearch = mappingSearch.trim().toLowerCase();
+
+  const filteredMappedProducts = useMemo(() => {
+    const items = mappingData?.mapped_products || [];
+    if (!normalizedMappingSearch) return items;
+    return items.filter(product =>
+      [
+        product.product_name,
+        product.brand_name,
+        product.category_name
+      ].some(value => String(value || '').toLowerCase().includes(normalizedMappingSearch))
+    );
+  }, [mappingData?.mapped_products, normalizedMappingSearch]);
+
+  const filteredAvailableProducts = useMemo(() => {
+    const items = mappingData?.available_products || [];
+    if (!normalizedMappingSearch) return items;
+    return items.filter(product =>
+      [
+        product.product_name,
+        product.brand_name,
+        product.category_name
+      ].some(value => String(value || '').toLowerCase().includes(normalizedMappingSearch))
+    );
+  }, [mappingData?.available_products, normalizedMappingSearch]);
 
   const openCreate = () => {
     setEditing(null);
@@ -151,6 +247,7 @@ export default function SuppliersPage() {
                 <th>Email</th>
                 <th>Địa chỉ</th>
                 <th>Trạng thái</th>
+                {isAdmin ? <th>Danh mục nhập</th> : null}
                 {(_canUpdate || _canDelete) ? <th>Thao tác</th> : null}
               </tr>
             </thead>
@@ -163,6 +260,13 @@ export default function SuppliersPage() {
                   <td>{supplier.email || '—'}</td>
                   <td style={{ maxWidth: 240 }}>{supplier.address || '—'}</td>
                   <td><span className={`badge ${supplier.is_active ? 'badge-success' : 'badge-danger'}`}>{supplier.is_active ? 'Đang HĐ' : 'Ngừng'}</span></td>
+                  {isAdmin ? (
+                    <td>
+                      <button className="btn btn-sm btn-outline" onClick={() => openMappingManager(supplier)}>
+                        <FiPackage /> Quản lý
+                      </button>
+                    </td>
+                  ) : null}
                   {(_canUpdate || _canDelete) ? (
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -173,7 +277,13 @@ export default function SuppliersPage() {
                   ) : null}
                 </tr>
               ))}
-              {!suppliers.length ? <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Không có nhà cung cấp phù hợp</td></tr> : null}
+              {!suppliers.length ? (
+                <tr>
+                  <td colSpan={6 + (isAdmin ? 1 : 0) + ((_canUpdate || _canDelete) ? 1 : 0)} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                    Không có nhà cung cấp phù hợp
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
@@ -188,6 +298,177 @@ export default function SuppliersPage() {
           </div>
         ) : null}
       </div>
+
+      {mappingSupplier ? (
+        <div className="modal-overlay" onClick={closeMappingManager}>
+          <div className="modal" onClick={event => event.stopPropagation()} style={{ width: 'min(1080px, 96vw)' }}>
+            <div className="modal-header">
+              <div>
+                <h3>Danh mục sản phẩm theo nhà cung cấp</h3>
+                <p style={{ color: '#64748b', marginTop: 4 }}>
+                  {mappingSupplier.supplier_name}
+                </p>
+              </div>
+              <button className="modal-close" onClick={closeMappingManager}>×</button>
+            </div>
+            <div className="modal-body">
+              {mappingLoading && !mappingData ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Đang tải danh mục sản phẩm...</div>
+              ) : mappingData ? (
+                <>
+                  <div
+                    style={{
+                      background: !mappingData.mapping_table_available
+                        ? '#fef2f2'
+                        : mappingData.mapping_enabled
+                          ? '#ecfdf5'
+                          : '#fffbeb',
+                      border: `1px solid ${!mappingData.mapping_table_available
+                        ? '#fecaca'
+                        : mappingData.mapping_enabled
+                          ? '#a7f3d0'
+                          : '#fde68a'}`,
+                      color: !mappingData.mapping_table_available
+                        ? '#991b1b'
+                        : mappingData.mapping_enabled
+                          ? '#065f46'
+                          : '#92400e',
+                      borderRadius: 10,
+                      padding: 14,
+                      marginBottom: 16
+                    }}
+                  >
+                    {!mappingData.mapping_table_available ? (
+                      <strong>CSDL demo chưa đồng bộ bảng mapping. Hệ thống hiện vẫn fallback toàn bộ catalog.</strong>
+                    ) : mappingData.mapping_enabled ? (
+                      <strong>
+                        Nhà cung cấp này đã có danh mục riêng với {mappingData.mapped_products.length} sản phẩm.
+                        Luồng nhập kho sẽ chỉ cho chọn các sản phẩm này.
+                      </strong>
+                    ) : (
+                      <strong>
+                        Nhà cung cấp này chưa có mapping riêng. Hệ thống đang fallback toàn bộ catalog để tương thích dữ liệu cũ.
+                      </strong>
+                    )}
+                  </div>
+
+                  <div className="toolbar" style={{ padding: 0, marginBottom: 16 }}>
+                    <div className="search-input" style={{ flex: 1 }}>
+                      <FiSearch className="search-icon" />
+                      <input
+                        value={mappingSearch}
+                        onChange={event => setMappingSearch(event.target.value)}
+                        placeholder="Tìm theo tên sản phẩm, thương hiệu, danh mục..."
+                      />
+                    </div>
+                    <button className="btn btn-outline" onClick={() => loadProductMappings(mappingSupplier.supplier_id)}>
+                      Làm mới
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+                    <div className="card" style={{ marginBottom: 0 }}>
+                      <div className="card-body" style={{ paddingBottom: 12 }}>
+                        <h4 style={{ marginBottom: 4 }}>Đã map với nhà cung cấp</h4>
+                        <p style={{ color: '#64748b', fontSize: 13 }}>
+                          {mappingData.mapped_products.length} sản phẩm đang được dùng làm danh mục nhập chính thức
+                        </p>
+                      </div>
+                      <div className="table-container" style={{ maxHeight: 420, overflow: 'auto' }}>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Sản phẩm</th>
+                              <th>Danh mục</th>
+                              <th>Thương hiệu</th>
+                              <th>Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredMappedProducts.map(product => (
+                              <tr key={`mapped-${product.product_id}`}>
+                                <td style={{ fontWeight: 600 }}>{product.product_name}</td>
+                                <td>{product.category_name || '—'}</td>
+                                <td>{product.brand_name || '—'}</td>
+                                <td>
+                                  <button
+                                    className="btn btn-sm btn-danger"
+                                    disabled={!mappingData.mapping_table_available || mappingBusyProductId === product.product_id}
+                                    onClick={() => handleRemoveMapping(product.product_id, product.product_name)}
+                                  >
+                                    Gỡ
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {!filteredMappedProducts.length ? (
+                              <tr>
+                                <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                                  {mappingSearch ? 'Không có sản phẩm phù hợp bộ lọc' : 'Chưa có sản phẩm nào được map'}
+                                </td>
+                              </tr>
+                            ) : null}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="card" style={{ marginBottom: 0 }}>
+                      <div className="card-body" style={{ paddingBottom: 12 }}>
+                        <h4 style={{ marginBottom: 4 }}>Sản phẩm có thể thêm</h4>
+                        <p style={{ color: '#64748b', fontSize: 13 }}>
+                          Khi thêm sản phẩm đầu tiên, nhà cung cấp sẽ chuyển từ fallback sang dùng danh mục riêng
+                        </p>
+                      </div>
+                      <div className="table-container" style={{ maxHeight: 420, overflow: 'auto' }}>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Sản phẩm</th>
+                              <th>Danh mục</th>
+                              <th>Thương hiệu</th>
+                              <th>Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredAvailableProducts.map(product => (
+                              <tr key={`available-${product.product_id}`}>
+                                <td style={{ fontWeight: 600 }}>{product.product_name}</td>
+                                <td>{product.category_name || '—'}</td>
+                                <td>{product.brand_name || '—'}</td>
+                                <td>
+                                  <button
+                                    className="btn btn-sm btn-primary"
+                                    disabled={!mappingData.mapping_table_available || mappingBusyProductId === product.product_id}
+                                    onClick={() => handleAddMapping(product.product_id)}
+                                  >
+                                    Thêm
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {!filteredAvailableProducts.length ? (
+                              <tr>
+                                <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>
+                                  {mappingSearch ? 'Không còn sản phẩm phù hợp bộ lọc' : 'Tất cả sản phẩm đã được map'}
+                                </td>
+                              </tr>
+                            ) : null}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-actions" style={{ marginTop: 20 }}>
+                    <button type="button" className="btn btn-outline" onClick={closeMappingManager}>Đóng</button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showModal ? (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>

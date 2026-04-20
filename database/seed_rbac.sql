@@ -28,6 +28,8 @@ DEALLOCATE PREPARE add_role_id_stmt;
 INSERT IGNORE INTO roles (role_name, description, is_system) VALUES
 ('admin',     'Quản trị viên hệ thống — toàn quyền', TRUE),
 ('manager',   'Quản lý — quản lý nhân sự, duyệt đơn, xem báo cáo', TRUE),
+('staff_portal', 'Nhân viên tự phục vụ — hồ sơ cá nhân, nghỉ phép và bảng lương', TRUE),
+('sales',     'Nhân viên kinh doanh — bán hàng nội bộ, chăm sóc khách hàng và xem báo cáo kinh doanh', TRUE),
 ('staff',     'Nhân viên bán hàng — tạo hóa đơn, quản lý khách hàng', TRUE),
 ('warehouse', 'Thủ kho — quản lý nhập kho, kiểm kho', TRUE);
 
@@ -119,12 +121,33 @@ INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.role_id, p.permission_id
 FROM roles r
 JOIN permissions p
+WHERE r.role_name = 'staff_portal'
+  AND (
+    p.module = 'leaves' AND p.action IN ('read', 'create')
+  );
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r
+JOIN permissions p
 WHERE r.role_name = 'staff'
   AND (
     (p.module = 'invoices' AND p.action IN ('read', 'create'))
     OR (p.module = 'customers' AND p.action IN ('read', 'create', 'update'))
     OR (p.module = 'products' AND p.action = 'read')
     OR (p.module = 'leaves' AND p.action IN ('read', 'create'))
+  );
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r
+JOIN permissions p
+WHERE r.role_name = 'sales'
+  AND (
+    (p.module = 'invoices' AND p.action IN ('read', 'create'))
+    OR (p.module = 'customers' AND p.action IN ('read', 'create', 'update'))
+    OR (p.module = 'products' AND p.action = 'read')
+    OR (p.module = 'reports' AND p.action = 'read')
   );
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id)

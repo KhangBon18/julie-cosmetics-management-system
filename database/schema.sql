@@ -195,6 +195,19 @@ CREATE TABLE products (
   FULLTEXT INDEX ft_products_search (product_name, description)
 ) ENGINE=InnoDB COMMENT='Sản phẩm mỹ phẩm';
 
+CREATE TABLE supplier_products (
+  supplier_id    INT            NOT NULL,
+  product_id     INT            NOT NULL,
+  is_active      BOOLEAN        NOT NULL DEFAULT TRUE,
+  created_at     TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (supplier_id, product_id),
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(supplier_id) ON DELETE CASCADE,
+  FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+  INDEX idx_supplier_products_product_id (product_id),
+  INDEX idx_supplier_products_is_active (is_active)
+) ENGINE=InnoDB COMMENT='Danh mục sản phẩm có thể nhập từ từng nhà cung cấp';
+
 CREATE TABLE import_receipts (
   receipt_id     INT            AUTO_INCREMENT PRIMARY KEY,
   supplier_id    INT            NOT NULL,

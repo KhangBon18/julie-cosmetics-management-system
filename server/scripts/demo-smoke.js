@@ -4,6 +4,9 @@ const { setTimeout: delay } = require('node:timers/promises');
 
 const serverDir = path.join(__dirname, '..');
 const port = process.env.CI_DEMO_SMOKE_PORT || '5011';
+const now = new Date();
+const currentMonth = now.getMonth() + 1;
+const currentYear = now.getFullYear();
 
 const DEMO_FLOWS = [
   {
@@ -13,6 +16,7 @@ const DEMO_FLOWS = [
     checks: [
       ['/api/users?page=1&limit=1', 'Danh sách tài khoản'],
       ['/api/roles', 'Nhóm quyền'],
+      ['/api/suppliers/1/product-mappings', 'Mapping NCC - sản phẩm'],
       ['/api/reports/profit?group_by=month&year=2026', 'Báo cáo lợi nhuận']
     ]
   },
@@ -23,18 +27,38 @@ const DEMO_FLOWS = [
     checks: [
       ['/api/employees?page=1&limit=1', 'Danh sách nhân sự'],
       ['/api/leaves?page=1&limit=1', 'Duyệt nghỉ phép'],
+      [`/api/salaries/bonuses?month=${currentMonth}&year=${currentYear}`, 'Thưởng kỳ lương hiện tại'],
       ['/api/reports/hr?year=2026', 'Báo cáo nhân sự']
     ]
   },
   {
-    label: 'staff/business',
+    label: 'staff/self-service',
     username: 'staff01',
     password: 'staff123',
     checks: [
       ['/api/staff/profile', 'Hồ sơ cá nhân'],
       ['/api/staff/leaves?page=1&limit=1', 'Đơn nghỉ cá nhân'],
       ['/api/staff/salaries?page=1&limit=1', 'Bảng lương cá nhân'],
-      ['/api/invoices?page=1&limit=1', 'Danh sách hóa đơn']
+      ['/api/staff/salary-formula', 'Cách tính lương']
+    ],
+    deniedChecks: [
+      ['/api/invoices?page=1&limit=1', 'Không được truy cập khu bán hàng nội bộ']
+    ]
+  },
+  {
+    label: 'sales/business',
+    username: 'sales01',
+    password: 'sales123',
+    checks: [
+      ['/api/invoices?page=1&limit=1', 'Danh sách hóa đơn'],
+      ['/api/customers?page=1&limit=1', 'Danh sách khách hàng'],
+      ['/api/products?page=1&limit=1', 'Danh sách sản phẩm để lập hóa đơn'],
+      [`/api/reports/revenue?group_by=month&year=${currentYear}`, 'Báo cáo kinh doanh']
+    ],
+    deniedChecks: [
+      ['/api/staff/profile', 'Không được truy cập hồ sơ self-service'],
+      ['/api/staff/leaves?page=1&limit=1', 'Không được truy cập đơn nghỉ self-service'],
+      ['/api/staff/salaries?page=1&limit=1', 'Không được truy cập bảng lương self-service']
     ]
   },
   {
@@ -129,6 +153,19 @@ async function runChecks(flow) {
     }
 
     console.log(`   ↳ ${label}: OK`);
+  }
+
+  for (const [endpoint, label] of flow.deniedChecks || []) {
+    const response = await fetch(`http://127.0.0.1:${port}${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (response.status !== 403) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(`${flow.label} -> ${label} expected 403 but got ${response.status}: ${payload?.message || endpoint}`);
+    }
+
+    console.log(`   ↳ ${label}: OK (403)`);
   }
 }
 

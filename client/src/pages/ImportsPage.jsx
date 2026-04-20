@@ -15,11 +15,14 @@ export default function ImportsPage() {
 
   // Form
   const [suppliers, setSuppliers] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedSupplier, setSelectedSupplier] = useState('');
+  const [supplierProductMeta, setSupplierProductMeta] = useState(null);
   const [note, setNote] = useState('');
   const [importItems, setImportItems] = useState([]);
   const [searchProduct, setSearchProduct] = useState('');
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const { canCreate, canDelete } = usePermission();
@@ -40,10 +43,50 @@ export default function ImportsPage() {
         supplierService.getAll({ limit: 200 }),
         productService.getAll({ limit: 500 })
       ]);
+      const normalizedProducts = prodData.products || [];
       setSuppliers(supData.suppliers || supData || []);
-      setProducts(prodData.products || []);
+      setAllProducts(normalizedProducts);
+      setProducts(normalizedProducts);
+      setSupplierProductMeta(null);
       setShowForm(true);
     } catch (err) { toast.error(err.message); }
+  };
+
+  const loadProductsForSupplier = async (supplierId) => {
+    if (!supplierId) {
+      setProducts(allProducts);
+      setSupplierProductMeta(null);
+      return;
+    }
+
+    setLoadingProducts(true);
+    try {
+      const data = await productService.getAll({ limit: 500, supplier_id: supplierId });
+      setProducts(data.products || []);
+      setSupplierProductMeta(data.supplierFilter || null);
+    } catch (err) {
+      toast.error(err.message || 'Không thể tải danh mục sản phẩm theo nhà cung cấp');
+      setProducts(allProducts);
+      setSupplierProductMeta(null);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const handleSupplierChange = async (nextSupplierId) => {
+    if (nextSupplierId === selectedSupplier) return;
+
+    if (importItems.length > 0) {
+      const confirmed = window.confirm(
+        'Đổi nhà cung cấp sẽ xóa danh sách sản phẩm đang chọn để tránh lệch nghiệp vụ nhập kho. Tiếp tục?'
+      );
+      if (!confirmed) return;
+      setImportItems([]);
+    }
+
+    setSelectedSupplier(nextSupplierId);
+    setSearchProduct('');
+    await loadProductsForSupplier(nextSupplierId);
   };
 
   const addItem = (product) => {
@@ -100,6 +143,9 @@ export default function ImportsPage() {
 
   const resetForm = () => {
     setShowForm(false);
+    setAllProducts([]);
+    setProducts([]);
+    setSupplierProductMeta(null);
     setImportItems([]);
     setSelectedSupplier('');
     setNote('');
@@ -153,12 +199,27 @@ export default function ImportsPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
               <div className="form-group">
                 <label>Nhà cung cấp *</label>
-                <select className="form-control" value={selectedSupplier} onChange={e => setSelectedSupplier(e.target.value)} required>
+                <select
+                  className="form-control"
+                  value={selectedSupplier}
+                  onChange={e => handleSupplierChange(e.target.value)}
+                  required
+                >
                   <option value="">— Chọn nhà cung cấp —</option>
                   {suppliers.map(s => (
                     <option key={s.supplier_id} value={s.supplier_id}>{s.supplier_name}</option>
                   ))}
                 </select>
+                {selectedSupplier && supplierProductMeta?.mapping_enabled ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#166534' }}>
+                    NCC này đã cấu hình {supplierProductMeta.mapped_product_count} sản phẩm. Danh sách bên dưới đang được lọc theo nhà cung cấp.
+                  </div>
+                ) : null}
+                {selectedSupplier && supplierProductMeta?.fallback_all_products ? (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#b45309' }}>
+                    NCC này chưa cấu hình danh mục riêng, hệ thống đang cho phép chọn toàn bộ sản phẩm để tương thích dữ liệu cũ.
+                  </div>
+                ) : null}
               </div>
               <div className="form-group">
                 <label>Ghi chú</label>
@@ -169,12 +230,19 @@ export default function ImportsPage() {
             {/* Tìm SP */}
             <div className="form-group" style={{ marginBottom: 12 }}>
               <label>Tìm sản phẩm để thêm</label>
-              <input className="form-control" value={searchProduct} onChange={e => setSearchProduct(e.target.value)} placeholder="Nhập tên sản phẩm..." />
+              <input
+                className="form-control"
+                value={searchProduct}
+                onChange={e => setSearchProduct(e.target.value)}
+                placeholder={selectedSupplier ? 'Nhập tên sản phẩm...' : 'Chọn nhà cung cấp để ưu tiên lọc đúng danh mục'}
+              />
             </div>
 
             {searchProduct && (
               <div style={{ maxHeight: 200, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 16 }}>
-                {filteredProducts.slice(0, 20).map(p => (
+                {loadingProducts ? (
+                  <div style={{ padding: '12px 14px', color: '#64748b' }}>Đang tải danh mục sản phẩm theo nhà cung cấp...</div>
+                ) : filteredProducts.slice(0, 20).map(p => (
                   <div key={p.product_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }} onClick={() => addItem(p)}>
                     <div>
                       <strong>{p.product_name}</strong>
@@ -183,6 +251,11 @@ export default function ImportsPage() {
                     <div style={{ color: '#f59e0b', fontWeight: 600 }}>{fmt(p.import_price)}đ</div>
                   </div>
                 ))}
+                {!loadingProducts && !filteredProducts.length ? (
+                  <div style={{ padding: '12px 14px', color: '#64748b' }}>
+                    Không tìm thấy sản phẩm phù hợp với nhà cung cấp và từ khóa hiện tại.
+                  </div>
+                ) : null}
               </div>
             )}
 

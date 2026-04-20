@@ -2,6 +2,25 @@ const { pool } = require('../config/db');
 const { logInventoryMovement } = require('../utils/inventoryLogger');
 
 const roundMoney = (value) => Number((Number(value) || 0).toFixed(2));
+let supplierProductsTableExistsCache = null;
+
+const hasSupplierProductsTable = async (connection) => {
+  if (supplierProductsTableExistsCache !== null) return supplierProductsTableExistsCache;
+
+  try {
+    const [rows] = await connection.query(
+      `SELECT COUNT(*) AS total
+       FROM information_schema.tables
+       WHERE table_schema = DATABASE()
+         AND table_name = 'supplier_products'`
+    );
+    supplierProductsTableExistsCache = Number(rows[0]?.total || 0) > 0;
+  } catch {
+    supplierProductsTableExistsCache = false;
+  }
+
+  return supplierProductsTableExistsCache;
+};
 
 const Import = {
   findAll: async ({ page = 1, limit = 10, supplier_id }) => {
@@ -71,6 +90,29 @@ const Import = {
         throw Object.assign(new Error('Nhà cung cấp không tồn tại hoặc đã ngừng hoạt động'), { status: 400 });
       }
 
+      const supplierMappingTableAvailable = await hasSupplierProductsTable(connection);
+      const [supplierMappingCountRows] = await connection.query(
+        supplierMappingTableAvailable
+          ? `SELECT COUNT(*) AS total
+             FROM supplier_products
+             WHERE supplier_id = ? AND is_active = 1`
+          : 'SELECT 0 AS total',
+        supplierMappingTableAvailable ? [supplier_id] : []
+      );
+      const supplierHasMappedCatalog = supplierMappingTableAvailable
+        && Number(supplierMappingCountRows[0]?.total || 0) > 0;
+      let allowedProductIds = null;
+
+      if (supplierHasMappedCatalog) {
+        const [mappingRows] = await connection.query(
+          `SELECT product_id
+           FROM supplier_products
+           WHERE supplier_id = ? AND is_active = 1`,
+          [supplier_id]
+        );
+        allowedProductIds = new Set(mappingRows.map((row) => Number(row.product_id)));
+      }
+
       // Tính tổng tiền
       for (const item of items) {
         totalAmount += item.quantity * item.unit_price;
@@ -91,6 +133,12 @@ const Import = {
         );
         if (!pRows.length) {
           throw Object.assign(new Error(`Sản phẩm ID ${item.product_id} không tồn tại`), { status: 400 });
+        }
+        if (supplierHasMappedCatalog && !allowedProductIds.has(Number(item.product_id))) {
+          throw Object.assign(
+            new Error(`Sản phẩm "${pRows[0].product_name}" không thuộc danh mục đã cấu hình cho nhà cung cấp này`),
+            { status: 400 }
+          );
         }
       }
 

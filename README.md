@@ -27,14 +27,25 @@ Hệ thống quản lý mỹ phẩm phục vụ đồ án HTTT doanh nghiệp, g
 - `admin / admin123`
 - `manager01 / manager123`
 - `staff01 / staff123`
+- `sales01 / sales123`
 - `warehouse01 / warehouse123`
 
 ### Vai trò dùng khi demo
 
 - `admin`: quản trị tài khoản, nhóm quyền, cấu hình, báo cáo toàn hệ thống
 - `manager01`: quản lý nhân sự, lương thưởng, duyệt nghỉ phép, báo cáo HR
-- `staff01`: dùng để demo khu kinh doanh nội bộ và self-service nhân viên
+- `staff01`: dùng để demo cổng tự phục vụ nhân viên
+- `sales01`: dùng để demo khu kinh doanh nội bộ
 - `warehouse01`: dùng để demo kho, sản phẩm, nhà cung cấp, phiếu nhập
+
+### Demo fixtures được tự phục hồi trước giờ chấm
+
+`npm run demo:fixtures` sẽ đảm bảo lại các case demo dễ bị trôi sau khi test nhiều lần:
+
+- 1 hóa đơn `pending` để demo xác nhận / thất bại thanh toán
+- 1 đơn nghỉ phép `pending` để manager duyệt
+- 1 kỳ lương tháng hiện tại cho `staff01` kèm thưởng demo nếu DB đã có migration bonus
+- NCC `1/2` còn mapping riêng và 1 NCC fallback toàn catalog để demo backward compatibility nhập kho
 
 ### Khôi phục nhanh tài khoản demo nếu DB bị drift
 
@@ -46,10 +57,11 @@ npm run demo:reset-users
 
 Lệnh này sẽ:
 
-- reset lại 4 tài khoản demo về đúng mật khẩu công bố
+- reset lại 5 tài khoản demo về đúng mật khẩu công bố
+- reset thêm tài khoản `sales01` cho khu kinh doanh nội bộ
 - kích hoạt lại tài khoản nếu đang bị khóa
-- xóa lịch sử throttle đăng nhập cho 4 tài khoản demo
-- đồng bộ lại các quyền cốt lõi cần cho flow demo của admin / manager / staff / warehouse
+- xóa lịch sử throttle đăng nhập cho 5 tài khoản demo
+- đồng bộ lại các quyền cốt lõi cần cho flow demo của admin / manager / staff / sales / warehouse
 
 Sau đó xác minh nhanh bằng:
 
@@ -144,6 +156,7 @@ npm run seed:demo
 ```bash
 mysql -h 127.0.0.1 -P 3307 -u julie_app -p julie_cosmetics < database/migrations/031_fix_invoice_crm_status_accounting.sql
 mysql -h 127.0.0.1 -P 3307 -u julie_app -p julie_cosmetics < database/migrations/032_create_salary_bonus_adjustments.sql
+mysql -h 127.0.0.1 -P 3307 -u julie_app -p julie_cosmetics < database/migrations/033_add_supplier_products_mapping.sql
 ```
 
 ## Docker run flow
@@ -233,6 +246,9 @@ Tại [ReportsPage](</Users/heisenbon/Documents/Workspace Code/HTTTDN/Julie Cosm
 - Tab `💰 Lợi nhuận`: có nút `🖨️ In báo cáo lợi nhuận`
 - Tab `📦 Kho hàng`: có nút `🖨️ In báo cáo kho` và `🖨️ In báo cáo xuất hàng`
 - Bản in dùng cửa sổ print riêng, tối ưu cho trình duyệt, giữ phần tổng hợp + bảng số liệu để hạn chế lỗi layout khi demo
+- Trước khi demo, nhớ cho phép **popup / pop-up windows** cho `localhost`
+
+Checklist demo tay chi tiết: [docs/demo-qa-checklist.md](</Users/heisenbon/Documents/Workspace Code/HTTTDN/Julie Cosmetics/docs/demo-qa-checklist.md>)
 
 ## Smoke checklist trước khi đi chấm
 
@@ -242,6 +258,7 @@ Tại [ReportsPage](</Users/heisenbon/Documents/Workspace Code/HTTTDN/Julie Cosm
 npm run db:up
 npm run seed:demo
 npm run demo:reset-users
+npm run demo:fixtures
 npm run smoke:server
 npm run demo:smoke
 npm run dev
@@ -256,8 +273,14 @@ npm run dev
   - vào `/hr/employees`
   - mở `/hr/salaries`, tạo thưởng kỳ lương, tính lương, in bảng lương
 - `staff01 / staff123`
-  - vào `/business/invoices`
+  - vào `/staff`
+  - chỉ demo hồ sơ / nghỉ phép / bảng lương cá nhân
+  - không thấy khu bán hàng nội bộ
   - mở `Bảng lương cá nhân`, thấy thưởng/lý do thưởng nếu có
+- `sales01 / sales123`
+  - vào `/business/invoices`
+  - thao tác hóa đơn / khách hàng / báo cáo kinh doanh
+  - không thấy `Hồ sơ của tôi`, `Nghỉ phép`, `Bảng lương`
 - `warehouse01 / warehouse123`
   - vào `/warehouse/imports`
   - mở tab `📦 Kho hàng`, in `Báo cáo kho`
@@ -278,8 +301,9 @@ npm run dev
 5. `npm run demo:reset-users`
 6. `npm run smoke:server`
 7. `npm run demo:smoke`
-8. `npm run dev`
-9. Đăng nhập `admin / admin123`
+8. `npm run demo:fixtures`
+9. `npm run dev`
+10. Đăng nhập `admin / admin123`
 
 ### Lệnh smoke ngắn nhất trước giờ chấm
 
@@ -290,6 +314,7 @@ npm run demo:prepare
 Lệnh này sẽ:
 
 - reset tài khoản demo
+- dựng lại các demo fixtures quan trọng (pending invoice, pending leave, bonus kỳ hiện tại, NCC fallback)
 - kiểm tra health check backend
-- đăng nhập `admin`, `manager01`, `staff01`, `warehouse01`
+- đăng nhập `admin`, `manager01`, `staff01`, `sales01`, `warehouse01`
 - kiểm tra endpoint chính của user/role, nhân sự, kho, bán hàng, báo cáo

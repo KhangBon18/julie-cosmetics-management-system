@@ -6,7 +6,7 @@ import usePermission from '../hooks/usePermission';
 import useAuth from '../hooks/useAuth';
 import roleService from '../services/roleService';
 
-const roleBadge = { admin: 'badge-danger', manager: 'badge-purple', staff: 'badge-info', warehouse: 'badge-warning' };
+const roleBadge = { admin: 'badge-danger', manager: 'badge-purple', sales: 'badge-primary', staff: 'badge-info', staff_portal: 'badge-info', warehouse: 'badge-warning' };
 
 const emptyResetModal = { open: false, userId: null, newPassword: '' };
 
@@ -189,7 +189,7 @@ export default function UsersPage() {
                     <div>{user.full_name || '— Tài khoản hệ thống —'}</div>
                     {user.email ? <div style={{ color: '#64748b', fontSize: 12 }}>{user.email}</div> : null}
                   </td>
-                  <td><span className={`badge ${roleBadge[user.role] || 'badge-info'}`}>{user.role_name || user.role}</span></td>
+                  <td><span className={`badge ${roleBadge[user.role_name || user.role] || 'badge-info'}`}>{user.role_name || user.role}</span></td>
                   <td><span className={`badge ${user.is_active ? 'badge-success' : 'badge-danger'}`}>{user.is_active ? 'Active' : 'Locked'}</span></td>
                   <td>{user.last_login ? new Date(user.last_login).toLocaleString('vi-VN') : '—'}</td>
                   {(_canUpdate || _canDelete) ? (

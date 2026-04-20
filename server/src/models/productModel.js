@@ -1,10 +1,31 @@
 const { pool } = require('../config/db');
 const { normalizePriceRange } = require('../utils/priceRange');
 
+let supplierProductsTableExistsCache = null;
+
+const hasSupplierProductsTable = async () => {
+  if (supplierProductsTableExistsCache !== null) return supplierProductsTableExistsCache;
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM information_schema.tables
+       WHERE table_schema = DATABASE()
+         AND table_name = 'supplier_products'`
+    );
+    supplierProductsTableExistsCache = Number(rows[0]?.total || 0) > 0;
+  } catch {
+    supplierProductsTableExistsCache = false;
+  }
+
+  return supplierProductsTableExistsCache;
+};
+
 const Product = {
   findAll: async ({
     page = 1,
     limit = 12,
+    supplier_id,
     category_id,
     brand_id,
     search,
@@ -17,18 +38,57 @@ const Product = {
   }) => {
     const normalizedPriceRange = normalizePriceRange(min_price, max_price);
 
+    let supplierFilter = null;
+    const normalizedSupplierId = supplier_id ? Number(supplier_id) : null;
+    let supplierMappingCount = 0;
+    const supplierMappingTableAvailable = normalizedSupplierId
+      ? await hasSupplierProductsTable()
+      : false;
+
+    if (normalizedSupplierId) {
+      const [mappingRows] = await pool.query(
+        supplierMappingTableAvailable
+          ? `SELECT COUNT(*) AS total
+             FROM supplier_products
+             WHERE supplier_id = ? AND is_active = 1`
+          : 'SELECT 0 AS total',
+        supplierMappingTableAvailable ? [normalizedSupplierId] : []
+      );
+      supplierMappingCount = supplierMappingTableAvailable
+        ? Number(mappingRows[0]?.total || 0)
+        : 0;
+      supplierFilter = {
+        supplier_id: normalizedSupplierId,
+        mapping_table_available: supplierMappingTableAvailable,
+        mapping_enabled: supplierMappingTableAvailable && supplierMappingCount > 0,
+        mapped_product_count: supplierMappingCount,
+        fallback_all_products: !supplierMappingTableAvailable || supplierMappingCount === 0
+      };
+    }
+
+    const supplierJoin = supplierFilter?.mapping_enabled
+      ? ' JOIN supplier_products sp ON sp.product_id = p.product_id AND sp.supplier_id = ? AND sp.is_active = 1'
+      : '';
+
     let query = `SELECT p.*, c.category_name, b.brand_name,
                         pc.category_name as parent_category_name, pc.category_id as parent_category_id
                  FROM products p
+                 ${supplierJoin}
                  LEFT JOIN categories c ON p.category_id = c.category_id
                  LEFT JOIN categories pc ON c.parent_id = pc.category_id
                  LEFT JOIN brands b ON p.brand_id = b.brand_id
                  WHERE p.deleted_at IS NULL`;
     let countQuery = `SELECT COUNT(*) as total FROM products p
+                      ${supplierJoin}
                       LEFT JOIN categories c ON p.category_id = c.category_id
                       WHERE p.deleted_at IS NULL`;
     const params = [];
     const countParams = [];
+
+    if (supplierFilter?.mapping_enabled) {
+      params.push(normalizedSupplierId);
+      countParams.push(normalizedSupplierId);
+    }
 
     // Public queries only show active products
     if (is_public) {
@@ -114,7 +174,8 @@ const Product = {
       products: rows,
       total: countResult[0].total,
       page,
-      totalPages: Math.ceil(countResult[0].total / limit)
+      totalPages: Math.ceil(countResult[0].total / limit),
+      supplierFilter
     };
   },
 

@@ -40,6 +40,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
+    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
   {
@@ -52,6 +53,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
+    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
   {
@@ -64,6 +66,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
+    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
 
@@ -271,7 +274,8 @@ export const ACTION_LABELS = {
  * @returns {Array<{title, items[]}>}
  */
 export const buildSidebarSections = (userPermissions = [], userRole = '', basePath = '/admin', workspaceKey = 'admin') => {
-  const isAdmin = userRole === 'admin';
+  const normalizedRole = String(userRole || '').trim().toLowerCase();
+  const isAdmin = normalizedRole === 'admin';
   const permSet = new Set(userPermissions);
   const sectionMap = new Map();
 
@@ -279,6 +283,7 @@ export const buildSidebarSections = (userPermissions = [], userRole = '', basePa
     if (!mod.showInSidebar) continue;
     const mustStayInWorkspace = mod.isPublic || mod.systemOnly;
     if (mustStayInWorkspace && mod.workspaceKeys?.length && !mod.workspaceKeys.includes(workspaceKey)) continue;
+    if (mod.allowedRoles?.length && !mod.allowedRoles.includes(normalizedRole)) continue;
 
     // Hide 'Cá nhân' section for admin accounts
     if (isAdmin && mod.section === 'Cá nhân') continue;

@@ -94,6 +94,16 @@ INSERT INTO products (product_name, brand_id, category_id, description, skin_typ
 ('Sữa tắm dưỡng ẩm Lipikar Baume AP+M',       7, 5, 'Sữa tắm cho da khô và nhạy cảm, dưỡng ẩm 48 giờ',                  'Da khô',         '200ml',  95000, 165000,  35),
 ('Kem dưỡng thể hương nước hoa Elseve',        1, 5, 'Kem dưỡng thể mềm mịn với hương thơm dịu nhẹ',                     'Mọi loại da',    '200ml',  60000, 105000,  50);
 
+-- ── SUPPLIER ↔ PRODUCT MAPPING (demo-safe) ───────────────────
+-- NCC 1 và 2 được cấu hình danh mục riêng để demo lọc theo NCC.
+-- NCC 3 cố ý chưa cấu hình để hệ thống fallback toàn bộ sản phẩm.
+INSERT IGNORE INTO supplier_products (supplier_id, product_id, is_active) VALUES
+(1, 1, TRUE),   -- CeraVe Moisturizing
+(1, 5, TRUE),   -- Bioderma Micellar
+(2, 3, TRUE),   -- Toner Jeju Green Tea
+(2, 4, TRUE),   -- Water Sleeping Mask
+(2, 6, TRUE);   -- Sulwhasoo Serum
+
 -- ── CUSTOMERS (CRM) ───────────────────────────────────────────
 INSERT INTO customers (full_name, phone, email, address, gender, date_of_birth, membership_tier, total_points, total_spent) VALUES
 ('Nguyễn Thị Lan',    '0961111111', 'lan.nguyen@gmail.com',  '12 Bà Triệu, Q1, TP.HCM',         'Nữ', '1995-03-12', 'gold',     625, 8750000),

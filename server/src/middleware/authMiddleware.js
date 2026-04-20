@@ -12,6 +12,10 @@ const clearPermissionCache = (userId) => {
   else _permCache.clear();
 };
 
+const resolveEffectiveRole = (user) => String(user?.role_name || user?.role || '')
+  .trim()
+  .toLowerCase();
+
 /**
  * Load permissions cho user từ DB (có cache).
  * Trả về Set<string> các permission_name.
@@ -85,6 +89,18 @@ const adminOnly = roleCheck('admin');
 // ─── Shortcut: admin hoặc manager ───
 const managerUp = roleCheck('admin', 'manager');
 
+const roleCheckResolved = (...roles) => {
+  const allowedRoles = roles.map(role => String(role || '').trim().toLowerCase());
+  return (req, res, next) => {
+    const effectiveRole = resolveEffectiveRole(req.user);
+    if (req.user && allowedRoles.includes(effectiveRole)) {
+      next();
+    } else {
+      res.status(403).json({ message: 'Bạn không có quyền truy cập chức năng này' });
+    }
+  };
+};
+
 /**
  * requirePermission — Middleware kiểm tra permission cụ thể.
  * Dùng cho fine-grained access control thay vì role-based.
@@ -138,10 +154,12 @@ const can = (user, permissionName) => {
 module.exports = {
   protect,
   roleCheck,
+  roleCheckResolved,
   adminOnly,
   managerUp,
   requirePermission,
   can,
   clearPermissionCache,
   loadPermissions,
+  resolveEffectiveRole,
 };

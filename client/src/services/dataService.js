@@ -29,7 +29,12 @@ export const salaryService = {
 };
 export const brandService = createService('/brands');
 export const categoryService = createService('/categories');
-export const supplierService = createService('/suppliers');
+export const supplierService = {
+  ...createService('/suppliers'),
+  getProductMappings: (id) => api.get(`/suppliers/${id}/product-mappings`),
+  addProductMapping: (id, product_id) => api.post(`/suppliers/${id}/product-mappings`, { product_id }),
+  removeProductMapping: (id, productId) => api.delete(`/suppliers/${id}/product-mappings/${productId}`)
+};
 export const importService = createService('/imports');
 export const customerService = {
   ...createService('/customers'),
