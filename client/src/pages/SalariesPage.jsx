@@ -447,6 +447,14 @@ export default function SalariesPage() {
         </div>
       </div>
 
+      {(_canExport && salaries.length > 0) ? (
+        <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #0ea5e9', background: '#eff6ff' }}>
+          <div className="card-body" style={{ color: '#0f172a' }}>
+            Khi in bảng lương theo tháng hoặc năm, hãy cho phép <strong>popup / pop-up windows</strong> cho trình duyệt. Nếu popup bị chặn, hệ thống sẽ báo lỗi mềm để tránh fail demo.
+          </div>
+        </div>
+      ) : null}
+
       {canManageBonus && !bonusFeatureEnabled ? (
         <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid #f59e0b', background: '#fffbeb' }}>
           <div className="card-body" style={{ color: '#92400e' }}>

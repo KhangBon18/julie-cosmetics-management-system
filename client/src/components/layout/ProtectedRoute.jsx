@@ -1,6 +1,6 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
-import { getWorkspaceHomePath, resolveWorkspaceKey } from '../../utils/workspace';
+import { getWorkspaceHomePath, normalizeUserRole, resolveWorkspaceKey } from '../../utils/workspace';
 
 /**
  * ProtectedRoute — kiểm tra quyền trước khi render.
@@ -14,7 +14,6 @@ import { getWorkspaceHomePath, resolveWorkspaceKey } from '../../utils/workspace
  */
 export default function ProtectedRoute({ allowedRoles, permission, workspaceKeys, children }) {
   const { user, loading } = useAuth();
-  const location = useLocation();
 
   if (loading) {
     return <div className="loading-container"><div className="spinner" /></div>;
@@ -26,8 +25,13 @@ export default function ProtectedRoute({ allowedRoles, permission, workspaceKeys
 
   const workspaceHome = getWorkspaceHomePath(user);
   const workspaceKey = resolveWorkspaceKey(user);
+  const normalizedRole = normalizeUserRole(user);
 
   if (workspaceKeys?.length && workspaceKey !== 'admin' && !workspaceKeys.includes(workspaceKey)) {
+    return <Navigate to={workspaceHome} replace />;
+  }
+
+  if (allowedRoles?.length && !allowedRoles.includes(normalizedRole)) {
     return <Navigate to={workspaceHome} replace />;
   }
 
@@ -45,9 +49,7 @@ export default function ProtectedRoute({ allowedRoles, permission, workspaceKeys
 
   // Legacy role-based check (backward compat)
   if (allowedRoles && allowedRoles.length) {
-    if (!allowedRoles.includes(user.role)) {
-      return <Navigate to={workspaceHome} replace />;
-    }
+    return children;
   }
 
   return children;

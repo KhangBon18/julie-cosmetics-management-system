@@ -6,11 +6,12 @@ const productController = {
   // GET /api/products
   getAll: async (req, res, next) => {
     try {
-      const { page, limit, category_id, brand_id, search, sort, min_price, max_price, is_active, stock_status } = req.query;
+      const { page, limit, supplier_id, category_id, brand_id, search, sort, min_price, max_price, is_active, stock_status } = req.query;
       const { min, max } = normalizePriceRange(min_price, max_price);
       const result = await Product.findAll({
         page: parseInt(page) || 1,
         limit: parseInt(limit) || 12,
+        supplier_id,
         category_id,
         brand_id,
         search,

@@ -174,14 +174,15 @@ export default function ReportsPage() {
       return;
     }
 
-    const rows = profit.data.map((row) => ([
-      { value: row.label, className: 'text-center' },
-      `${fmt(row.revenue)}đ`,
-      `${fmt(row.cost)}đ`,
-      `${fmt(row.profit)}đ`
-    ]));
+    try {
+      const rows = profit.data.map((row) => ([
+        { value: row.label, className: 'text-center' },
+        `${fmt(row.revenue)}đ`,
+        `${fmt(row.cost)}đ`,
+        `${fmt(row.profit)}đ`
+      ]));
 
-    openPrintWindow(`
+      openPrintWindow(`
       <h1>JULIE COSMETICS</h1>
       <h2>Báo cáo lợi nhuận theo ${groupByLabel[profit.group_by] || 'tháng'} — ${periodScopeLabel(profit.group_by)}</h2>
       <div class="meta">
@@ -220,6 +221,9 @@ export default function ReportsPage() {
       </table>
       <div class="footer">In lúc ${generatedAtLabel()} — Báo cáo lợi nhuận Julie Cosmetics</div>
     `, `Bao cao loi nhuan ${year}`);
+    } catch (error) {
+      toast.error(error.message || 'Không thể mở cửa sổ in báo cáo lợi nhuận.');
+    }
   };
 
   const handlePrintInventoryReport = () => {
@@ -228,21 +232,22 @@ export default function ReportsPage() {
       return;
     }
 
-    const importRows = (inventory.import_periodic || []).map((row) => ([
-      { value: row.label, className: 'text-center' },
-      `${fmt(row.total)}đ`
-    ]));
-    const exportRows = (inventory.export_periodic || []).map((row) => ([
-      { value: row.label, className: 'text-center' },
-      `${fmt(row.total_exported)}`
-    ]));
-    const lowStockRows = (inventory.low_stock || []).map((row) => ([
-      { value: row.product_name, className: 'text-left' },
-      `${fmt(row.stock_quantity)}`,
-      `${fmt(row.sell_price)}đ`
-    ]));
+    try {
+      const importRows = (inventory.import_periodic || []).map((row) => ([
+        { value: row.label, className: 'text-center' },
+        `${fmt(row.total)}đ`
+      ]));
+      const exportRows = (inventory.export_periodic || []).map((row) => ([
+        { value: row.label, className: 'text-center' },
+        `${fmt(row.total_exported)}`
+      ]));
+      const lowStockRows = (inventory.low_stock || []).map((row) => ([
+        { value: row.product_name, className: 'text-left' },
+        `${fmt(row.stock_quantity)}`,
+        `${fmt(row.sell_price)}đ`
+      ]));
 
-    openPrintWindow(`
+      openPrintWindow(`
       <h1>JULIE COSMETICS</h1>
       <h2>Báo cáo kho hàng theo ${groupByLabel[inventory.group_by] || 'tháng'} — ${periodScopeLabel(inventory.group_by)}</h2>
       <div class="meta">
@@ -288,6 +293,9 @@ export default function ReportsPage() {
       </table>
       <div class="footer">In lúc ${generatedAtLabel()} — Báo cáo kho Julie Cosmetics</div>
     `, `Bao cao kho ${year}`);
+    } catch (error) {
+      toast.error(error.message || 'Không thể mở cửa sổ in báo cáo kho.');
+    }
   };
 
   const handlePrintExportReport = () => {
@@ -296,15 +304,16 @@ export default function ReportsPage() {
       return;
     }
 
-    const exportRows = inventory.export_periodic.map((row) => ([
-      { value: row.label, className: 'text-center' },
-      `${fmt(row.gross_exported)}`,
-      `${fmt(row.returned_quantity)}`,
-      `${fmt(row.total_exported)}`,
-      `${fmt(row.total_export_value)}đ`
-    ]));
+    try {
+      const exportRows = inventory.export_periodic.map((row) => ([
+        { value: row.label, className: 'text-center' },
+        `${fmt(row.gross_exported)}`,
+        `${fmt(row.returned_quantity)}`,
+        `${fmt(row.total_exported)}`,
+        `${fmt(row.total_export_value)}đ`
+      ]));
 
-    openPrintWindow(`
+      openPrintWindow(`
       <h1>JULIE COSMETICS</h1>
       <h2>Báo cáo xuất hàng theo ${groupByLabel[inventory.group_by] || 'tháng'} — ${periodScopeLabel(inventory.group_by)}</h2>
       <div class="meta">
@@ -341,6 +350,9 @@ export default function ReportsPage() {
       </table>
       <div class="footer">In lúc ${generatedAtLabel()} — Báo cáo xuất hàng Julie Cosmetics</div>
     `, `Bao cao xuat hang ${year}`);
+    } catch (error) {
+      toast.error(error.message || 'Không thể mở cửa sổ in báo cáo xuất hàng.');
+    }
   };
 
   return (
@@ -362,6 +374,12 @@ export default function ReportsPage() {
             <option value={2025}>2025</option>
             <option value={2026}>2026</option>
           </select>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #0ea5e9', background: '#eff6ff' }}>
+        <div className="card-body" style={{ color: '#0f172a' }}>
+          Khi demo chức năng in báo cáo, hãy cho phép <strong>popup / pop-up windows</strong> cho trình duyệt trước. Nếu popup bị chặn, hệ thống sẽ báo lỗi mềm và không làm mất dữ liệu báo cáo hiện tại.
         </div>
       </div>
 

@@ -4,6 +4,14 @@ import staffService from '../../services/staffService';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 const normalizeNote = (value) => String(value || '').trim();
+const openPrintWindow = (title) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    throw new Error('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup để tiếp tục.');
+  }
+  printWindow.document.title = title;
+  return printWindow;
+};
 const getSupplementalNotes = (salary) => {
   const notes = [];
   const mainNote = normalizeNote(salary.notes);
@@ -47,8 +55,9 @@ export default function MySalaryPage() {
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    try {
+      const printWindow = openPrintWindow('Bảng lương - Julie Cosmetics');
+      printWindow.document.write(`
       <html>
       <head>
         <title>Bảng lương - Julie Cosmetics</title>
@@ -101,13 +110,17 @@ export default function MySalaryPage() {
       </body>
       </html>
     `);
-    printWindow.document.close();
-    printWindow.print();
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      toast.error(error.message || 'Không thể mở cửa sổ in bảng lương năm.');
+    }
   };
 
   const handlePrintMonth = (salary) => {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+    try {
+      const printWindow = openPrintWindow(`Phiếu lương tháng ${salary.month}/${salary.year}`);
+      printWindow.document.write(`
       <html>
       <head>
         <title>Phiếu lương tháng ${salary.month}/${salary.year}</title>
@@ -151,8 +164,11 @@ export default function MySalaryPage() {
       </body>
       </html>
     `);
-    printWindow.document.close();
-    printWindow.print();
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      toast.error(error.message || 'Không thể mở cửa sổ in phiếu lương tháng.');
+    }
   };
 
   if (loading) return <div className="loading-container"><div className="spinner" /></div>;
@@ -169,6 +185,12 @@ export default function MySalaryPage() {
             📐 {showFormula ? 'Ẩn công thức' : 'Cách tính lương'}
           </button>
           <button className="btn btn-primary" onClick={handlePrint}>🖨️ In bảng lương năm</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #0ea5e9', background: '#eff6ff' }}>
+        <div className="card-body" style={{ color: '#0f172a' }}>
+          Khi in phiếu lương hoặc bảng lương năm, hãy cho phép <strong>popup / pop-up windows</strong> cho trình duyệt. Nếu popup bị chặn, hệ thống sẽ báo lỗi mềm để bạn thử lại.
         </div>
       </div>
 
