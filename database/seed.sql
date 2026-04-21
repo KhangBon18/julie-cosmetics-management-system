@@ -33,13 +33,14 @@ INSERT INTO employee_positions (employee_id, position_id, effective_date, end_da
 (6, 1, '2021-09-01', '2023-12-31', 14000000, 'Kết thúc hợp đồng lao động vào cuối năm 2023.');
 
 -- ── USERS ─────────────────────────────────────────────────────
--- Password hash cho 'admin123', 'manager123', 'staff123', 'warehouse123'
+-- Password hash cho 'admin123', 'manager123', 'staff123', 'sales123', 'warehouse123'
 -- Các hash được generate bởi bcryptjs (rounds=10) — ĐÃ VERIFY ĐÚNG
 INSERT INTO users (username, password_hash, role, employee_id, is_active) VALUES
 ('admin',        '$2a$10$rxik/AurZ4RtBxuwB6K2eOKxhuOzU1oT/qNqymIykEoSvPD3Wx2jC', 'admin',     NULL, TRUE),
 ('manager01',    '$2a$10$C1ZWe0OszlFZd7GUK2m1ae6bn9F4Ox7LA.R.YnHs3RLGrPsErnU3C', 'manager',   1,    TRUE),
 ('staff01',      '$2a$10$102u8BDnzPvddN.TErjNNe89gtGZGCaZqyUrh20XPNaTsQyVvhf62', 'staff',     2,    TRUE),
 ('staff02',      '$2a$10$XdTW7K.YPLrzY5H16hYaaO8HPLWUNxC5PWmZv4iviw6T4CoF71OE6', 'staff',     3,    TRUE),
+('sales01',      '$2a$10$AYOnKExz6y1i/nwfJMUrguL/FNyhorXpbOZag8smiEG82uXPCLgFa', 'staff',     NULL, TRUE),
 ('warehouse01',  '$2a$10$R99s632OA5DWlSdzJIckkOyJ3kWjbLUAmY9mymYCcqu.oz4WltdI2', 'warehouse', 4,    TRUE),
 ('staff03',      '$2a$10$jvO2ApKOX/5dUxPLT6YrLOAMwURCLCFmYJ3YfAJrpJAf694JQ7jXi', 'staff',     5,    TRUE);
 

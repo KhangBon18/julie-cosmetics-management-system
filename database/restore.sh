@@ -33,15 +33,17 @@ BACKUP_DIR="${SCRIPT_DIR}/backups"
 FORCE_RESTORE="${FORCE:-0}"
 
 print_usage() {
+  local script_name
+  script_name="$(basename "$0")"
   echo "📋 Danh sách backup hiện có:"
   ls -lt "$BACKUP_DIR"/backup_*.sql.gz "$BACKUP_DIR"/backup_*.sql 2>/dev/null || echo "  (Chưa có bản backup nào)"
   echo ""
   echo "Cách dùng:"
-  echo "  ./restore.sh <ten_file_backup>"
-  echo "  FORCE=1 ./restore.sh <ten_file_backup>   # bỏ qua bước hỏi lại"
+  echo "  ./$script_name <ten_file_backup>"
+  echo "  FORCE=1 ./$script_name <ten_file_backup>   # bỏ qua bước hỏi lại"
   echo ""
   echo "Ví dụ:"
-  echo "  ./restore.sh backup_20260417_093000.sql.gz"
+  echo "  ./$script_name backup_20260417_093000.sql.gz"
 }
 
 run_mysql_command() {

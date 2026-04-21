@@ -3,6 +3,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
+const { ensureRoleIdColumn, ensureSystemRoles, syncSystemRolePermissions } = require('../src/utils/rbacSync');
 
 const serverDir = path.join(__dirname, '..');
 const projectRoot = path.join(serverDir, '..');
@@ -24,44 +25,8 @@ const DEMO_ACCOUNTS = [
   { username: 'warehouse01', password: 'warehouse123', role_name: 'warehouse', legacy_role: 'warehouse', employee_id: 4 }
 ];
 
-const DEMO_ROLE_PERMISSIONS = {
-  admin: ['users.read', 'roles.read', 'settings.read', 'reports.read'],
-  manager: ['employees.read', 'employees.create', 'employees.update', 'leaves.read', 'leaves.update', 'salaries.read', 'salaries.create', 'salaries.update', 'reports.read'],
-  staff: ['invoices.read', 'invoices.create', 'customers.read', 'customers.create', 'customers.update', 'leaves.read', 'leaves.create'],
-  staff_portal: ['leaves.read', 'leaves.create'],
-  sales: ['invoices.read', 'invoices.create', 'customers.read', 'customers.create', 'customers.update', 'products.read', 'reports.read'],
-  warehouse: ['products.read', 'products.update', 'brands.read', 'categories.read', 'suppliers.read', 'imports.read', 'imports.create', 'leaves.read', 'leaves.create', 'reports.read']
-};
-
-async function ensureRoleExists(connection, roleName) {
-  const [rows] = await connection.query(
-    'SELECT role_id FROM roles WHERE role_name = ? LIMIT 1',
-    [roleName]
-  );
-
-  if (rows[0]?.role_id) {
-    return rows[0].role_id;
-  }
-
-  const descriptions = {
-    admin: 'Quản trị viên hệ thống — toàn quyền',
-    manager: 'Quản lý — quản lý nhân sự, duyệt đơn, xem báo cáo',
-    staff_portal: 'Nhân viên tự phục vụ — hồ sơ cá nhân, nghỉ phép và bảng lương',
-    sales: 'Nhân viên kinh doanh — bán hàng nội bộ, chăm sóc khách hàng và xem báo cáo kinh doanh',
-    staff: 'Nhân viên bán hàng — tạo hóa đơn, quản lý khách hàng',
-    warehouse: 'Thủ kho — quản lý nhập kho, kiểm kho'
-  };
-
-  const [insertResult] = await connection.query(
-    'INSERT INTO roles (role_name, description, is_system) VALUES (?, ?, TRUE)',
-    [roleName, descriptions[roleName] || `System role: ${roleName}`]
-  );
-
-  return insertResult.insertId;
-}
-
 async function findRoleId(connection, roleName) {
-  await ensureRoleExists(connection, roleName);
+  await ensureSystemRoles(connection);
   const [rows] = await connection.query(
     'SELECT role_id FROM roles WHERE role_name = ? LIMIT 1',
     [roleName]
@@ -89,21 +54,6 @@ async function findUserByEmployee(connection, employeeId) {
     [employeeId]
   );
   return rows[0] || null;
-}
-
-async function ensureRolePermissions(connection, roleName, permissionNames) {
-  if (!permissionNames.length) return;
-
-  const placeholders = permissionNames.map(() => '?').join(', ');
-  await connection.query(
-    `INSERT IGNORE INTO role_permissions (role_id, permission_id)
-     SELECT r.role_id, p.permission_id
-     FROM roles r
-     JOIN permissions p
-     WHERE r.role_name = ?
-       AND p.permission_name IN (${placeholders})`,
-    [roleName, ...permissionNames]
-  );
 }
 
 async function releaseEmployeeAssignment(connection, employeeId, keepUserId = null) {
@@ -184,15 +134,18 @@ async function main() {
   try {
     await connection.beginTransaction();
     console.log('🔐 Resetting demo accounts...\n');
+    await ensureRoleIdColumn(connection);
+    await ensureSystemRoles(connection);
 
     for (const account of DEMO_ACCOUNTS) {
       const result = await upsertDemoAccount(connection, account);
       console.log(`- ${account.username}: ${result.action} (${result.target})`);
     }
 
-    for (const [roleName, permissionNames] of Object.entries(DEMO_ROLE_PERMISSIONS)) {
-      await ensureRolePermissions(connection, roleName, permissionNames);
-    }
+    const syncedRoles = await syncSystemRolePermissions(connection, { replaceExisting: true });
+    syncedRoles.forEach(roleInfo => {
+      console.log(`- role ${roleInfo.roleName}: synced ${roleInfo.permissionCount} permissions`);
+    });
 
     const loginAttemptPlaceholders = DEMO_ACCOUNTS.map(() => '?').join(', ');
     await connection.query(
@@ -207,7 +160,7 @@ async function main() {
     console.log('   staff01 / staff123');
     console.log('   sales01 / sales123');
     console.log('   warehouse01 / warehouse123');
-    console.log('   Core demo permissions have been synced for admin / manager / staff / sales / warehouse.');
+    console.log('   Core demo permissions have been replaced with the clean system defaults.');
   } catch (error) {
     await connection.rollback();
     console.error('❌ Failed to reset demo accounts:', error.message);

@@ -15,7 +15,15 @@ export default function TopHeader({ title, subtitle, toggleSidebar }) {
 
   const initials = (user?.full_name || user?.username || '?').charAt(0).toUpperCase();
 
-  const roleLabels = { admin: 'Quản trị viên', manager: 'Quản lý', staff: 'Nhân viên', warehouse: 'Thủ kho' };
+  const roleLabels = {
+    admin: 'Quản trị viên',
+    manager: 'Quản lý',
+    sales: 'Nhân viên kinh doanh',
+    staff: 'Nhân viên bán hàng',
+    staff_portal: 'Cổng nhân viên',
+    warehouse: 'Thủ kho'
+  };
+  const effectiveRole = user?.role_name || user?.role;
 
   return (
     <header className="top-header">
@@ -40,7 +48,7 @@ export default function TopHeader({ title, subtitle, toggleSidebar }) {
             <div className="user-avatar" aria-hidden="true">{initials}</div>
             <div>
               <div className="user-info-name">{user?.full_name || user?.username}</div>
-              <div className="user-info-role">{roleLabels[user?.role] || user?.role}</div>
+              <div className="user-info-role">{roleLabels[effectiveRole] || effectiveRole}</div>
             </div>
           </button>
           {showDropdown ? (

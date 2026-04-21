@@ -139,7 +139,7 @@ const MODULES = [
   },
   {
     key: 'salaries',
-    name: 'Bảng lương',
+    name: 'Tính lương',
     section: 'Nhân sự',
     path: '/admin/salaries',
     icon: 'FiDollarSign',

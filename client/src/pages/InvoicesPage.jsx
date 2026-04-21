@@ -53,12 +53,15 @@ export default function InvoicesPage() {
   const [searchProduct, setSearchProduct] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [crmSettings, setCrmSettings] = useState({});
+  const [failingPaymentTarget, setFailingPaymentTarget] = useState(null);
+  const [paymentFailureNote, setPaymentFailureNote] = useState('Khách chưa thanh toán, hủy hóa đơn');
 
   const { user } = useAuth();
   const { canCreate, canExport } = usePermission();
   const _canCreate = canCreate('invoices');
   const _canExport = canExport('invoices');
-  const canHandlePayments = user?.role === 'admin' || user?.role === 'manager';
+  const effectiveRole = String(user?.role_name || user?.role || '').trim().toLowerCase();
+  const canHandlePayments = effectiveRole === 'admin' || effectiveRole === 'manager';
 
   useEffect(() => { loadData(); }, [page]);
 
@@ -195,16 +198,30 @@ export default function InvoicesPage() {
     }
   };
 
-  const handleFailPayment = async (invoice) => {
-    if (!invoice.latest_transaction_id) return;
-    const note = window.prompt('Lý do thanh toán thất bại / hủy hóa đơn:', 'Khách chưa thanh toán, hủy hóa đơn');
-    if (note === null) return;
+  const openFailPaymentModal = (invoice) => {
+    setFailingPaymentTarget(invoice);
+    setPaymentFailureNote('Khách chưa thanh toán, hủy hóa đơn');
+  };
+
+  const closeFailPaymentModal = () => {
+    setFailingPaymentTarget(null);
+    setPaymentFailureNote('Khách chưa thanh toán, hủy hóa đơn');
+  };
+
+  const handleFailPayment = async () => {
+    if (!failingPaymentTarget?.latest_transaction_id) return;
+    const note = paymentFailureNote.trim();
+    if (!note) {
+      toast.error('Vui lòng nhập lý do đánh dấu thất bại');
+      return;
+    }
     try {
-      await paymentService.markFailed(invoice.latest_transaction_id, { note });
-      toast.success(`Đã đánh dấu thanh toán thất bại cho hóa đơn #${invoice.invoice_id}`);
-      if (viewInvoice?.invoice_id === invoice.invoice_id) {
-        await viewDetail(invoice.invoice_id);
+      await paymentService.markFailed(failingPaymentTarget.latest_transaction_id, { note });
+      toast.success(`Đã đánh dấu thanh toán thất bại cho hóa đơn #${failingPaymentTarget.invoice_id}`);
+      if (viewInvoice?.invoice_id === failingPaymentTarget.invoice_id) {
+        await viewDetail(failingPaymentTarget.invoice_id);
       }
+      closeFailPaymentModal();
       loadData();
     } catch (err) {
       toast.error(err.message);
@@ -379,7 +396,7 @@ export default function InvoicesPage() {
             {canHandlePayments && viewInvoice.payment_status === 'pending' && viewInvoice.latest_transaction_id ? (
               <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                 <button className="btn btn-success" onClick={() => handleConfirmPayment(viewInvoice)}>✅ Xác nhận đã thanh toán</button>
-                <button className="btn btn-danger" onClick={() => handleFailPayment(viewInvoice)}>❌ Đánh dấu thất bại / hủy đơn</button>
+                <button className="btn btn-danger" onClick={() => openFailPaymentModal(viewInvoice)}>❌ Đánh dấu thất bại / hủy đơn</button>
               </div>
             ) : null}
             <table>
@@ -426,7 +443,7 @@ export default function InvoicesPage() {
                       {canHandlePayments && inv.payment_status === 'pending' && inv.latest_transaction_id ? (
                         <>
                           <button className="btn btn-success" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => handleConfirmPayment(inv)}>✅</button>
-                          <button className="btn btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => handleFailPayment(inv)}>❌</button>
+                          <button className="btn btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => openFailPaymentModal(inv)}>❌</button>
                         </>
                       ) : null}
                     </div>
@@ -439,6 +456,37 @@ export default function InvoicesPage() {
         </div>
         {total > limit && <div className="pagination"><div className="pagination-info">Trang {page}/{Math.ceil(total / limit)}</div><div className="pagination-buttons"><button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Trước</button><button disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(p => p + 1)}>Sau</button></div></div>}
       </div>
+
+      {failingPaymentTarget && (
+        <div className="modal-overlay" onClick={closeFailPaymentModal} role="dialog" aria-modal="true" aria-label="Đánh dấu thanh toán thất bại">
+          <div className="modal" onClick={event => event.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <h3>Đánh dấu thanh toán thất bại</h3>
+              <button className="modal-close" onClick={closeFailPaymentModal} aria-label="Đóng">×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginTop: 0, color: 'var(--text-secondary)' }}>
+                Hóa đơn <strong>#{failingPaymentTarget.invoice_id}</strong> sẽ chuyển giao dịch về trạng thái thất bại.
+              </p>
+              <div className="form-group">
+                <label htmlFor="payment-failure-note">Ghi chú / lý do</label>
+                <textarea
+                  id="payment-failure-note"
+                  className="form-control"
+                  rows={4}
+                  value={paymentFailureNote}
+                  onChange={event => setPaymentFailureNote(event.target.value)}
+                  placeholder="Nhập lý do thất bại hoặc ghi chú hủy hóa đơn"
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button className="btn btn-outline" onClick={closeFailPaymentModal}>Hủy</button>
+                <button className="btn btn-danger" onClick={handleFailPayment}>Lưu trạng thái thất bại</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

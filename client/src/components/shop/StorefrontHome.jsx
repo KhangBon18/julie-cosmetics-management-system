@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import publicService from '../../services/publicService';
 import { CartContext } from '../../context/CartContext';
 import { toast } from 'react-toastify';
+import { getProductImage, getCategoryGradient, getCategoryEmoji } from '../../utils/productImages';
 
 const fadeUpVar = {
   hidden: { opacity: 0, y: 40 },
@@ -13,7 +14,7 @@ const fadeUpVar = {
 
 const staggerContainer = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
 };
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
@@ -38,33 +39,53 @@ function ProductCard({ product, addToCart }) {
   const lowStock = product.stock_quantity > 0 && product.stock_quantity <= 5;
   const outOfStock = product.stock_quantity <= 0;
   const isBestseller = product.total_sold > 5;
+  const imgSrc = getProductImage(product);
 
   return (
-    <motion.div variants={fadeUpVar} className="product-card">
-      <div className="product-card-image">
-        <img src={product.image_url} alt={product.product_name}
-          onError={e => { e.target.src = 'https://via.placeholder.com/400x400.png?text=Julie'; }} />
-        <div className="product-card-badges">
-          {isNew && <span className="card-badge card-badge-new">Mới</span>}
-          {isBestseller && <span className="card-badge card-badge-bestseller">Bán chạy</span>}
-          {lowStock && <span className="card-badge card-badge-low-stock">Sắp hết</span>}
-          {outOfStock && <span className="card-badge card-badge-out">Hết hàng</span>}
-        </div>
-        {!outOfStock && (
-          <div className="product-card-quick">
-            <button className="btn-quick-add" onClick={(e) => { e.preventDefault(); addToCart(product, 1); toast.success('Đã thêm vào giỏ!'); }}>
-              <FiShoppingCart size={14} /> Thêm vào giỏ
-            </button>
+    <motion.div variants={fadeUpVar} className="product-card product-card-v2">
+      <Link to={`/shop/product/${product.product_id}`} className="product-card-image-link">
+        <div className="product-card-image">
+          <img
+            src={imgSrc}
+            alt={product.product_name}
+            loading="lazy"
+            onError={e => { e.target.src = '/products/serum-1.jpg'; }}
+          />
+          <div className="product-card-badges">
+            {isNew && <span className="card-badge card-badge-new">Mới</span>}
+            {isBestseller && <span className="card-badge card-badge-bestseller">Bán chạy</span>}
+            {lowStock && <span className="card-badge card-badge-low-stock">Sắp hết</span>}
+            {outOfStock && <span className="card-badge card-badge-out">Hết hàng</span>}
           </div>
-        )}
-      </div>
+          {!outOfStock && (
+            <div className="product-card-quick">
+              <button
+                className="btn-quick-add"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  addToCart(product, 1);
+                  toast.success('Đã thêm vào giỏ!');
+                }}
+              >
+                <FiShoppingCart size={14} /> Thêm vào giỏ
+              </button>
+            </div>
+          )}
+        </div>
+      </Link>
       <div className="product-card-body">
         <div className="product-card-brand">{product.brand_name}</div>
         <div className="product-card-title">
           <Link to={`/shop/product/${product.product_id}`}>{product.product_name}</Link>
         </div>
-        {product.avg_rating > 0 && <StarRating rating={Number(product.avg_rating)} count={product.review_count || 0} />}
-        <div className="product-card-price">{fmt(product.sell_price)}đ</div>
+        {product.avg_rating > 0 && (
+          <StarRating rating={Number(product.avg_rating)} count={product.review_count || 0} />
+        )}
+        <div className="product-card-footer">
+          <div className="product-card-price">{fmt(product.sell_price)}đ</div>
+          {product.volume && <div className="product-card-volume">{product.volume}</div>}
+        </div>
       </div>
     </motion.div>
   );
@@ -85,6 +106,32 @@ function SkeletonGrid({ count = 4 }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function CategoryCard({ cat }) {
+  const gradient = getCategoryGradient(cat.category_id, cat.category_name);
+  const emoji = getCategoryEmoji(cat.category_id, cat.category_name);
+
+  return (
+    <motion.div variants={fadeUpVar}>
+      <Link
+        to={`/shop/products?category=${cat.category_id}`}
+        className="category-card-v2"
+        style={{ background: gradient }}
+      >
+        <div className="cat-v2-emoji">{emoji}</div>
+        <div className="cat-v2-content">
+          <h3 className="cat-v2-name">{cat.category_name}</h3>
+          <span className="cat-v2-count">
+            {cat.product_count || cat.total_product_count || 0} sản phẩm
+          </span>
+        </div>
+        <div className="cat-v2-arrow">
+          <FiArrowRight size={18} />
+        </div>
+      </Link>
+    </motion.div>
   );
 }
 
@@ -114,18 +161,18 @@ export default function StorefrontHome() {
     <div>
       {/* ═══ HERO ═══ */}
       <section className="hero-section" style={{
-        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.7)), url('/hero-banner.png')`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.65)), url('/hero-banner.png')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed',
       }}>
-        <motion.div 
+        <motion.div
           className="hero-content"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
         >
-          <motion.span 
+          <motion.span
             className="hero-badge"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -149,7 +196,7 @@ export default function StorefrontHome() {
       </section>
 
       {/* ═══ SERVICE STRIP ═══ */}
-      <motion.div 
+      <motion.div
         className="service-strip"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -183,23 +230,17 @@ export default function StorefrontHome() {
             <div className="section-header">
               <span className="section-badge">Khám phá</span>
               <h2 className="section-title">Danh Mục Sản Phẩm</h2>
+              <p className="section-subtitle">Tìm kiếm sản phẩm theo danh mục yêu thích của bạn</p>
             </div>
-            <motion.div 
-              className="category-grid"
+            <motion.div
+              className="category-grid-v2"
               variants={staggerContainer}
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: "-50px" }}
             >
-              {categories.slice(0, 8).map(cat => (
-                <motion.div key={cat.category_id} variants={fadeUpVar}>
-                  <Link to={`/shop/products?category=${cat.category_id}`} className="category-card-premium">
-                    <div className="cat-premium-content">
-                      <h3 className="cat-premium-name">{cat.category_name}</h3>
-                      <span className="cat-premium-count">Khám phá {cat.product_count || 0} sản phẩm</span>
-                    </div>
-                  </Link>
-                </motion.div>
+              {categories.slice(0, 6).map(cat => (
+                <CategoryCard key={cat.category_id} cat={cat} />
               ))}
             </motion.div>
           </div>
@@ -215,8 +256,8 @@ export default function StorefrontHome() {
             <p className="section-subtitle">Những sản phẩm được khách hàng tin dùng và yêu thích nhất</p>
           </div>
           {loading ? <SkeletonGrid count={4} /> : (
-            <motion.div 
-              className="product-grid"
+            <motion.div
+              className="product-grid product-grid-featured"
               variants={staggerContainer}
               initial="hidden"
               whileInView="visible"
@@ -241,7 +282,7 @@ export default function StorefrontHome() {
               <p className="section-subtitle">Sản phẩm vừa cập nhật, chưa bao giờ dễ dàng trải nghiệm đến thế</p>
             </div>
             {loading ? <SkeletonGrid count={4} /> : (
-              <motion.div 
+              <motion.div
                 className="product-grid"
                 variants={staggerContainer}
                 initial="hidden"
@@ -263,7 +304,7 @@ export default function StorefrontHome() {
               <span className="section-badge">Thương hiệu</span>
               <h2 className="section-title">Thương Hiệu Nổi Bật</h2>
             </div>
-            <motion.div 
+            <motion.div
               className="brand-grid"
               variants={staggerContainer}
               initial="hidden"

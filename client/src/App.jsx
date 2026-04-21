@@ -125,7 +125,20 @@ function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
-            <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} theme="colored" />
+            <ToastContainer
+              position="top-center"
+              autoClose={2800}
+              hideProgressBar={false}
+              newestOnTop
+              closeOnClick
+              pauseOnFocusLoss={false}
+              draggable
+              pauseOnHover
+              theme="light"
+              toastClassName="julie-toast"
+              progressClassName="julie-toast-progress"
+              style={{ top: '72px', width: 'auto', maxWidth: '420px', minWidth: '280px' }}
+            />
           </BrowserRouter>
         </CartProvider>
       </AuthProvider>

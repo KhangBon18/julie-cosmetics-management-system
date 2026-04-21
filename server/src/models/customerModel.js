@@ -64,11 +64,11 @@ const Customer = {
     );
     if (!custRows[0]) return null;
 
-    // Get recent orders (last 20)
+    // Get recent orders with items (last 20)
     const [orders] = await pool.query(
       `SELECT i.invoice_id, i.subtotal, i.discount_percent, i.discount_amount,
               i.final_total, i.points_earned, i.payment_method, i.status,
-              i.created_at,
+              i.created_at, i.note,
               (SELECT COUNT(*) FROM invoice_items ii WHERE ii.invoice_id = i.invoice_id) as item_count
        FROM invoices i
        WHERE i.customer_id = ?
@@ -76,7 +76,21 @@ const Customer = {
        LIMIT 20`, [id]
     );
 
-    return { ...custRows[0], orders };
+    // Fetch items for each order
+    const ordersWithItems = await Promise.all(orders.map(async (order) => {
+      const [items] = await pool.query(
+        `SELECT ii.product_id, ii.quantity, ii.unit_price, ii.subtotal,
+                p.product_name, p.image_url, p.category_id,
+                b.brand_name
+         FROM invoice_items ii
+         JOIN products p ON p.product_id = ii.product_id
+         LEFT JOIN brands b ON b.brand_id = p.brand_id
+         WHERE ii.invoice_id = ?`, [order.invoice_id]
+      );
+      return { ...order, items };
+    }));
+
+    return { ...custRows[0], orders: ordersWithItems };
   },
 
   findByPhone: async (phone) => {

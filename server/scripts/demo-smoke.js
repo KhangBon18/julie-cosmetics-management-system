@@ -29,6 +29,10 @@ const DEMO_FLOWS = [
       ['/api/leaves?page=1&limit=1', 'Duyệt nghỉ phép'],
       [`/api/salaries/bonuses?month=${currentMonth}&year=${currentYear}`, 'Thưởng kỳ lương hiện tại'],
       ['/api/reports/hr?year=2026', 'Báo cáo nhân sự']
+    ],
+    deniedChecks: [
+      ['/api/products?page=1&limit=1', 'Không được truy cập khu kho nếu chưa được cấp quyền'],
+      ['/api/users?page=1&limit=1', 'Không được truy cập quản trị tài khoản']
     ]
   },
   {
@@ -42,7 +46,8 @@ const DEMO_FLOWS = [
       ['/api/staff/salary-formula', 'Cách tính lương']
     ],
     deniedChecks: [
-      ['/api/invoices?page=1&limit=1', 'Không được truy cập khu bán hàng nội bộ']
+      ['/api/invoices?page=1&limit=1', 'Không được truy cập khu bán hàng nội bộ'],
+      ['/api/customers?page=1&limit=1', 'Không được truy cập dữ liệu khách hàng nội bộ']
     ]
   },
   {

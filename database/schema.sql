@@ -60,6 +60,7 @@ CREATE TABLE users (
   username       VARCHAR(50)    NOT NULL UNIQUE,
   password_hash  VARCHAR(255)   NOT NULL,
   role           ENUM('admin','manager','staff','warehouse') NOT NULL DEFAULT 'staff',
+  role_id        INT            NULL COMMENT 'FK to roles table (RBAC)',
   employee_id    INT            NULL COMMENT 'NULL = tài khoản hệ thống không gắn NV',
   is_active      BOOLEAN        NOT NULL DEFAULT TRUE,
   last_login     TIMESTAMP      NULL,
@@ -67,6 +68,7 @@ CREATE TABLE users (
   updated_at     TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at     TIMESTAMP      NULL,
   FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
+  INDEX idx_users_role_id (role_id),
   INDEX idx_users_deleted (deleted_at)
 ) ENGINE=InnoDB COMMENT='Tài khoản đăng nhập hệ thống';
 
@@ -379,6 +381,10 @@ CREATE TABLE role_permissions (
   FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE CASCADE,
   FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Gán quyền cho vai trò (N:N)';
+
+ALTER TABLE users
+  ADD CONSTRAINT fk_users_role_id
+  FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE SET NULL;
 
 -- ── 6. PRODUCT IMAGES & SKIN TYPES ────────────────────────────
 

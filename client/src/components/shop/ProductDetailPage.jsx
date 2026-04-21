@@ -4,6 +4,7 @@ import { FiShoppingCart, FiArrowLeft, FiMinus, FiPlus, FiShield, FiTruck, FiRefr
 import publicService from '../../services/publicService';
 import { CartContext } from '../../context/CartContext';
 import { toast } from 'react-toastify';
+import { getProductImage } from '../../utils/productImages';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -35,11 +36,17 @@ function SkeletonPDP() {
 
 function RelatedCard({ product }) {
   return (
-    <div className="product-card">
-      <div className="product-card-image">
-        <img src={product.image_url} alt={product.product_name}
-          onError={e => { e.target.src = 'https://via.placeholder.com/300x300.png?text=Julie'; }} />
-      </div>
+    <div className="product-card product-card-v2">
+      <Link to={`/shop/product/${product.product_id}`} className="product-card-image-link">
+        <div className="product-card-image">
+          <img
+            src={getProductImage(product)}
+            alt={product.product_name}
+            loading="lazy"
+            onError={e => { e.target.src = '/products/serum-1.jpg'; }}
+          />
+        </div>
+      </Link>
       <div className="product-card-body">
         <div className="product-card-brand">{product.brand_name}</div>
         <div className="product-card-title">
@@ -51,7 +58,9 @@ function RelatedCard({ product }) {
             <span className="rating-count">({product.review_count})</span>
           </div>
         )}
-        <div className="product-card-price">{fmt(product.sell_price)}đ</div>
+        <div className="product-card-footer">
+          <div className="product-card-price">{fmt(product.sell_price)}đ</div>
+        </div>
       </div>
     </div>
   );
@@ -110,8 +119,9 @@ export default function ProductDetailPage() {
 
       <div className="product-detail">
         <div className="product-detail-image">
-          <img src={product.image_url} alt={product.product_name}
-            onError={e => { e.target.src = 'https://via.placeholder.com/600x600.png?text=Julie+Cosmetics'; }} />
+          <img src={getProductImage(product)} alt={product.product_name}
+            loading="eager"
+            onError={e => { e.target.src = '/products/serum-1.jpg'; }} />
         </div>
         <div className="product-detail-info">
           <span className="product-detail-brand">{product.brand_name}</span>

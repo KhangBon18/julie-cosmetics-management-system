@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import { getWorkspaceHomePath, normalizeUserRole, resolveWorkspaceKey } from '../../utils/workspace';
 
@@ -14,6 +14,7 @@ import { getWorkspaceHomePath, normalizeUserRole, resolveWorkspaceKey } from '..
  */
 export default function ProtectedRoute({ allowedRoles, permission, workspaceKeys, children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return <div className="loading-container"><div className="spinner" /></div>;
@@ -23,8 +24,8 @@ export default function ProtectedRoute({ allowedRoles, permission, workspaceKeys
     return <Navigate to="/admin/login" replace />;
   }
 
-  const workspaceHome = getWorkspaceHomePath(user);
-  const workspaceKey = resolveWorkspaceKey(user);
+  const workspaceHome = getWorkspaceHomePath(user, location.pathname);
+  const workspaceKey = resolveWorkspaceKey(user, location.pathname);
   const normalizedRole = normalizeUserRole(user);
 
   if (workspaceKeys?.length && workspaceKey !== 'admin' && !workspaceKeys.includes(workspaceKey)) {

@@ -26,7 +26,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
-    workspaceKeys: ['admin', 'staff'],
+    workspaceKeys: ['admin', 'hr', 'staff'],
   },
 
   // ─── Cá nhân ───
@@ -198,7 +198,7 @@ const MODULES = [
   },
   {
     key: 'salaries',
-    name: 'Bảng lương',
+    name: 'Tính lương',
     section: 'Nhân sự',
     path: '/admin/salaries',
     icon: FiDollarSign,

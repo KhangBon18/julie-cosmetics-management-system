@@ -5,6 +5,7 @@ import { CartContext } from '../../context/CartContext';
 import publicService from '../../services/publicService';
 import { toast } from 'react-toastify';
 import { buildCartSignature, summarizeCartIssues } from '../../utils/cartValidation';
+import { getProductImage } from '../../utils/productImages';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -69,8 +70,11 @@ export default function CartPage() {
           {cart.map(item => (
             <div key={item.product_id} className="cart-item">
               <div className="cart-item-image">
-                <img src={item.image_url} alt={item.product_name}
-                  onError={e => { e.target.src = 'https://via.placeholder.com/100x100.png?text=No+Image'; }} />
+                <img
+                  src={getProductImage(item)}
+                  alt={item.product_name}
+                  onError={e => { e.target.src = '/products/serum-1.jpg'; }}
+                />
               </div>
               <div className="cart-item-info">
                 <div className="cart-item-brand">{item.brand_name || 'Julie Cosmetics'}</div>

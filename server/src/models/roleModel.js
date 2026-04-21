@@ -50,17 +50,26 @@ const Role = {
   // Tạo role mới
   create: async ({ role_name, description }) => {
     const [result] = await pool.query(
-      'INSERT INTO roles (role_name, description) VALUES (?, ?)',
+      'INSERT INTO roles (role_name, description, is_system) VALUES (?, ?, FALSE)',
       [role_name, description || null]
     );
     return result.insertId;
   },
 
-  // Cập nhật role (chỉ role không phải system)
+  // Cập nhật role
   update: async (id, { role_name, description }) => {
+    const [roleRows] = await pool.query(
+      'SELECT role_name, is_system FROM roles WHERE role_id = ? LIMIT 1',
+      [id]
+    );
+    if (!roleRows[0]) return 0;
+
+    const currentRole = roleRows[0];
+    const nextRoleName = currentRole.is_system ? currentRole.role_name : role_name;
+
     const [result] = await pool.query(
       'UPDATE roles SET role_name = ?, description = ? WHERE role_id = ?',
-      [role_name, description, id]
+      [nextRoleName, description, id]
     );
     return result.affectedRows;
   },

@@ -1,9 +1,51 @@
 import axios from 'axios';
 
+const baseURL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL,
   headers: { 'Content-Type': 'application/json' }
 });
+
+const refreshClient = axios.create({
+  baseURL,
+  headers: { 'Content-Type': 'application/json' }
+});
+
+let pendingRefreshPromise = null;
+
+const clearStaffSession = () => {
+  localStorage.removeItem('staff_token');
+  localStorage.removeItem('staff_refresh_token');
+};
+
+const refreshStaffToken = async () => {
+  const refreshToken = localStorage.getItem('staff_refresh_token');
+  if (!refreshToken) {
+    throw new Error('Không có refresh token');
+  }
+
+  if (!pendingRefreshPromise) {
+    pendingRefreshPromise = refreshClient.post('/auth/refresh', { refreshToken })
+      .then((response) => {
+        const nextToken = response?.data?.token;
+        if (!nextToken) {
+          throw new Error('Refresh token không trả về access token mới');
+        }
+        localStorage.setItem('staff_token', nextToken);
+        return nextToken;
+      })
+      .catch((error) => {
+        clearStaffSession();
+        throw error;
+      })
+      .finally(() => {
+        pendingRefreshPromise = null;
+      });
+  }
+
+  return pendingRefreshPromise;
+};
 
 /**
  * Request interceptor — chọn đúng token theo context:
@@ -32,16 +74,35 @@ api.interceptors.request.use(
 // Response interceptor - xử lý lỗi
 api.interceptors.response.use(
   (response) => response.data,
-  (error) => {
+  async (error) => {
     if (error.response) {
       if (error.response.status === 401) {
-        const url = error.config?.url || '';
+        const originalRequest = error.config || {};
+        const url = originalRequest.url || '';
         const path = window.location.pathname;
 
         const isCustomerAuth = url.includes('/customer-auth');
+        const isStaffAuthRequest = url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/logout');
         const isOnShop = path.startsWith('/shop');
         const isOnShopAuth = path.startsWith('/shop/auth');
         const isOnLogin = path.startsWith('/admin/login');
+
+        if (!isCustomerAuth && !isStaffAuthRequest && !originalRequest._retry) {
+          const hasRefreshToken = Boolean(localStorage.getItem('staff_refresh_token'));
+          if (hasRefreshToken) {
+            try {
+              originalRequest._retry = true;
+              const nextToken = await refreshStaffToken();
+              originalRequest.headers = {
+                ...(originalRequest.headers || {}),
+                Authorization: `Bearer ${nextToken}`
+              };
+              return api(originalRequest);
+            } catch {
+              // fall through to redirect logic below
+            }
+          }
+        }
 
         if (!isCustomerAuth && !isOnShopAuth && !isOnLogin) {
           if (isOnShop) {
@@ -50,7 +111,7 @@ api.interceptors.response.use(
             window.location.href = '/shop/auth';
           } else {
             // Staff session expired on admin pages
-            localStorage.removeItem('staff_token');
+            clearStaffSession();
             window.location.href = '/admin/login';
           }
         }

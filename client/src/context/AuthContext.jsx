@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useCallback, useEffect, useState } from 'react';
 import authService from '../services/authService';
 
 export const AuthContext = createContext(null);
@@ -15,6 +15,19 @@ export const AuthProvider = ({ children }) => {
   const [customerUser, setCustomerUser] = useState(null); // Customer
   const [loading, setLoading] = useState(true);
 
+  const loadStaffUser = useCallback(async () => {
+    try {
+      const userData = await authService.getProfile();
+      setUser(userData);
+      return userData;
+    } catch {
+      localStorage.removeItem('staff_token');
+      localStorage.removeItem('staff_refresh_token');
+      setUser(null);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     let pending = 0;
     const done = () => { pending--; if (pending <= 0) setLoading(false); };
@@ -28,18 +41,7 @@ export const AuthProvider = ({ children }) => {
 
     if (staffToken) loadStaffUser().finally(done);
     if (customerToken) loadCustomerUser().finally(done);
-  }, []);
-
-  // ── Load staff profile ──
-  const loadStaffUser = async () => {
-    try {
-      const userData = await authService.getProfile();
-      setUser(userData);
-    } catch {
-      localStorage.removeItem('staff_token');
-      setUser(null);
-    }
-  };
+  }, [loadStaffUser]);
 
   // ── Load customer profile ──
   const loadCustomerUser = async () => {
@@ -56,6 +58,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     const data = await authService.login({ username, password });
     localStorage.setItem('staff_token', data.token);
+    if (data.refreshToken) {
+      localStorage.setItem('staff_refresh_token', data.refreshToken);
+    }
     setUser(data.user);
     return data;
   };
@@ -77,8 +82,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── Staff logout (only clears staff session) ──
-  const logout = () => {
+  const logout = async () => {
+    const refreshToken = localStorage.getItem('staff_refresh_token');
+    try {
+      if (refreshToken) {
+        await authService.logout({ refreshToken });
+      }
+    } catch {
+      // Best-effort revoke; always clear local session below.
+    }
     localStorage.removeItem('staff_token');
+    localStorage.removeItem('staff_refresh_token');
+    localStorage.removeItem('rbac_permissions_version');
     setUser(null);
   };
 
@@ -94,6 +109,47 @@ export const AuthProvider = ({ children }) => {
       await loadStaffUser();
     }
   };
+
+  useEffect(() => {
+    if (!user || !localStorage.getItem('staff_token')) return undefined;
+
+    let syncing = false;
+    const syncPermissions = async () => {
+      if (syncing || !localStorage.getItem('staff_token')) return;
+      syncing = true;
+      try {
+        await loadStaffUser();
+      } finally {
+        syncing = false;
+      }
+    };
+
+    const handleFocus = () => {
+      syncPermissions().catch(() => {});
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncPermissions().catch(() => {});
+      }
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === 'rbac_permissions_version') {
+        syncPermissions().catch(() => {});
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [user, loadStaffUser]);
 
   return (
     <AuthContext.Provider value={{

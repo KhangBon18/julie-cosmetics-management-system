@@ -111,6 +111,7 @@ export default function MySalaryPage() {
       </html>
     `);
       printWindow.document.close();
+      printWindow.focus();
       printWindow.print();
     } catch (error) {
       toast.error(error.message || 'Không thể mở cửa sổ in bảng lương năm.');
@@ -165,6 +166,7 @@ export default function MySalaryPage() {
       </html>
     `);
       printWindow.document.close();
+      printWindow.focus();
       printWindow.print();
     } catch (error) {
       toast.error(error.message || 'Không thể mở cửa sổ in phiếu lương tháng.');

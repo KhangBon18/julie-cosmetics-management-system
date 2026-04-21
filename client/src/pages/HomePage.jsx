@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import AdminOverview from './AdminOverview';
 import StaffDashboard from './staff/StaffDashboard';
+import ManagerDashboard from './hr/ManagerDashboard';
 import { getWorkspaceHomePath, resolveWorkspaceKey } from '../utils/workspace';
 
 export default function HomePage() {
@@ -12,7 +13,11 @@ export default function HomePage() {
     return <AdminOverview />;
   }
 
-  if (workspaceKey === 'hr' || workspaceKey === 'warehouse' || workspaceKey === 'business') {
+  if (workspaceKey === 'hr') {
+    return <ManagerDashboard />;
+  }
+
+  if (workspaceKey === 'warehouse' || workspaceKey === 'business') {
     return <Navigate to={getWorkspaceHomePath(user)} replace />;
   }
 

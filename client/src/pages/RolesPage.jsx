@@ -6,7 +6,17 @@ import { getPermissionModules, ACTION_LABELS } from '../config/moduleRegistry';
 import usePermission from '../hooks/usePermission';
 
 // ─── ACTION COLUMNS for the matrix ───
-const MATRIX_ACTIONS = ['read', 'create', 'update', 'delete'];
+const MATRIX_ACTIONS = ['read', 'create', 'update', 'delete', 'export'];
+const ROLE_LABELS = {
+  admin: 'Quản trị viên',
+  manager: 'Quản lý nhân sự',
+  sales: 'Nhân viên kinh doanh',
+  warehouse: 'Thủ kho',
+  staff_portal: 'Nhân viên cổng cá nhân',
+  staff: 'Nhân viên bán hàng (legacy)',
+};
+
+const getRoleDisplayName = (roleName) => ROLE_LABELS[String(roleName || '').trim().toLowerCase()] || roleName;
 
 // ─── Confirm Dialog ───
 function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
@@ -354,9 +364,11 @@ export default function RolesPage() {
       };
       if (editing) {
         await roleService.update(editing.role_id, payload);
+        localStorage.setItem('rbac_permissions_version', String(Date.now()));
         toast.success('Cập nhật nhóm quyền thành công');
       } else {
         await roleService.create(payload);
+        localStorage.setItem('rbac_permissions_version', String(Date.now()));
         toast.success('Tạo nhóm quyền thành công');
       }
       setShowModal(false);
@@ -373,6 +385,7 @@ export default function RolesPage() {
     if (!deleteTarget) return;
     try {
       await roleService.delete(deleteTarget.role_id);
+      localStorage.setItem('rbac_permissions_version', String(Date.now()));
       toast.success('Xóa nhóm quyền thành công');
       loadData();
     } catch (err) {
@@ -388,6 +401,9 @@ export default function RolesPage() {
         <div>
           <h1>Nhóm quyền</h1>
           <p>Quản lý phân quyền theo vai trò</p>
+          <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+            Lưu ý: quyền động của nhân viên hiện tách thành <strong>`sales`</strong> cho khu kinh doanh và <strong>`staff_portal`</strong> cho cổng cá nhân. Sau khi lưu quyền, người dùng chỉ cần tải lại trang hoặc chuyển lại tab để sidebar tự đồng bộ.
+          </p>
         </div>
         {_canCreate && (
           <button className="btn btn-primary" onClick={openCreate} id="btn-create-role">
@@ -438,7 +454,10 @@ export default function RolesPage() {
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <FiShield style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                        <strong>{role.role_name}</strong>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <strong>{getRoleDisplayName(role.role_name)}</strong>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{role.role_name}</span>
+                        </div>
                       </div>
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{role.description || '—'}</td>
@@ -507,6 +526,11 @@ export default function RolesPage() {
                       disabled={editing?.is_system}
                       autoComplete="off"
                     />
+                    {editing?.is_system ? (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                        Tên kỹ thuật của role hệ thống được giữ cố định để tránh lệch RBAC và workspace.
+                      </div>
+                    ) : null}
                   </div>
                   <div className="form-group">
                     <label htmlFor="role-desc">Mô tả</label>
