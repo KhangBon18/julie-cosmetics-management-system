@@ -42,7 +42,7 @@ export default function DashboardLayout() {
       {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} workspace={workspace} basePath={basePath} />
       <div className="main-content">
-        <TopHeader title={workspace.title} subtitle={workspace.subtitle} toggleSidebar={toggleSidebar} />
+        <TopHeader title={workspace.title} subtitle={workspace.subtitle} workspace={workspace} toggleSidebar={toggleSidebar} />
         <div className="page-content">
           <Outlet />
         </div>

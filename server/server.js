@@ -16,6 +16,7 @@ const categoryRoutes = require('./src/routes/categoryRoutes');
 const positionRoutes = require('./src/routes/positionRoutes');
 const employeeRoutes = require('./src/routes/employeeRoutes');
 const leaveRoutes = require('./src/routes/leaveRoutes');
+const attendanceRoutes = require('./src/routes/attendanceRoutes');
 const salaryRoutes = require('./src/routes/salaryRoutes');
 const brandRoutes = require('./src/routes/brandRoutes');
 const supplierRoutes = require('./src/routes/supplierRoutes');
@@ -33,6 +34,7 @@ const notificationRoutes = require('./src/routes/notificationRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const shippingRoutes = require('./src/routes/shippingRoutes');
 const returnRoutes = require('./src/routes/returnRoutes');
+const payrollRoutes = require('./src/routes/payrollRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -91,7 +93,10 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/positions', positionRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/leaves', leaveRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/attendances', attendanceRoutes);
 app.use('/api/salaries', salaryRoutes);
+app.use('/api/payroll', payrollRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/imports', importRoutes);
@@ -109,7 +114,7 @@ app.use('/api/shipping', shippingRoutes);
 app.use('/api/returns', returnRoutes);
 
 // Health check (kiểm tra cả DB connection)
-app.get('/api/health', async (req, res) => {
+const healthCheckHandler = async (req, res) => {
   try {
     const connection = await pool.getConnection();
     connection.release();
@@ -117,7 +122,11 @@ app.get('/api/health', async (req, res) => {
   } catch {
     res.status(503).json({ status: 'ERROR', database: 'disconnected', message: 'Database connection failed' });
   }
-});
+};
+
+// Compatibility health endpoints for docs, smoke scripts, and deployment checks
+app.get('/health', healthCheckHandler);
+app.get('/api/health', healthCheckHandler);
 
 // Error handling middleware
 app.use(errorHandler);

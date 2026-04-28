@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './shop.css';
@@ -23,6 +23,7 @@ const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
 const PositionsPage = lazy(() => import('./pages/PositionsPage'));
 const SuppliersPage = lazy(() => import('./pages/SuppliersPage'));
 const LeavesPage = lazy(() => import('./pages/LeavesPage'));
+const AttendancesPage = lazy(() => import('./pages/AttendancesPage'));
 const SalariesPage = lazy(() => import('./pages/SalariesPage'));
 const ImportsPage = lazy(() => import('./pages/ImportsPage'));
 const ReviewsPage = lazy(() => import('./pages/ReviewsPage'));
@@ -40,6 +41,7 @@ const CustomerProfilePage = lazy(() => import('./components/shop/CustomerProfile
 const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'));
 const MyProfilePage = lazy(() => import('./pages/staff/MyProfilePage'));
 const MyLeavePage = lazy(() => import('./pages/staff/MyLeavePage'));
+const MyAttendancePage = lazy(() => import('./pages/staff/MyAttendancePage'));
 const MySalaryPage = lazy(() => import('./pages/staff/MySalaryPage'));
 
 /* Loading fallback */
@@ -62,12 +64,14 @@ const renderInternalWorkspaceRoutes = () => (
 
     <Route path="profile" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']}><MyProfilePage /></P>} />
     <Route path="my-leaves" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']}><MyLeavePage /></P>} />
+    <Route path="my-attendance" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']} workspaceKeys={['hr', 'warehouse', 'business', 'staff']}><MyAttendancePage /></P>} />
     <Route path="my-salary" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']}><MySalaryPage /></P>} />
 
     <Route path="products" element={<P perm="products.read"><ProductsPage /></P>} />
     <Route path="invoices" element={<P perm="invoices.read"><InvoicesPage /></P>} />
     <Route path="customers" element={<P perm="customers.read"><CustomersPage /></P>} />
     <Route path="leaves" element={<P perm="leaves.read"><LeavesPage /></P>} />
+    <Route path="attendances" element={<P perm="attendances.read" workspaceKeys={['admin', 'hr']}><AttendancesPage /></P>} />
     <Route path="employees" element={<P perm="employees.read"><EmployeesPage /></P>} />
     <Route path="brands" element={<P perm="brands.read"><BrandsPage /></P>} />
     <Route path="categories" element={<P perm="categories.read"><CategoriesPage /></P>} />
@@ -82,6 +86,74 @@ const renderInternalWorkspaceRoutes = () => (
     <Route path="settings" element={<P perm="settings.read" workspaceKeys={['admin']}><SettingsPage /></P>} />
   </>
 );
+
+const ADMIN_TOAST_CONTAINER_ID = 'admin-toast-container';
+
+function AdminToastCloseButton({ closeToast }) {
+  return (
+    <button
+      type="button"
+      className="admin-toast-close"
+      aria-label="Đóng thông báo"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeToast?.(event);
+      }}
+    >
+      ×
+    </button>
+  );
+}
+
+/* ─── Route-aware Toast — shop vs admin themes ─── */
+function SmartToast() {
+  const { pathname } = useLocation();
+  const isShop = pathname.startsWith('/shop');
+
+  if (isShop) {
+    // Shop: light cream/rose theme matching Julie brand
+    return (
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss={false}
+        draggable
+        pauseOnHover
+        theme="light"
+        limit={3}
+        toastClassName="julie-toast"
+        progressClassName="julie-toast-progress"
+        style={{ top: '16px', width: 'auto', maxWidth: '400px', minWidth: '280px' }}
+      />
+    );
+  }
+
+  // Admin / HR / Staff / Warehouse / Business: vibrant system theme
+  return (
+    <ToastContainer
+      containerId={ADMIN_TOAST_CONTAINER_ID}
+      className="admin-toast-container"
+      position="top-center"
+      autoClose={5000}
+      hideProgressBar={false}
+      newestOnTop
+      closeOnClick={false}
+      pauseOnFocusLoss={false}
+      draggable={false}
+      pauseOnHover
+      theme="light"
+      limit={3}
+      toastClassName="admin-toast"
+      bodyClassName="admin-toast-body"
+      progressClassName="admin-toast-progress"
+      closeButton={AdminToastCloseButton}
+    />
+  );
+}
 
 function App() {
   return (
@@ -125,20 +197,8 @@ function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
-            <ToastContainer
-              position="top-center"
-              autoClose={2800}
-              hideProgressBar={false}
-              newestOnTop
-              closeOnClick
-              pauseOnFocusLoss={false}
-              draggable
-              pauseOnHover
-              theme="light"
-              toastClassName="julie-toast"
-              progressClassName="julie-toast-progress"
-              style={{ top: '72px', width: 'auto', maxWidth: '420px', minWidth: '280px' }}
-            />
+            {/* SmartToast must be inside BrowserRouter to use useLocation */}
+            <SmartToast />
           </BrowserRouter>
         </CartProvider>
       </AuthProvider>

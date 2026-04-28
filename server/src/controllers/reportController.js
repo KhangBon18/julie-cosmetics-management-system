@@ -159,6 +159,146 @@ const reportController = {
     } catch (error) { next(error); }
   },
 
+  // GET /api/reports/sales-summary — Compatibility alias for sales overview
+  getSalesSummary: async (req, res, next) => {
+    try {
+      const { year, group_by } = req.query;
+      const y = year || new Date().getFullYear();
+      const periodConfig = resolvePeriodConfig(group_by, y);
+      const invoiceStatusPlaceholders = buildPlaceholders(SALES_ANALYTICS_INVOICE_STATUSES);
+      const invoiceRefundSql = buildInvoiceRefundAmountSql({
+        invoiceAlias: 'i',
+        invoiceReturnsAlias: 'invoice_returns'
+      });
+      const lineNetRevenueSql = buildLineNetRevenueSql('i', 'ii');
+      const refundAmountSql = buildRefundAmountSql({
+        invoiceAlias: 'i',
+        lineNetRevenueSql,
+        invoiceReturnsAlias: 'invoice_returns',
+        itemReturnsAlias: 'item_returns'
+      });
+      const returnedQuantitySql = buildReturnedQuantitySql({
+        invoiceAlias: 'i',
+        itemAlias: 'ii',
+        invoiceReturnsAlias: 'invoice_returns',
+        itemReturnsAlias: 'item_returns'
+      });
+
+      const [revenueRows] = await pool.query(
+        `SELECT
+           ${periodConfig.periodSelect},
+           COUNT(*) as invoice_count,
+           SUM(i.final_total) as gross_revenue,
+           SUM(${invoiceRefundSql}) as refunded_revenue,
+           SUM(i.final_total - ${invoiceRefundSql}) as revenue
+         FROM invoices i
+         LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+           ON invoice_returns.invoice_id = i.invoice_id
+         WHERE ${periodConfig.dataDateClause} AND i.status IN (${invoiceStatusPlaceholders})
+         GROUP BY period, label
+         ORDER BY period`,
+        [...periodConfig.dataDateParams, ...SALES_ANALYTICS_INVOICE_STATUSES]
+      );
+
+      const [exportRows] = await pool.query(
+        `SELECT
+            ${periodConfig.periodSelect},
+            SUM(ii.quantity) as gross_exported,
+            SUM(${returnedQuantitySql}) as returned_quantity,
+            SUM(GREATEST(0, ii.quantity - ${returnedQuantitySql})) as total_exported,
+            SUM(GREATEST(0, ${lineNetRevenueSql} - ${refundAmountSql})) as total_export_value
+         FROM invoice_items ii
+         JOIN invoices i ON ii.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+           ON invoice_returns.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_ITEM_AGGREGATE_SQL}) item_returns
+           ON item_returns.invoice_id = i.invoice_id
+          AND item_returns.product_id = ii.product_id
+         WHERE ${periodConfig.dataDateClause} AND i.status IN (${invoiceStatusPlaceholders})
+         GROUP BY period, label
+         ORDER BY period`,
+        [...periodConfig.dataDateParams, ...SALES_ANALYTICS_INVOICE_STATUSES]
+      );
+
+      const [revenueSummaryRows] = await pool.query(
+        `SELECT
+           COUNT(*) as total_invoices,
+           SUM(i.final_total) as gross_revenue,
+           SUM(${invoiceRefundSql}) as refunded_revenue,
+           SUM(i.final_total - ${invoiceRefundSql}) as total_revenue
+         FROM invoices i
+         LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+           ON invoice_returns.invoice_id = i.invoice_id
+         WHERE YEAR(i.created_at) = ? AND i.status IN (${invoiceStatusPlaceholders})`,
+        [y, ...SALES_ANALYTICS_INVOICE_STATUSES]
+      );
+
+      const [exportSummaryRows] = await pool.query(
+        `SELECT
+            SUM(ii.quantity) as gross_exported,
+            SUM(${returnedQuantitySql}) as returned_quantity,
+            SUM(GREATEST(0, ii.quantity - ${returnedQuantitySql})) as total_exported,
+            SUM(GREATEST(0, ${lineNetRevenueSql} - ${refundAmountSql})) as total_export_value
+         FROM invoice_items ii
+         JOIN invoices i ON ii.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_INVOICE_AGGREGATE_SQL}) invoice_returns
+           ON invoice_returns.invoice_id = i.invoice_id
+         LEFT JOIN (${COMPLETED_RETURN_ITEM_AGGREGATE_SQL}) item_returns
+           ON item_returns.invoice_id = i.invoice_id
+          AND item_returns.product_id = ii.product_id
+         WHERE YEAR(i.created_at) = ? AND i.status IN (${invoiceStatusPlaceholders})`,
+        [y, ...SALES_ANALYTICS_INVOICE_STATUSES]
+      );
+
+      const data = periodConfig.periods.map((period) => {
+        const revenueRow = revenueRows.find((row) => Number(row.period) === period);
+        const exportRow = exportRows.find((row) => Number(row.period) === period);
+
+        return {
+          period,
+          label: revenueRow?.label || exportRow?.label || (
+            periodConfig.groupBy === 'quarter'
+              ? `Q${period}`
+              : periodConfig.groupBy === 'year'
+                ? `${period}`
+                : `T${period}`
+          ),
+          invoice_count: toNumber(revenueRow?.invoice_count),
+          gross_revenue: toNumber(revenueRow?.gross_revenue),
+          refunded_revenue: toNumber(revenueRow?.refunded_revenue),
+          revenue: toNumber(revenueRow?.revenue),
+          gross_exported: toNumber(exportRow?.gross_exported),
+          returned_quantity: toNumber(exportRow?.returned_quantity),
+          total_exported: toNumber(exportRow?.total_exported),
+          total_export_value: toNumber(exportRow?.total_export_value),
+        };
+      });
+
+      const revenueSummary = revenueSummaryRows[0] || {};
+      const exportSummary = exportSummaryRows[0] || {};
+
+      res.json({
+        data,
+        summary: {
+          total_invoices: toNumber(revenueSummary.total_invoices),
+          gross_revenue: toNumber(revenueSummary.gross_revenue),
+          refunded_revenue: toNumber(revenueSummary.refunded_revenue),
+          total_revenue: toNumber(revenueSummary.total_revenue),
+          gross_exported: toNumber(exportSummary.gross_exported),
+          returned_quantity: toNumber(exportSummary.returned_quantity),
+          total_exported: toNumber(exportSummary.total_exported),
+          total_export_value: toNumber(exportSummary.total_export_value),
+        },
+        year: y,
+        group_by: periodConfig.groupBy,
+        meta: {
+          revenue_scope_rule: SALES_SCOPE_RULE,
+          export_scope_rule: INVENTORY_SCOPE_RULE,
+        }
+      });
+    } catch (error) { next(error); }
+  },
+
   // GET /api/reports/profit — Lợi nhuận = Doanh thu - Giá vốn hàng bán (COGS)
   getProfit: async (req, res, next) => {
     try {

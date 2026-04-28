@@ -1,4 +1,16 @@
 import api from './api';
+import { downloadCSV } from './exportService';
+
+/**
+ * Strip empty/null/undefined values from params before sending to backend.
+ * Prevents empty strings (e.g. employee_id='') from reaching validation.
+ */
+const cleanParams = (params = {}) =>
+  Object.fromEntries(
+    Object.entries(params).filter(([, value]) =>
+      value !== undefined && value !== null && value !== ''
+    )
+  );
 
 // Generic CRUD service factory
 const createService = (basePath) => ({
@@ -26,6 +38,26 @@ export const salaryService = {
   getBonuses: (params) => api.get('/salaries/bonuses', { params }),
   upsertBonus: (data) => api.post('/salaries/bonuses', data),
   deleteBonus: (id) => api.delete(`/salaries/bonuses/${id}`)
+};
+export const attendanceService = {
+  getAll: (params) => api.get('/attendances', { params: cleanParams(params) }),
+  getSummary: (params) => api.get('/attendances/summary', { params: cleanParams(params) }),
+  getById: (id) => api.get(`/attendances/${id}`),
+  manual: (data) => api.post('/attendances/manual', data),
+  update: (id, data) => api.put(`/attendances/${id}`, data),
+  delete: (id) => api.delete(`/attendances/${id}`),
+  export: async (params = {}) => {
+    const safeParams = cleanParams(params);
+    const search = new URLSearchParams();
+    Object.entries(safeParams).forEach(([key, value]) => {
+      search.set(key, value);
+    });
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return downloadCSV(`/attendances/export${suffix}`, 'cham-cong.csv');
+  },
+  getAdjustments: (params) => api.get('/attendances/adjustments', { params: cleanParams(params) }),
+  approveAdjustment: (id) => api.put(`/attendances/adjustments/${id}/approve`),
+  rejectAdjustment: (id, data) => api.put(`/attendances/adjustments/${id}/reject`, data)
 };
 export const brandService = createService('/brands');
 export const categoryService = createService('/categories');
@@ -71,6 +103,29 @@ export const reviewService = {
 export const productService = createService('/products');
 export const userService = {
   ...createService('/users'),
+  getPermissions: (id) => api.get(`/users/${id}/permissions`),
+  updatePermissions: (id, data) => api.put(`/users/${id}/permissions`, data),
   resetPassword: (id, data) => api.put(`/users/${id}/reset-password`, data),
   toggleActive: (id, data) => api.put(`/users/${id}/toggle-active`, data)
+};
+export const payrollService = {
+  // Attendance Periods
+  getAttendancePeriods: () => api.get('/payroll/attendance-periods'),
+  createAttendancePeriod: (data) => api.post('/payroll/attendance-periods', data),
+  lockAttendancePeriod: (id) => api.post(`/payroll/attendance-periods/${id}/lock`),
+  unlockAttendancePeriod: (id) => api.post(`/payroll/attendance-periods/${id}/unlock`),
+  // Payroll Periods
+  getPayrollPeriods: () => api.get('/payroll/periods'),
+  createPayrollPeriod: (data) => api.post('/payroll/periods', data),
+  calculatePayroll: (id) => api.post(`/payroll/periods/${id}/calculate`),
+  approvePayroll: (id) => api.post(`/payroll/periods/${id}/approve`),
+  markPaid: (id) => api.post(`/payroll/periods/${id}/mark-paid`),
+  lockPayroll: (id) => api.post(`/payroll/periods/${id}/lock`),
+  getRecords: (id) => api.get(`/payroll/periods/${id}/records`),
+  export: (id) => downloadCSV(`/payroll/periods/${id}/export`, `bang-luong-${id}.csv`),
+  // Payroll Records
+  getRecordById: (id) => api.get(`/payroll/records/${id}`),
+  // Payroll Adjustments
+  createAdjustment: (salaryId, data) => api.post(`/payroll/records/${salaryId}/adjustments`, data),
+  deleteAdjustment: (id) => api.delete(`/payroll/adjustments/${id}`),
 };

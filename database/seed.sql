@@ -13,6 +13,18 @@ INSERT INTO positions (position_name, base_salary, description) VALUES
 ('Thủ kho',              7500000, 'Quản lý nhập - xuất - tồn kho, lập phiếu nhập và kiểm soát số liệu hàng hóa.'),
 ('Kế toán',              9000000, 'Theo dõi tài chính, đối soát chứng từ và kiểm tra báo cáo doanh thu.');
 
+-- ── ATTENDANCE SHIFTS (seed mặc định cho module chấm công) ────
+INSERT INTO attendance_shifts (shift_code, shift_name, start_time, end_time, break_minutes, grace_minutes, standard_work_minutes, is_active)
+VALUES ('HC', 'Ca hành chính', '08:00:00', '17:00:00', 60, 10, 480, TRUE)
+ON DUPLICATE KEY UPDATE
+  shift_name = VALUES(shift_name),
+  start_time = VALUES(start_time),
+  end_time = VALUES(end_time),
+  break_minutes = VALUES(break_minutes),
+  grace_minutes = VALUES(grace_minutes),
+  standard_work_minutes = VALUES(standard_work_minutes),
+  is_active = VALUES(is_active);
+
 -- ── EMPLOYEES ─────────────────────────────────────────────────
 INSERT INTO employees (full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary, status) VALUES
 ('Nguyễn Thị Julie',   'julie@juliecosmetics.vn',   '0901234567', '123 Nguyễn Huệ, Q1, TP.HCM',         'Nữ', '1990-05-15', '2022-01-01', 15000000, 'active'),

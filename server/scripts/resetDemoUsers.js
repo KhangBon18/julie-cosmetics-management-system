@@ -17,6 +17,12 @@ const loadEnv = (filePath) => {
 loadEnv(path.join(projectRoot, '.env'));
 loadEnv(path.join(serverDir, '.env'));
 
+if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEMO_RESET) {
+  console.error('ERROR: resetDemoUsers is blocked on NODE_ENV=production.');
+  console.error('Set ALLOW_DEMO_RESET=1 explicitly to override (demo envs only).');
+  process.exit(1);
+}
+
 const DEMO_ACCOUNTS = [
   { username: 'admin', password: 'admin123', role_name: 'admin', legacy_role: 'admin', employee_id: null },
   { username: 'manager01', password: 'manager123', role_name: 'manager', legacy_role: 'manager', employee_id: 1 },

@@ -94,6 +94,52 @@ const findOpenResignation = async (db, employeeId, excludeRequestId = null) => {
   return rows[0] || null;
 };
 
+const checkAndDeductLeaveBalance = async (db, employeeId, startDate, totalDays, leaveType) => {
+  if (leaveType !== 'annual') return; // Only annual leave requires balance check
+
+  const year = new Date(startDate).getFullYear();
+
+  // First, ensure balance record exists
+  await db.query(
+    `INSERT IGNORE INTO employee_leave_balances (employee_id, year, annual_leave_entitled, annual_leave_remaining)
+     VALUES (?, ?, 12, 12)`,
+    [employeeId, year]
+  );
+
+  const [rows] = await db.query(
+    `SELECT balance_id, annual_leave_remaining
+     FROM employee_leave_balances
+     WHERE employee_id = ? AND year = ?
+     FOR UPDATE`,
+    [employeeId, year]
+  );
+
+  const balance = rows[0];
+  if (!balance || balance.annual_leave_remaining < totalDays) {
+    throw Object.assign(new Error(`Số ngày phép năm còn lại không đủ (Cần: ${totalDays}, Còn: ${balance ? balance.annual_leave_remaining : 0})`), { status: 400 });
+  }
+
+  await db.query(
+    `UPDATE employee_leave_balances
+     SET annual_leave_used = annual_leave_used + ?,
+         annual_leave_remaining = annual_leave_remaining - ?
+     WHERE balance_id = ?`,
+    [totalDays, totalDays, balance.balance_id]
+  );
+};
+
+const restoreLeaveBalance = async (db, employeeId, startDate, totalDays, leaveType) => {
+  if (leaveType !== 'annual') return;
+  const year = new Date(startDate).getFullYear();
+  await db.query(
+    `UPDATE employee_leave_balances
+     SET annual_leave_used = annual_leave_used - ?,
+         annual_leave_remaining = annual_leave_remaining + ?
+     WHERE employee_id = ? AND year = ?`,
+    [totalDays, totalDays, employeeId, year]
+  );
+};
+
 const Leave = {
   findAll: async ({ page = 1, limit = 10, employee_id, status }) => {
     await syncApprovedResignations(undefined, employee_id ? Number(employee_id) : null);
@@ -257,6 +303,8 @@ const Leave = {
 
       if (leave.leave_type === 'resignation') {
         await syncApprovedResignations(connection, leave.employee_id);
+      } else if (leave.leave_type === 'annual') {
+        await checkAndDeductLeaveBalance(connection, leave.employee_id, leave.start_date, calculateTotalDays(leave.start_date, leave.end_date), leave.leave_type);
       }
 
       await connection.commit();
@@ -308,8 +356,29 @@ const Leave = {
   },
 
   delete: async (id) => {
-    const [result] = await pool.query('DELETE FROM leave_requests WHERE request_id = ?', [id]);
-    return result.affectedRows;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [rows] = await connection.query('SELECT employee_id, leave_type, start_date, end_date, status FROM leave_requests WHERE request_id = ? FOR UPDATE', [id]);
+      if (!rows.length) {
+        await connection.rollback();
+        return 0;
+      }
+      const leave = rows[0];
+      if (leave.status === 'approved' && leave.leave_type === 'annual') {
+        const totalDays = calculateTotalDays(leave.start_date, leave.end_date);
+        await restoreLeaveBalance(connection, leave.employee_id, leave.start_date, totalDays, leave.leave_type);
+      }
+
+      const [result] = await connection.query('DELETE FROM leave_requests WHERE request_id = ?', [id]);
+      await connection.commit();
+      return result.affectedRows;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 };
 

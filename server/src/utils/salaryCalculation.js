@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 const Setting = require('../models/settingModel');
-const SalaryBonus = require('../models/salaryBonusModel');
+const Attendance = require('../models/attendanceModel');
 const { syncApprovedResignations } = require('./employeeLifecycle');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -20,14 +20,9 @@ const maxDate = (a, b) => (a > b ? a : b);
 const minDate = (a, b) => (a < b ? a : b);
 const diffDaysInclusive = (start, end) => Math.floor((end - start) / MS_PER_DAY) + 1;
 
-const formatCurrency = (value) => new Intl.NumberFormat('vi-VN').format(Math.round(value || 0));
-
 /**
  * Tính lương tự động cho nhân viên trong tháng/năm
- * Công thức: net = base × (actual/standard) + bonus - deductions
- * - actual = standard - unpaid_leave_days
- * - unpaid_leave_days = nghỉ không phép (unpaid) đã duyệt trong tháng
- * - Nghỉ phép năm (annual) đã duyệt → không trừ lương
+ * Công thức mới với đầy đủ breakdown chi tiết
  */
 async function calculateSalary(employeeId, month, year) {
   const targetDate = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -35,42 +30,27 @@ async function calculateSalary(employeeId, month, year) {
   const fullMonthEnd = parseSqlDate(`${year}-${String(month).padStart(2, '0')}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}`);
   const monthCalendarDays = diffDaysInclusive(monthStart, fullMonthEnd);
 
-  // 1. Lấy thông tin nhân viên
-  const [empRows] = await pool.query(
-    `SELECT e.*
-     FROM employees e
-     WHERE e.employee_id = ?`,
-    [employeeId]
-  );
-
+  // 1. Employee Info & Resignation Check
+  const [empRows] = await pool.query(`SELECT * FROM employees WHERE employee_id = ?`, [employeeId]);
   if (!empRows.length) throw new Error('Không tìm thấy nhân viên');
   const emp = empRows[0];
 
   const [resignationRows] = await pool.query(
-    `SELECT MIN(end_date) as resignation_date
-     FROM leave_requests
-     WHERE employee_id = ?
-       AND leave_type = 'resignation'
-       AND status = 'approved'`,
+    `SELECT MIN(end_date) as resignation_date FROM leave_requests WHERE employee_id = ? AND leave_type = 'resignation' AND status = 'approved'`,
     [employeeId]
   );
-
   const resignationDate = resignationRows[0]?.resignation_date ? parseSqlDate(resignationRows[0].resignation_date) : null;
   if (resignationDate && resignationDate < monthStart) {
     throw new Error('Nhân viên đã nghỉ việc trước kỳ lương này');
   }
-
   const activePeriodEnd = resignationDate && resignationDate < fullMonthEnd ? resignationDate : fullMonthEnd;
 
-  // 2. Lấy lịch sử chức vụ giao với tháng cần tính.
-  // Có thể tồn tại overlap lịch sử cũ, nên sẽ normalize lại theo thứ tự effective_date.
+  // 2. Base Salary Prorating (Position Segments)
   const [positionRows] = await pool.query(
     `SELECT ep.position_id, ep.effective_date, ep.end_date, ep.salary_at_time, p.position_name
      FROM employee_positions ep
      LEFT JOIN positions p ON ep.position_id = p.position_id
-     WHERE ep.employee_id = ?
-       AND ep.effective_date <= ?
-       AND (ep.end_date IS NULL OR ep.end_date >= ?)
+     WHERE ep.employee_id = ? AND ep.effective_date <= ? AND (ep.end_date IS NULL OR ep.end_date >= ?)
      ORDER BY ep.effective_date ASC, ep.id ASC`,
     [employeeId, formatSqlDate(activePeriodEnd), formatSqlDate(monthStart)]
   );
@@ -79,111 +59,134 @@ async function calculateSalary(employeeId, month, year) {
   let cursor = monthStart;
   const pushFallbackSegment = (start, end) => {
     if (start > end) return;
-    normalizedSegments.push({
-      position_id: null,
-      position_name: 'Lương hồ sơ nhân viên',
-      salary_at_time: Number(emp.base_salary) || 0,
-      start,
-      end,
-      is_fallback: true
-    });
+    normalizedSegments.push({ salary_at_time: Number(emp.base_salary) || 0, start, end, is_fallback: true });
   };
 
   for (const row of positionRows) {
     const rawStart = maxDate(parseSqlDate(row.effective_date), monthStart);
     const rawEnd = minDate(parseSqlDate(row.end_date || formatSqlDate(activePeriodEnd)), activePeriodEnd);
     if (rawEnd < rawStart) continue;
-    if (cursor < rawStart) {
-      pushFallbackSegment(cursor, addDays(rawStart, -1));
-    }
+    if (cursor < rawStart) pushFallbackSegment(cursor, addDays(rawStart, -1));
     const segmentStart = maxDate(rawStart, cursor);
     if (segmentStart > rawEnd) continue;
-    normalizedSegments.push({
-      position_id: row.position_id,
-      position_name: row.position_name || 'Chức vụ không xác định',
-      salary_at_time: Number(row.salary_at_time) || Number(emp.base_salary) || 0,
-      start: segmentStart,
-      end: rawEnd,
-      is_fallback: false
-    });
+    normalizedSegments.push({ salary_at_time: Number(row.salary_at_time) || Number(emp.base_salary) || 0, start: segmentStart, end: rawEnd, is_fallback: false });
     cursor = addDays(rawEnd, 1);
   }
-
   if (cursor <= activePeriodEnd || !normalizedSegments.length) {
     pushFallbackSegment(cursor <= activePeriodEnd ? cursor : monthStart, activePeriodEnd);
   }
 
-  // 3. Tính ngày nghỉ không lương (unpaid) đã duyệt rơi vào đúng tháng này.
-  // Dùng Set theo ngày để tránh double count nếu dữ liệu đơn nghỉ bị chồng.
+  let effectiveBaseSalary = 0;
+  for (const segment of normalizedSegments) {
+    const calendarDays = diffDaysInclusive(segment.start, segment.end);
+    effectiveBaseSalary += segment.salary_at_time * (calendarDays / monthCalendarDays);
+  }
+  effectiveBaseSalary = Math.round(effectiveBaseSalary);
+
+  // 3. System Settings
+  const getNumSetting = async (key, def) => {
+    const s = await Setting.findByKey(key);
+    return s ? Number(s.parsed_value) : def;
+  };
+  const workDaysStandard = await getNumSetting('payroll.standard_working_days', 26);
+  const hoursPerDay = await getNumSetting('payroll.standard_working_hours_per_day', 8);
+  const otRateMultiplier = await getNumSetting('payroll.ot_rate_weekday', 1.5);
+  const latePenaltyPerMin = await getNumSetting('payroll.late_penalty_per_minute', 0);
+  const earlyPenaltyPerMin = await getNumSetting('payroll.early_leave_penalty_per_minute', 0);
+
+  // 4. Base Rates
+  const dailyRate = workDaysStandard > 0 ? (effectiveBaseSalary / workDaysStandard) : 0;
+  const hourlyRate = hoursPerDay > 0 ? (dailyRate / hoursPerDay) : 0;
+  const minuteRate = hourlyRate / 60;
+
+  // 5. Approved Leaves (overlap with active period)
   const [leaveRows] = await pool.query(
-    `SELECT start_date, end_date
+    `SELECT start_date, end_date, leave_type
      FROM leave_requests
-     WHERE employee_id = ? AND status = 'approved' AND leave_type = 'unpaid'
-     AND start_date <= LAST_DAY(?)
-     AND end_date >= ?`,
-    [employeeId, targetDate, targetDate]
+     WHERE employee_id = ? AND status = 'approved' AND leave_type IN ('annual', 'unpaid', 'sick', 'maternity')
+     AND start_date <= ? AND end_date >= ?`,
+    [employeeId, formatSqlDate(activePeriodEnd), formatSqlDate(monthStart)]
   );
 
-  const unpaidLeaveDates = new Set();
+  let paidLeaveDays = 0;
+  let unpaidLeaveDays = 0;
   for (const leave of leaveRows) {
     let current = maxDate(parseSqlDate(leave.start_date), monthStart);
     const leaveEnd = minDate(parseSqlDate(leave.end_date), activePeriodEnd);
-    while (current <= leaveEnd) {
-      unpaidLeaveDates.add(formatSqlDate(current));
-      current = addDays(current, 1);
+    const days = diffDaysInclusive(current, leaveEnd);
+    if (days > 0) {
+      if (leave.leave_type === 'annual') paidLeaveDays += days;
+      else unpaidLeaveDays += days; // sick, unpaid, maternity default to unpaid deduction
     }
   }
-  const unpaidLeaveDays = unpaidLeaveDates.size;
 
-  // 4. Lấy số ngày công chuẩn từ settings (mặc định 22)
-  const workDaysSetting = await Setting.findByKey('work_days_standard');
-  const workDaysStandard = workDaysSetting ? parseInt(workDaysSetting.parsed_value) : 22;
+  // 6. Attendance Summary
+  const [attRows] = await pool.query(
+    `SELECT
+      COALESCE(SUM(minutes_late), 0) AS total_late_minutes,
+      COALESCE(SUM(minutes_early_leave), 0) AS total_early_leave_minutes,
+      COALESCE(SUM(overtime_minutes), 0) AS total_overtime_minutes,
+      COALESCE(SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END), 0) AS absent_days,
+      COALESCE(SUM(work_day_value), 0) AS work_days_actual
+     FROM attendance_records
+     WHERE employee_id = ? AND MONTH(work_date) = ? AND YEAR(work_date) = ?`,
+    [employeeId, month, year]
+  );
+  const att = attRows[0] || {};
+  const totalLateMinutes = Number(att.total_late_minutes);
+  const totalEarlyMinutes = Number(att.total_early_leave_minutes);
+  const totalOvertimeMinutes = Number(att.total_overtime_minutes);
+  const absentDays = Number(att.absent_days);
+  const workDaysActual = Number(att.work_days_actual);
 
-  // 5. Tính lương theo từng giai đoạn chức vụ trong tháng.
-  // Mỗi giai đoạn nhận một phần ngày công chuẩn tương ứng số ngày lịch trong tháng.
-  let baseSalaryEquivalent = 0;
-  let grossSalary = 0;
-  const salaryBreakdown = normalizedSegments.map((segment) => {
-    const calendarDays = diffDaysInclusive(segment.start, segment.end);
-    const standardDaysEquivalent = workDaysStandard * (calendarDays / monthCalendarDays);
+  // 7. Additions & Deductions
+  const overtimeAmount = Math.round((totalOvertimeMinutes / 60) * hourlyRate * otRateMultiplier);
+  const latePenaltyAmount = Math.round(totalLateMinutes * latePenaltyPerMin);
+  const earlyLeavePenaltyAmount = Math.round(totalEarlyMinutes * earlyPenaltyPerMin);
+  const unpaidLeaveDeduction = Math.round(unpaidLeaveDays * dailyRate);
+  const absenceDeduction = Math.round(absentDays * dailyRate);
 
-    let segmentUnpaidDays = 0;
-    let current = segment.start;
-    while (current <= segment.end) {
-      if (unpaidLeaveDates.has(formatSqlDate(current))) segmentUnpaidDays++;
-      current = addDays(current, 1);
+  const grossSalary = effectiveBaseSalary + overtimeAmount;
+  const deductions = unpaidLeaveDeduction + absenceDeduction + latePenaltyAmount + earlyLeavePenaltyAmount;
+  const netSalary = Math.max(0, grossSalary - deductions);
+
+  // 8. Calculation Details JSON
+  const calculation_details = {
+    formula: "net_salary = base_salary + overtime_amount - unpaid_leave_deduction - absence_deduction - late_penalty - early_leave_penalty",
+    base_rates: {
+      effective_base_salary: effectiveBaseSalary,
+      standard_working_days: workDaysStandard,
+      daily_rate: Math.round(dailyRate),
+      hourly_rate: Math.round(hourlyRate),
+      minute_rate: Math.round(minuteRate)
+    },
+    leaves: {
+      paid_leave_days: paidLeaveDays,
+      unpaid_leave_days: unpaidLeaveDays,
+      unpaid_leave_deduction: unpaidLeaveDeduction
+    },
+    attendance: {
+      work_days_actual: workDaysActual,
+      absent_days: absentDays,
+      absence_deduction: absenceDeduction
+    },
+    penalties: {
+      late_minutes: totalLateMinutes,
+      late_penalty_amount: latePenaltyAmount,
+      early_leave_minutes: totalEarlyMinutes,
+      early_leave_penalty_amount: earlyLeavePenaltyAmount
+    },
+    additions: {
+      overtime_minutes: totalOvertimeMinutes,
+      overtime_multiplier: otRateMultiplier,
+      overtime_amount: overtimeAmount
+    },
+    summary: {
+      gross_salary: grossSalary,
+      total_deductions: deductions,
+      net_salary: netSalary
     }
-
-    const paidDaysEquivalent = Math.max(0, standardDaysEquivalent - segmentUnpaidDays);
-    const segmentBaseEquivalent = segment.salary_at_time * (standardDaysEquivalent / workDaysStandard);
-    const segmentGross = segment.salary_at_time * (paidDaysEquivalent / workDaysStandard);
-
-    baseSalaryEquivalent += segmentBaseEquivalent;
-    grossSalary += segmentGross;
-
-    return {
-      position_id: segment.position_id,
-      position_name: segment.position_name,
-      start_date: formatSqlDate(segment.start),
-      end_date: formatSqlDate(segment.end),
-      calendar_days: calendarDays,
-      standard_days_equivalent: Number(standardDaysEquivalent.toFixed(2)),
-      unpaid_leave_days: segmentUnpaidDays,
-      paid_days_equivalent: Number(paidDaysEquivalent.toFixed(2)),
-      salary_at_time: segment.salary_at_time,
-      gross_salary: Math.round(segmentGross),
-      is_fallback: segment.is_fallback
-    };
-  });
-
-  const workDaysActual = Math.max(0, workDaysStandard - unpaidLeaveDays);
-  const baseSalary = Math.round(baseSalaryEquivalent);
-  const grossSalaryRounded = Math.round(grossSalary);
-  const bonusAdjustment = await SalaryBonus.findByPeriod(employeeId, month, year);
-  const bonusAmount = Number(bonusAdjustment?.amount || 0);
-  const notes = salaryBreakdown.length > 1
-    ? `Lương tháng được phân bổ theo ${salaryBreakdown.length} giai đoạn chức vụ: ${salaryBreakdown.map((segment) => `${segment.start_date} đến ${segment.end_date} - ${segment.position_name} (${formatCurrency(segment.salary_at_time)}đ)`).join('; ')}.`
-    : (unpaidLeaveDays > 0 ? `Phát sinh ${unpaidLeaveDays} ngày nghỉ không lương trong tháng.` : null);
+  };
 
   return {
     employee_id: employeeId,
@@ -192,17 +195,29 @@ async function calculateSalary(employeeId, month, year) {
     year: parseInt(year),
     work_days_standard: workDaysStandard,
     work_days_actual: workDaysActual,
+    paid_leave_days: paidLeaveDays,
     unpaid_leave_days: unpaidLeaveDays,
-    base_salary: baseSalary,
-    gross_salary: grossSalaryRounded,
-    bonus: bonusAmount,
-    bonus_reason: bonusAdjustment?.reason || null,
-    deductions: 0,
-    net_salary: grossSalaryRounded + bonusAmount,
+    absent_days: absentDays,
+    total_late_minutes: totalLateMinutes,
+    total_early_leave_minutes: totalEarlyMinutes,
+    total_overtime_minutes: totalOvertimeMinutes,
+    overtime_amount: overtimeAmount,
+    late_penalty_amount: latePenaltyAmount,
+    early_leave_penalty_amount: earlyLeavePenaltyAmount,
+    daily_rate: Math.round(dailyRate),
+    hourly_rate: Math.round(hourlyRate),
+    minute_rate: Math.round(minuteRate),
+    unpaid_leave_deduction: unpaidLeaveDeduction,
+    absence_deduction: absenceDeduction,
+    other_deduction_amount: 0,
+    calculation_details: calculation_details,
+    base_salary: effectiveBaseSalary,
+    gross_salary: grossSalary,
+    deductions: deductions,
+    net_salary: netSalary,
     notes: resignationDate && resignationDate <= fullMonthEnd
-      ? `${notes ? `${notes} ` : ''}Hệ thống chỉ tính lương đến hết ngày ${formatSqlDate(resignationDate)} do nhân sự nghỉ việc từ thời điểm này.`
-      : notes,
-    salary_breakdown: salaryBreakdown
+      ? `Tính lương đến hết ngày ${formatSqlDate(resignationDate)} (nghỉ việc)`
+      : null
   };
 }
 
@@ -211,11 +226,7 @@ async function calculateSalary(employeeId, month, year) {
  */
 async function calculateAllSalaries(month, year) {
   await syncApprovedResignations();
-
-  const [employees] = await pool.query(
-    "SELECT employee_id FROM employees WHERE status = 'active'"
-  );
-
+  const [employees] = await pool.query("SELECT employee_id FROM employees WHERE status = 'active'");
   const results = [];
   for (const emp of employees) {
     try {

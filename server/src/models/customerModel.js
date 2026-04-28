@@ -1,8 +1,24 @@
 const { pool } = require('../config/db');
 
+const CUSTOMER_SAFE_FIELDS = `
+  c.customer_id,
+  c.full_name,
+  c.phone,
+  c.email,
+  c.address,
+  c.gender,
+  c.date_of_birth,
+  c.membership_tier,
+  c.total_points,
+  c.total_spent,
+  c.created_at,
+  c.updated_at,
+  c.deleted_at
+`;
+
 const Customer = {
   findAll: async ({ page = 1, limit = 10, search, membership_tier }) => {
-    let query = `SELECT c.*,
+    let query = `SELECT ${CUSTOMER_SAFE_FIELDS},
                    (c.password_hash IS NOT NULL) as has_account,
                    COALESCE(oc.order_count, 0) as order_count
                  FROM customers c
@@ -42,7 +58,7 @@ const Customer = {
 
   findById: async (id) => {
     const [rows] = await pool.query(
-      `SELECT c.*, (c.password_hash IS NOT NULL) as has_account
+      `SELECT ${CUSTOMER_SAFE_FIELDS}, (c.password_hash IS NOT NULL) as has_account
        FROM customers c WHERE c.customer_id = ? AND c.deleted_at IS NULL`, [id]
     );
     return rows[0];
@@ -51,7 +67,7 @@ const Customer = {
   // Get full customer profile with recent orders (for admin detail view)
   findByIdWithOrders: async (id) => {
     const [custRows] = await pool.query(
-      `SELECT c.*,
+      `SELECT ${CUSTOMER_SAFE_FIELDS},
               (c.password_hash IS NOT NULL) as has_account,
               COALESCE(oc.order_count, 0) as order_count
        FROM customers c
@@ -94,7 +110,11 @@ const Customer = {
   },
 
   findByPhone: async (phone) => {
-    const [rows] = await pool.query('SELECT * FROM customers WHERE phone = ?', [phone]);
+    const [rows] = await pool.query(
+      `SELECT ${CUSTOMER_SAFE_FIELDS}, (password_hash IS NOT NULL) as has_account
+       FROM customers WHERE phone = ?`,
+      [phone]
+    );
     return rows[0];
   },
 

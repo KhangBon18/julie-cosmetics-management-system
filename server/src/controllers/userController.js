@@ -97,6 +97,49 @@ const userController = {
     } catch (error) { next(error); }
   },
 
+  // GET /api/users/:id/permissions
+  getPermissions: async (req, res, next) => {
+    try {
+      const targetId = Number(req.params.id);
+      const user = await User.findById(targetId);
+      if (!user) return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
+
+      const details = await Role.getUserPermissionDetails(targetId);
+      res.json({
+        user_id: targetId,
+        role_id: user.role_id,
+        role_name: user.role_name || user.role,
+        ...details,
+      });
+    } catch (error) { next(error); }
+  },
+
+  // PUT /api/users/:id/permissions
+  setPermissions: async (req, res, next) => {
+    try {
+      const targetId = Number(req.params.id);
+      const { permission_ids } = req.body;
+
+      if (!Array.isArray(permission_ids)) {
+        return res.status(400).json({ message: 'permission_ids phải là array' });
+      }
+
+      const details = await Role.setUserEffectivePermissions(targetId, permission_ids);
+      clearPermissionCache(targetId);
+
+      res.json({
+        message: 'Cập nhật quyền riêng của tài khoản thành công',
+        user_id: targetId,
+        ...details,
+      });
+    } catch (error) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
+      }
+      next(error);
+    }
+  },
+
   // POST /api/users (admin tạo tài khoản)
   create: async (req, res, next) => {
     try {

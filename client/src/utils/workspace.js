@@ -17,17 +17,17 @@ const WORKSPACE_CONFIG = {
   },
   warehouse: {
     key: 'warehouse',
-    title: 'Khu Kho',
-    subtitle: 'Quản lý sản phẩm, nhập kho, nhà cung cấp và tồn kho',
+    title: 'Khu Quản lý Kho',
+    subtitle: 'Quản lý sản phẩm, nhà cung cấp, phiếu nhập và báo cáo tồn kho',
     defaultBasePath: '/warehouse',
-    homePath: '/warehouse/imports'
+    homePath: '/warehouse'
   },
   business: {
     key: 'business',
-    title: 'Khu Kinh doanh',
-    subtitle: 'Bán hàng, khách hàng, doanh thu và lợi nhuận',
+    title: 'Khu Kinh doanh Nội bộ',
+    subtitle: 'Lập hóa đơn, quản lý khách hàng, doanh thu, xuất hàng và lợi nhuận',
     defaultBasePath: '/business',
-    homePath: '/business/invoices'
+    homePath: '/business'
   },
   staff: {
     key: 'staff',
@@ -52,7 +52,7 @@ const ROLE_WORKSPACE_MAP = {
 
 const WORKSPACE_PERMISSION_PREFIXES = {
   admin: ['users.', 'roles.', 'settings.'],
-  hr: ['employees.', 'positions.', 'leaves.', 'salaries.'],
+  hr: ['employees.', 'positions.', 'leaves.', 'attendances.', 'salaries.'],
   warehouse: ['products.', 'brands.', 'categories.', 'suppliers.', 'imports.'],
   business: ['invoices.', 'customers.', 'reviews.'],
   staff: []

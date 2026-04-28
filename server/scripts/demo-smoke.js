@@ -28,7 +28,10 @@ const DEMO_FLOWS = [
       ['/api/employees?page=1&limit=1', 'Danh sách nhân sự'],
       ['/api/leaves?page=1&limit=1', 'Duyệt nghỉ phép'],
       [`/api/salaries/bonuses?month=${currentMonth}&year=${currentYear}`, 'Thưởng kỳ lương hiện tại'],
-      ['/api/reports/hr?year=2026', 'Báo cáo nhân sự']
+      ['/api/reports/hr?year=2026', 'Báo cáo nhân sự'],
+      ['/api/payments?page=1&limit=1', 'Giao dịch thanh toán'],
+      ['/api/shipping?page=1&limit=1', 'Đơn giao hàng'],
+      ['/api/returns?page=1&limit=1', 'Yêu cầu đổi trả']
     ],
     deniedChecks: [
       ['/api/products?page=1&limit=1', 'Không được truy cập khu kho nếu chưa được cấp quyền'],
@@ -47,7 +50,10 @@ const DEMO_FLOWS = [
     ],
     deniedChecks: [
       ['/api/invoices?page=1&limit=1', 'Không được truy cập khu bán hàng nội bộ'],
-      ['/api/customers?page=1&limit=1', 'Không được truy cập dữ liệu khách hàng nội bộ']
+      ['/api/customers?page=1&limit=1', 'Không được truy cập dữ liệu khách hàng nội bộ'],
+      ['/api/payments?page=1&limit=1', 'Không được truy cập giao dịch thanh toán nội bộ'],
+      ['/api/shipping?page=1&limit=1', 'Không được truy cập đơn giao hàng nội bộ'],
+      ['/api/returns?page=1&limit=1', 'Không được truy cập yêu cầu đổi trả nội bộ']
     ]
   },
   {
@@ -58,7 +64,9 @@ const DEMO_FLOWS = [
       ['/api/invoices?page=1&limit=1', 'Danh sách hóa đơn'],
       ['/api/customers?page=1&limit=1', 'Danh sách khách hàng'],
       ['/api/products?page=1&limit=1', 'Danh sách sản phẩm để lập hóa đơn'],
-      [`/api/reports/revenue?group_by=month&year=${currentYear}`, 'Báo cáo kinh doanh']
+      [`/api/reports/revenue?group_by=month&year=${currentYear}`, 'Báo cáo kinh doanh'],
+      ['/api/shipping?page=1&limit=1', 'Theo dõi đơn giao hàng'],
+      ['/api/returns?page=1&limit=1', 'Yêu cầu đổi trả']
     ],
     deniedChecks: [
       ['/api/staff/profile', 'Không được truy cập hồ sơ self-service'],

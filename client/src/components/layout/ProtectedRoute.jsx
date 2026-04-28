@@ -39,7 +39,7 @@ export default function ProtectedRoute({ allowedRoles, permission, workspaceKeys
   // Permission-based check (new system)
   if (permission) {
     // Admin always passes
-    if (workspaceKey === 'admin') return children;
+    if (normalizedRole === 'admin') return children;
 
     const userPerms = new Set(user.permissions || []);
     if (userPerms.has(permission)) return children;

@@ -1,13 +1,16 @@
-import { Navigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import AdminOverview from './AdminOverview';
 import StaffDashboard from './staff/StaffDashboard';
 import ManagerDashboard from './hr/ManagerDashboard';
-import { getWorkspaceHomePath, resolveWorkspaceKey } from '../utils/workspace';
+import BusinessDashboard from './business/BusinessDashboard';
+import WarehouseDashboard from './warehouse/WarehouseDashboard';
+import { resolveWorkspaceKey } from '../utils/workspace';
 
 export default function HomePage() {
   const { user } = useAuth();
-  const workspaceKey = resolveWorkspaceKey(user);
+  const location = useLocation();
+  const workspaceKey = resolveWorkspaceKey(user, location.pathname);
 
   if (workspaceKey === 'admin') {
     return <AdminOverview />;
@@ -17,8 +20,12 @@ export default function HomePage() {
     return <ManagerDashboard />;
   }
 
-  if (workspaceKey === 'warehouse' || workspaceKey === 'business') {
-    return <Navigate to={getWorkspaceHomePath(user)} replace />;
+  if (workspaceKey === 'warehouse') {
+    return <WarehouseDashboard />;
+  }
+
+  if (workspaceKey === 'business') {
+    return <BusinessDashboard />;
   }
 
   return <StaffDashboard />;

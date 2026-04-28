@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import useAuth from '../../hooks/useAuth';
 import { FiMenu } from 'react-icons/fi';
 
-export default function TopHeader({ title, subtitle, toggleSidebar }) {
+export default function TopHeader({ title, subtitle, workspace, toggleSidebar }) {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const ref = useRef();
@@ -24,6 +24,13 @@ export default function TopHeader({ title, subtitle, toggleSidebar }) {
     warehouse: 'Thủ kho'
   };
   const effectiveRole = user?.role_name || user?.role;
+  const workspaceLabels = {
+    admin: 'ADMIN',
+    hr: 'HR',
+    warehouse: 'KHO',
+    business: 'KINH DOANH',
+    staff: 'NHÂN VIÊN'
+  };
 
   return (
     <header className="top-header">
@@ -32,7 +39,14 @@ export default function TopHeader({ title, subtitle, toggleSidebar }) {
           <FiMenu />
         </button>
         <div>
-          <h2>{title}</h2>
+          <div className="top-header-title-row">
+            <h2>{title}</h2>
+            {workspace?.key ? (
+              <span className={`workspace-badge workspace-badge-${workspace.key}`}>
+                {workspaceLabels[workspace.key] || workspace.key}
+              </span>
+            ) : null}
+          </div>
           {subtitle ? <div className="top-header-subtitle">{subtitle}</div> : null}
         </div>
       </div>

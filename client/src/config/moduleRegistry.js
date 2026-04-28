@@ -10,7 +10,7 @@
 import {
   FiHome, FiUsers, FiPackage, FiShoppingBag, FiTruck,
   FiFileText, FiDollarSign, FiCalendar, FiStar, FiSettings, FiUser,
-  FiTag, FiGrid, FiUserCheck, FiClipboard, FiShield, FiBarChart2
+  FiTag, FiGrid, FiUserCheck, FiClipboard, FiShield, FiBarChart2, FiClock
 } from 'react-icons/fi';
 import { rebaseInternalPath } from '../utils/workspace';
 
@@ -26,7 +26,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
-    workspaceKeys: ['admin', 'hr', 'staff'],
+    workspaceKeys: ['admin', 'hr', 'warehouse', 'business', 'staff'],
   },
 
   // ─── Cá nhân ───
@@ -69,6 +69,19 @@ const MODULES = [
     allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
+  {
+    key: 'my_attendance',
+    name: 'Chấm công của tôi',
+    section: 'Cá nhân',
+    path: '/admin/my-attendance',
+    icon: FiClock,
+    sortOrder: 4,
+    showInSidebar: true,
+    actions: [],
+    isPublic: true,
+    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
+  },
 
   // ─── Bán hàng ───
   {
@@ -102,6 +115,50 @@ const MODULES = [
     sortOrder: 12,
     showInSidebar: true,
     actions: ['read', 'update', 'delete'],
+    workspaceKeys: ['admin', 'business'],
+  },
+  {
+    key: 'promotions',
+    name: 'Khuyến mãi',
+    section: 'Bán hàng',
+    path: '/admin/promotions',
+    icon: FiTag,
+    sortOrder: 13,
+    showInSidebar: false,
+    actions: ['read', 'create', 'update', 'delete'],
+    workspaceKeys: ['admin', 'business'],
+  },
+  {
+    key: 'payments',
+    name: 'Thanh toán',
+    section: 'Bán hàng',
+    path: '/admin/payments',
+    icon: FiDollarSign,
+    sortOrder: 14,
+    showInSidebar: false,
+    actions: ['read', 'update'],
+    workspaceKeys: ['admin', 'business'],
+  },
+  {
+    key: 'shipping',
+    name: 'Vận chuyển',
+    section: 'Bán hàng',
+    path: '/admin/shipping',
+    icon: FiTruck,
+    sortOrder: 15,
+    showInSidebar: false,
+    actions: ['read', 'update'],
+    workspaceKeys: ['admin', 'business'],
+  },
+  {
+    key: 'returns',
+    name: 'Đổi trả',
+    section: 'Bán hàng',
+    path: '/admin/returns',
+    icon: FiClipboard,
+    sortOrder: 16,
+    showInSidebar: false,
+    actions: ['read', 'create', 'update'],
     workspaceKeys: ['admin', 'business'],
   },
 
@@ -197,12 +254,23 @@ const MODULES = [
     workspaceKeys: ['admin', 'hr'],
   },
   {
+    key: 'attendances',
+    name: 'Chấm công',
+    section: 'Nhân sự',
+    path: '/admin/attendances',
+    icon: FiClock,
+    sortOrder: 33,
+    showInSidebar: true,
+    actions: ['read', 'create', 'update', 'delete', 'export'],
+    workspaceKeys: ['admin', 'hr'],
+  },
+  {
     key: 'salaries',
     name: 'Tính lương',
     section: 'Nhân sự',
     path: '/admin/salaries',
     icon: FiDollarSign,
-    sortOrder: 33,
+    sortOrder: 34,
     showInSidebar: true,
     actions: ['read', 'create', 'update', 'delete', 'export'],
     workspaceKeys: ['admin', 'hr'],
@@ -281,8 +349,7 @@ export const buildSidebarSections = (userPermissions = [], userRole = '', basePa
 
   for (const mod of MODULES) {
     if (!mod.showInSidebar) continue;
-    const mustStayInWorkspace = mod.isPublic || mod.systemOnly;
-    if (mustStayInWorkspace && mod.workspaceKeys?.length && !mod.workspaceKeys.includes(workspaceKey)) continue;
+    if (mod.workspaceKeys?.length && !mod.workspaceKeys.includes(workspaceKey)) continue;
     if (mod.allowedRoles?.length && !mod.allowedRoles.includes(normalizedRole)) continue;
 
     // Hide 'Cá nhân' section for admin accounts
