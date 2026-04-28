@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiEdit2, FiLock, FiPlus, FiToggleLeft, FiToggleRight, FiTrash2 } from 'react-icons/fi';
+import { FiEdit2, FiLock, FiPlus, FiShield, FiToggleLeft, FiToggleRight, FiTrash2 } from 'react-icons/fi';
 import { employeeService, userService } from '../services/dataService';
 import { toast } from 'react-toastify';
 import usePermission from '../hooks/usePermission';
 import useAuth from '../hooks/useAuth';
 import roleService from '../services/roleService';
+import PermissionMatrix from '../components/PermissionMatrix';
 
 const roleBadge = { admin: 'badge-danger', manager: 'badge-purple', sales: 'badge-primary', staff: 'badge-info', staff_portal: 'badge-info', warehouse: 'badge-warning' };
 
 const emptyResetModal = { open: false, userId: null, newPassword: '' };
+const emptyPermissionModal = {
+  open: false,
+  user: null,
+  selectedIds: [],
+  inheritedIds: [],
+  grantedIds: [],
+  deniedIds: [],
+  loading: false,
+  saving: false
+};
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -17,8 +28,10 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [resetModal, setResetModal] = useState(emptyResetModal);
+  const [permissionModal, setPermissionModal] = useState(emptyPermissionModal);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState({});
+  const [allPermissions, setAllPermissions] = useState([]);
 
   const { user: currentUser, refreshUser } = useAuth();
   const { canCreate, canUpdate, canDelete } = usePermission();
@@ -41,6 +54,14 @@ export default function UsersPage() {
     } catch (error) {
       toast.error(error.message);
     }
+  };
+
+  const loadAllPermissions = async () => {
+    if (allPermissions.length) return allPermissions;
+    const permissionData = await roleService.getAllPermissions();
+    const permissions = permissionData.permissions || [];
+    setAllPermissions(permissions);
+    return permissions;
   };
 
   const employeeOptions = useMemo(
@@ -146,6 +167,60 @@ export default function UsersPage() {
     }
   };
 
+  const openPermissions = async (targetUser) => {
+    setPermissionModal({
+      ...emptyPermissionModal,
+      open: true,
+      user: targetUser,
+      loading: true
+    });
+
+    try {
+      const [permissions, userPermissions] = await Promise.all([
+        loadAllPermissions(),
+        userService.getPermissions(targetUser.user_id)
+      ]);
+
+      setAllPermissions(permissions);
+      setPermissionModal({
+        open: true,
+        user: targetUser,
+        selectedIds: userPermissions.effective_permission_ids || [],
+        inheritedIds: userPermissions.inherited_permission_ids || [],
+        grantedIds: userPermissions.granted_permission_ids || [],
+        deniedIds: userPermissions.denied_permission_ids || [],
+        loading: false,
+        saving: false
+      });
+    } catch (error) {
+      toast.error(error.message || 'Lỗi khi tải quyền tài khoản');
+      setPermissionModal(emptyPermissionModal);
+    }
+  };
+
+  const savePermissions = async () => {
+    if (!permissionModal.user) return;
+
+    setPermissionModal(current => ({ ...current, saving: true }));
+    try {
+      await userService.updatePermissions(permissionModal.user.user_id, {
+        permission_ids: permissionModal.selectedIds
+      });
+      localStorage.setItem('rbac_permissions_version', String(Date.now()));
+      toast.success('Cập nhật quyền riêng của tài khoản thành công');
+
+      if (currentUser?.user_id === permissionModal.user.user_id) {
+        await refreshUser();
+      }
+
+      setPermissionModal(emptyPermissionModal);
+      loadData();
+    } catch (error) {
+      toast.error(error.message || 'Lỗi khi lưu quyền tài khoản');
+      setPermissionModal(current => ({ ...current, saving: false }));
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -196,6 +271,7 @@ export default function UsersPage() {
                     <td>
                       <div style={{ display: 'flex', gap: 6 }}>
                         {_canUpdate ? <button type="button" className="btn btn-sm btn-outline" title="Sửa tài khoản" onClick={() => openEdit(user)}><FiEdit2 /></button> : null}
+                        {_canUpdate ? <button type="button" className="btn btn-sm btn-outline" title="Phân quyền riêng" onClick={() => openPermissions(user)}><FiShield /></button> : null}
                         {_canUpdate ? <button type="button" className="btn btn-sm btn-outline" title="Reset mật khẩu" onClick={() => setResetModal({ open: true, userId: user.user_id, newPassword: '' })}><FiLock /></button> : null}
                         {_canUpdate ? <button type="button" className="btn btn-sm btn-outline" title={user.is_active ? 'Khóa' : 'Mở khóa'} onClick={() => toggleActive(user)}>{user.is_active ? <FiToggleRight /> : <FiToggleLeft />}</button> : null}
                         {_canDelete ? <button type="button" className="btn btn-sm btn-danger" title="Xóa tài khoản" onClick={() => setDeleteTarget(user)}><FiTrash2 /></button> : null}
@@ -288,6 +364,51 @@ export default function UsersPage() {
                   <button type="submit" className="btn btn-primary">Xác nhận</button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {permissionModal.open ? (
+        <div className="modal-overlay" onClick={() => !permissionModal.saving && setPermissionModal(emptyPermissionModal)}>
+          <div className="modal perm-modal" onClick={event => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3><FiShield style={{ color: 'var(--primary)', flexShrink: 0 }} /> Phân quyền tài khoản</h3>
+              <button className="modal-close" onClick={() => !permissionModal.saving && setPermissionModal(emptyPermissionModal)} disabled={permissionModal.saving}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: 14 }}>
+                <p className="form-section-label" style={{ marginBottom: 6 }}>
+                  {permissionModal.user?.username} · {permissionModal.user?.role_name || permissionModal.user?.role}
+                </p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
+                  Ma trận này là quyền hiệu lực cuối cùng của tài khoản. Quyền nhóm được chọn sẵn; tick thêm để cấp riêng, bỏ tick để chặn riêng cho tài khoản này.
+                </p>
+              </div>
+
+              {permissionModal.loading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Đang tải quyền...</div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                    <span className="badge badge-info">Nhóm: {permissionModal.inheritedIds.length}</span>
+                    <span className="badge badge-success">Cấp riêng: {permissionModal.grantedIds.length}</span>
+                    <span className="badge badge-warning">Chặn riêng: {permissionModal.deniedIds.length}</span>
+                  </div>
+                  <PermissionMatrix
+                    allPermissions={allPermissions}
+                    selectedIds={permissionModal.selectedIds}
+                    onChange={(nextIds) => setPermissionModal(current => ({ ...current, selectedIds: nextIds }))}
+                  />
+                </>
+              )}
+
+              <div className="form-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setPermissionModal(emptyPermissionModal)} disabled={permissionModal.saving}>Hủy</button>
+                <button type="button" className="btn btn-primary" onClick={savePermissions} disabled={permissionModal.loading || permissionModal.saving}>
+                  {permissionModal.saving ? 'Đang lưu...' : 'Lưu phân quyền'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

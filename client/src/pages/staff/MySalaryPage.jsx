@@ -1,175 +1,51 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import staffService from '../../services/staffService';
 
-const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
-const normalizeNote = (value) => String(value || '').trim();
-const openPrintWindow = (title) => {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    throw new Error('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup để tiếp tục.');
-  }
-  printWindow.document.title = title;
-  return printWindow;
+const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0));
+
+const STATUS_LABELS = {
+  draft: { label: 'Nháp', color: '#64748b', bg: '#f1f5f9' },
+  approved: { label: 'Đã duyệt', color: '#8b5cf6', bg: '#f3e8ff' },
+  paid: { label: 'Đã thanh toán', color: '#059669', bg: '#d1fae5' },
+  locked: { label: 'Đã khóa', color: '#dc2626', bg: '#fee2e2' },
 };
-const getSupplementalNotes = (salary) => {
-  const notes = [];
-  const mainNote = normalizeNote(salary.notes);
-  const bonusReason = normalizeNote(salary.bonus_reason);
 
-  if (mainNote) notes.push({ text: mainNote, tone: 'default' });
-  if (bonusReason && bonusReason !== mainNote) {
-    notes.push({ text: `Thưởng: ${bonusReason}`, tone: 'bonus' });
-  }
-
-  return notes;
+const Badge = ({ status }) => {
+  const s = STATUS_LABELS[status] || STATUS_LABELS.draft;
+  return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600, color: s.color, background: s.bg }}>{s.label}</span>;
 };
 
 export default function MySalaryPage() {
   const [salaries, setSalaries] = useState([]);
   const [formula, setFormula] = useState(null);
-  const [year, setYear] = useState('2026');
+  const [year, setYear] = useState(String(new Date().getFullYear()));
   const [loading, setLoading] = useState(true);
   const [showFormula, setShowFormula] = useState(false);
-  const printRef = useRef();
+  const [detailSalary, setDetailSalary] = useState(null);
 
   useEffect(() => { loadData(); }, [year]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [salaryData, formulaData] = await Promise.all([
         staffService.getMySalaries({ year: year || undefined }),
         staffService.getSalaryFormula()
       ]);
-      setSalaries(salaryData.salaries || []);
+      const sals = salaryData.salaries || [];
+      sals.forEach(s => {
+        if (typeof s.calculation_details === 'string') {
+          try { s.calculation_details = JSON.parse(s.calculation_details); } catch(e){}
+        }
+      });
+      setSalaries(sals);
       setFormula(formulaData);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { toast.error(err.message); }
+    finally { setLoading(false); }
   };
 
   const totalNet = salaries.reduce((s, r) => s + parseFloat(r.net_salary || 0), 0);
-
-  const handlePrint = () => {
-    const content = printRef.current;
-    if (!content) return;
-    try {
-      const printWindow = openPrintWindow('Bảng lương - Julie Cosmetics');
-      printWindow.document.write(`
-      <html>
-      <head>
-        <title>Bảng lương - Julie Cosmetics</title>
-        <style>
-          body { font-family: 'Segoe UI', sans-serif; padding: 30px; color: #1e293b; }
-          h1 { text-align: center; color: #6366f1; margin-bottom: 4px; }
-          h2 { text-align: center; color: #64748b; font-weight: 400; margin-top: 0; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; font-size: 13px; }
-          th { background: #f1f5f9; font-weight: 600; text-align: center; }
-          td:first-child { text-align: center; }
-          .total-row { background: #eff6ff; font-weight: 700; }
-          .note { display:block; margin-top:4px; font-size:11px; color:#64748b; text-align:left; }
-          .note.bonus { color:#059669; }
-          .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <h1>💄 JULIE COSMETICS</h1>
-        <h2>BẢNG LƯƠNG NĂM ${year}</h2>
-        <p><strong>Nhân viên:</strong> ${salaries[0]?.employee_name || '—'}</p>
-        <table>
-          <thead>
-            <tr><th>Tháng</th><th>Ngày công</th><th>Lương CB</th><th>Lương thực</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th></tr>
-          </thead>
-          <tbody>
-            ${salaries.map(s => `
-              <tr>
-                <td>
-                  ${s.month}/${s.year}
-                  ${getSupplementalNotes(s).map(note => `<span class="note${note.tone === 'bonus' ? ' bonus' : ''}">${note.text}</span>`).join('')}
-                </td>
-                <td>${s.work_days_actual}/${s.work_days_standard}</td>
-                <td>${fmt(s.base_salary)}đ</td>
-                <td>${fmt(s.gross_salary)}đ</td>
-                <td>${s.bonus > 0 ? '+' + fmt(s.bonus) + 'đ' : '—'}</td>
-                <td>${s.deductions > 0 ? '-' + fmt(s.deductions) + 'đ' : '—'}</td>
-                <td style="font-weight:bold;color:#2563eb">${fmt(s.net_salary)}đ</td>
-              </tr>
-            `).join('')}
-            <tr class="total-row">
-              <td colspan="6" style="text-align:right">TỔNG CỘNG NĂM ${year}:</td>
-              <td style="color:#059669">${fmt(totalNet)}đ</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="footer">
-          <p>Xuất bởi hệ thống Julie Cosmetics — ${new Date().toLocaleString('vi-VN')}</p>
-        </div>
-      </body>
-      </html>
-    `);
-      printWindow.document.close();
-      printWindow.print();
-    } catch (error) {
-      toast.error(error.message || 'Không thể mở cửa sổ in bảng lương năm.');
-    }
-  };
-
-  const handlePrintMonth = (salary) => {
-    try {
-      const printWindow = openPrintWindow(`Phiếu lương tháng ${salary.month}/${salary.year}`);
-      printWindow.document.write(`
-      <html>
-      <head>
-        <title>Phiếu lương tháng ${salary.month}/${salary.year}</title>
-        <style>
-          body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1e293b; max-width: 600px; margin: auto; }
-          h1 { text-align: center; color: #6366f1; margin-bottom: 4px; }
-          h2 { text-align: center; color: #64748b; font-weight: 400; margin-top: 0; }
-          .info { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
-          .info:last-child { border-bottom: none; }
-          .label { color: #64748b; }
-          .value { font-weight: 600; }
-          .total { font-size: 20px; color: #2563eb; text-align: center; margin-top: 24px; padding: 16px; background: #eff6ff; border-radius: 8px; }
-          .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 12px; }
-          .section { margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 8px; }
-        </style>
-      </head>
-      <body>
-        <h1>💄 JULIE COSMETICS</h1>
-        <h2>PHIẾU LƯƠNG THÁNG ${salary.month}/${salary.year}</h2>
-        <div class="section">
-          <div class="info"><span class="label">Nhân viên:</span><span class="value">${salary.employee_name}</span></div>
-          <div class="info"><span class="label">Ngày công chuẩn:</span><span class="value">${salary.work_days_standard} ngày</span></div>
-          <div class="info"><span class="label">Ngày công thực tế:</span><span class="value">${salary.work_days_actual} ngày</span></div>
-          <div class="info"><span class="label">Ngày nghỉ không lương:</span><span class="value">${salary.unpaid_leave_days} ngày</span></div>
-        </div>
-        <div class="section">
-          <div class="info"><span class="label">Lương cơ bản:</span><span class="value">${fmt(salary.base_salary)}đ</span></div>
-          <div class="info"><span class="label">Lương thực tế:</span><span class="value">${fmt(salary.gross_salary)}đ</span></div>
-          <div class="info"><span class="label">Thưởng:</span><span class="value" style="color:#059669">${salary.bonus > 0 ? '+' + fmt(salary.bonus) + 'đ' : '—'}</span></div>
-          ${normalizeNote(salary.bonus_reason) && normalizeNote(salary.bonus_reason) !== normalizeNote(salary.notes) ? `<div class="info"><span class="label">Lý do thưởng:</span><span class="value">${salary.bonus_reason}</span></div>` : ''}
-          <div class="info"><span class="label">Khấu trừ:</span><span class="value" style="color:#ef4444">${salary.deductions > 0 ? '-' + fmt(salary.deductions) + 'đ' : '—'}</span></div>
-        </div>
-        <div class="total">
-          <div style="font-size:14px;color:#64748b;margin-bottom:4px">THỰC NHẬN</div>
-          <strong>${fmt(salary.net_salary)}đ</strong>
-        </div>
-        ${getSupplementalNotes(salary).length ? `<div style="margin-top:16px;color:#64748b">${getSupplementalNotes(salary).map(note => `<p style="margin:6px 0;color:${note.tone === 'bonus' ? '#059669' : '#64748b'}"><em>${note.text}</em></p>`).join('')}</div>` : ''}
-        <div class="footer">
-          <p>Xuất bởi hệ thống Julie Cosmetics — ${new Date().toLocaleString('vi-VN')}</p>
-        </div>
-      </body>
-      </html>
-    `);
-      printWindow.document.close();
-      printWindow.print();
-    } catch (error) {
-      toast.error(error.message || 'Không thể mở cửa sổ in phiếu lương tháng.');
-    }
-  };
 
   if (loading) return <div className="loading-container"><div className="spinner" /></div>;
 
@@ -178,30 +54,20 @@ export default function MySalaryPage() {
       <div className="page-header">
         <div>
           <h1>Bảng lương cá nhân</h1>
-          <p>Xem và in bảng lương của bạn</p>
+          <p>Xem phiếu lương và chi tiết tính toán</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-outline" onClick={() => setShowFormula(!showFormula)}>
             📐 {showFormula ? 'Ẩn công thức' : 'Cách tính lương'}
           </button>
-          <button className="btn btn-primary" onClick={handlePrint}>🖨️ In bảng lương năm</button>
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #0ea5e9', background: '#eff6ff' }}>
-        <div className="card-body" style={{ color: '#0f172a' }}>
-          Khi in phiếu lương hoặc bảng lương năm, hãy cho phép <strong>popup / pop-up windows</strong> cho trình duyệt. Nếu popup bị chặn, hệ thống sẽ báo lỗi mềm để bạn thử lại.
-        </div>
-      </div>
-
-      {/* Công thức tính lương */}
       {showFormula && formula && (
         <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid #f59e0b' }}>
           <div className="card-header"><h3>📐 Công thức tính lương</h3></div>
           <div className="card-body">
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#6366f1', marginBottom: 12, fontFamily: 'monospace' }}>
-              {formula.formula}
-            </div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#6366f1', marginBottom: 12, fontFamily: 'monospace' }}>{formula.formula}</div>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
               {formula.details.map((d, i) => <li key={i} style={{ padding: '4px 0', color: '#475569' }}>{d}</li>)}
             </ul>
@@ -209,15 +75,12 @@ export default function MySalaryPage() {
         </div>
       )}
 
-      {/* Filter */}
       <div className="card">
         <div className="card-body">
           <div className="toolbar">
             <select className="form-control" style={{ width: 120 }} value={year} onChange={e => setYear(e.target.value)}>
               <option value="">Tất cả năm</option>
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
+              {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
             <span style={{ color: '#64748b', fontSize: 14 }}>
               Tổng thực nhận: <strong style={{ color: '#2563eb' }}>{fmt(totalNet)}đ</strong>
@@ -225,43 +88,172 @@ export default function MySalaryPage() {
           </div>
         </div>
 
-        <div className="table-container" ref={printRef}>
+        <div className="table-container">
           <table>
             <thead>
-              <tr><th>Tháng</th><th>Ngày công</th><th>Lương CB</th><th>Lương thực</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th><th>Thao tác</th></tr>
+              <tr>
+                <th>Tháng</th><th>Ngày công</th><th>NP có lương</th><th>NP k.lương</th>
+                <th>Trễ</th><th>OT</th><th>Lương CB</th><th>Gross</th>
+                <th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th><th>TT</th><th></th>
+              </tr>
             </thead>
             <tbody>
               {salaries.map(s => (
                 <tr key={s.salary_id}>
-                  <td style={{ fontWeight: 600 }}>
-                    <div>{s.month}/{s.year}</div>
-                    {getSupplementalNotes(s).map(note => (
-                      <div
-                        key={`${s.salary_id}-${note.tone}-${note.text}`}
-                        style={{ fontSize: 12, color: note.tone === 'bonus' ? '#059669' : '#64748b', fontWeight: 400, marginTop: 4 }}
-                      >
-                        {note.text}
-                      </div>
-                    ))}
-                  </td>
+                  <td style={{ fontWeight: 600 }}>{s.month}/{s.year}</td>
                   <td>{s.work_days_actual}/{s.work_days_standard}</td>
-                  <td>{fmt(s.base_salary)}đ</td>
-                  <td>{fmt(s.gross_salary)}đ</td>
-                  <td style={{ color: '#059669' }}>{s.bonus > 0 ? `+${fmt(s.bonus)}đ` : '—'}</td>
-                  <td style={{ color: '#ef4444' }}>{s.deductions > 0 ? `-${fmt(s.deductions)}đ` : '—'}</td>
+                  <td>{s.paid_leave_days || 0}</td>
+                  <td>{s.unpaid_leave_days || 0}</td>
+                  <td>{s.total_late_minutes || 0}ph</td>
+                  <td>{s.total_overtime_minutes || 0}ph</td>
+                  <td>{fmt(s.base_salary)}</td>
+                  <td>{fmt(s.gross_salary)}</td>
+                  <td style={{ color: '#059669' }}>{Number(s.bonus) > 0 ? `+${fmt(s.bonus)}` : '—'}</td>
+                  <td style={{ color: '#ef4444' }}>{Number(s.deductions) > 0 ? `-${fmt(s.deductions)}` : '—'}</td>
                   <td style={{ fontWeight: 700, color: '#2563eb' }}>{fmt(s.net_salary)}đ</td>
+                  <td><Badge status={s.status} /></td>
                   <td>
-                    <button className="btn btn-outline" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => handlePrintMonth(s)}>
-                      🖨️ In
-                    </button>
+                    <button className="btn btn-sm btn-outline" onClick={() => setDetailSalary(s)}>📋</button>
                   </td>
                 </tr>
               ))}
-              {!salaries.length && <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có bảng lương</td></tr>}
+              {!salaries.length && <tr><td colSpan={13} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Chưa có bảng lương</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Detail Modal */}
+      {detailSalary && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+             onClick={() => setDetailSalary(null)}>
+          <div style={{ background: '#fff', borderRadius: 16, width: '90%', maxWidth: 600, maxHeight: '90vh', overflow: 'auto', padding: 28 }}
+               onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ margin: 0 }}>Phiếu lương T{detailSalary.month}/{detailSalary.year}</h2>
+              <button className="btn btn-sm btn-outline" onClick={() => setDetailSalary(null)}>✕</button>
+            </div>
+
+            {detailSalary.calculation_details ? (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div style={{ background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ margin: '0 0 12px', color: '#334155' }}>Cơ sở tính toán</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Lương cơ bản hiệu lực:</span>
+                      <span style={{ fontWeight: 600 }}>{fmt(detailSalary.calculation_details.base_rates.effective_base_salary)}đ</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Công chuẩn:</span>
+                      <span style={{ fontWeight: 600 }}>{detailSalary.calculation_details.base_rates.standard_working_days} ngày</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Đơn giá ngày:</span>
+                      <span style={{ fontWeight: 600 }}>{fmt(detailSalary.calculation_details.base_rates.daily_rate)}đ/ngày</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Đơn giá giờ:</span>
+                      <span style={{ fontWeight: 600 }}>{fmt(detailSalary.calculation_details.base_rates.hourly_rate)}đ/giờ</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Công thực tế:</span>
+                      <span style={{ fontWeight: 600 }}>{detailSalary.calculation_details.attendance.work_days_actual} ngày</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ margin: '0 0 12px', color: '#334155' }}>Các khoản Cộng / Trừ</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Tăng ca ({detailSalary.calculation_details.additions.overtime_minutes}p × {detailSalary.calculation_details.additions.overtime_multiplier}):</span>
+                      <span style={{ fontWeight: 600, color: '#059669' }}>+{fmt(detailSalary.calculation_details.additions.overtime_amount)}đ</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Nghỉ không lương ({detailSalary.calculation_details.leaves.unpaid_leave_days} ngày):</span>
+                      <span style={{ fontWeight: 600, color: '#ef4444' }}>-{fmt(detailSalary.calculation_details.leaves.unpaid_leave_deduction)}đ</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Vắng không phép ({detailSalary.calculation_details.attendance.absent_days} ngày):</span>
+                      <span style={{ fontWeight: 600, color: '#ef4444' }}>-{fmt(detailSalary.calculation_details.attendance.absence_deduction)}đ</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Phạt trễ ({detailSalary.calculation_details.penalties.late_minutes} phút):</span>
+                      <span style={{ fontWeight: 600, color: '#ef4444' }}>-{fmt(detailSalary.calculation_details.penalties.late_penalty_amount)}đ</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                      <span style={{ color: '#64748b' }}>Phạt về sớm ({detailSalary.calculation_details.penalties.early_leave_minutes} phút):</span>
+                      <span style={{ fontWeight: 600, color: '#ef4444' }}>-{fmt(detailSalary.calculation_details.penalties.early_leave_penalty_amount)}đ</span>
+                    </div>
+                  </div>
+                </div>
+
+                {detailSalary.notes && (
+                  <div style={{ padding: 12, background: '#fffbeb', borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#92400e', border: '1px solid #fde68a' }}>
+                    📝 Ghi chú: {detailSalary.notes}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: 16, background: '#eff6ff', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+                  <div><div style={{ color: '#64748b', fontSize: 12 }}>GROSS (Base + OT)</div><div style={{ fontSize: 18, fontWeight: 700 }}>{fmt(detailSalary.calculation_details.summary.gross_salary)}đ</div></div>
+                  <div><div style={{ color: '#64748b', fontSize: 12 }}>THƯỞNG KHÁC</div><div style={{ fontSize: 18, fontWeight: 700, color: '#059669' }}>+{fmt(detailSalary.bonus)}đ</div></div>
+                  <div><div style={{ color: '#64748b', fontSize: 12 }}>TỔNG TRỪ</div><div style={{ fontSize: 18, fontWeight: 700, color: '#ef4444' }}>-{fmt(detailSalary.calculation_details.summary.total_deductions)}đ</div></div>
+                  <div><div style={{ color: '#64748b', fontSize: 12 }}>THỰC NHẬN</div><div style={{ fontSize: 22, fontWeight: 800, color: '#2563eb' }}>{fmt(detailSalary.net_salary)}đ</div></div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+                {[
+                  ['Trạng thái', <Badge key="s" status={detailSalary.status} />],
+                  ['Lương cơ bản', `${fmt(detailSalary.base_salary)}đ`],
+                  ['Ngày công chuẩn', `${detailSalary.work_days_standard} ngày`],
+                  ['Ngày công thực tế', `${detailSalary.work_days_actual} ngày`],
+                  ['Nghỉ có lương', `${detailSalary.paid_leave_days || 0} ngày`],
+                  ['Nghỉ không lương', `${detailSalary.unpaid_leave_days || 0} ngày`],
+                  ['Vắng', `${detailSalary.absent_days || 0} ngày`],
+                  ['Đi trễ', `${detailSalary.total_late_minutes || 0} phút`],
+                  ['Về sớm', `${detailSalary.total_early_leave_minutes || 0} phút`],
+                  ['Tăng ca', `${detailSalary.total_overtime_minutes || 0} phút`],
+                  ['Tiền tăng ca', `${fmt(detailSalary.overtime_amount)}đ`],
+                  ['Phụ cấp', `${fmt(detailSalary.allowance_amount)}đ`],
+                  ['Phạt đi trễ', `${fmt(detailSalary.late_penalty_amount)}đ`],
+                  ['Phạt về sớm', `${fmt(detailSalary.early_leave_penalty_amount)}đ`],
+                ].map(([label, value], i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                    <span style={{ color: '#64748b' }}>{label}</span>
+                    <span style={{ fontWeight: 600 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!detailSalary.calculation_details && (
+              <div style={{ display: 'flex', justifyContent: 'space-around', padding: 16, background: '#eff6ff', borderRadius: 12 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ color: '#64748b', fontSize: 12 }}>GROSS</div>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>{fmt(detailSalary.gross_salary)}đ</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ color: '#64748b', fontSize: 12 }}>THƯỞNG</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#059669' }}>+{fmt(detailSalary.bonus)}đ</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ color: '#64748b', fontSize: 12 }}>KHẤU TRỪ</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#ef4444' }}>-{fmt(detailSalary.deductions)}đ</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ color: '#64748b', fontSize: 12 }}>THỰC NHẬN</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: '#2563eb' }}>{fmt(detailSalary.net_salary)}đ</div>
+                </div>
+              </div>
+            )}
+
+            {!detailSalary.calculation_details && detailSalary.notes && (
+              <div style={{ marginTop: 16, padding: 12, background: '#f8fafc', borderRadius: 8, fontSize: 13, color: '#475569' }}>
+                📝 {detailSalary.notes}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

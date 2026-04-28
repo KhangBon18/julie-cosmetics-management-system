@@ -9,6 +9,11 @@ const mysql = require('mysql2/promise');
 const { calculateLoyaltyPoints } = require('./src/utils/crmRules');
 const { logInventoryMovement } = require('./src/utils/inventoryLogger');
 
+if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEMO_SEED) {
+  console.error('ERROR: seed-demo is blocked in production. Use ALLOW_DEMO_SEED=1 to force.');
+  process.exit(1);
+}
+
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const forceSeed = process.env.SEED_DEMO_FORCE === '1' || process.argv.includes('--force');
 

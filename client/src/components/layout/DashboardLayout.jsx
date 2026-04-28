@@ -6,6 +6,7 @@ import useAuth from '../../hooks/useAuth';
 import {
   getWorkspaceBaseFromPath,
   getPreferredWorkspaceBasePath,
+  isWorkspaceAccessible,
   resolveWorkspaceMeta
 } from '../../utils/workspace';
 
@@ -24,11 +25,14 @@ export default function DashboardLayout() {
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
   const closeSidebar = () => setSidebarOpen(false);
-  const workspace = resolveWorkspaceMeta(user);
-  const basePath = getWorkspaceBaseFromPath(location.pathname) || getPreferredWorkspaceBasePath(user);
+  const currentBasePath = getWorkspaceBaseFromPath(location.pathname);
   const preferredBasePath = getPreferredWorkspaceBasePath(user);
+  const currentWorkspaceKey = currentBasePath ? currentBasePath.slice(1) : null;
+  const currentWorkspaceAccessible = currentWorkspaceKey ? isWorkspaceAccessible(user, currentWorkspaceKey) : false;
+  const basePath = currentBasePath && currentWorkspaceAccessible ? currentBasePath : preferredBasePath;
+  const workspace = resolveWorkspaceMeta(user, location.pathname);
 
-  if (basePath !== preferredBasePath) {
+  if (currentBasePath && !currentWorkspaceAccessible) {
     const redirectedPathname = location.pathname.replace(/^\/(admin|hr|warehouse|business|staff)/, preferredBasePath);
     return <Navigate to={`${redirectedPathname}${location.search}${location.hash}`} replace />;
   }
@@ -38,7 +42,7 @@ export default function DashboardLayout() {
       {sidebarOpen && <div className="sidebar-overlay" onClick={closeSidebar}></div>}
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} workspace={workspace} basePath={basePath} />
       <div className="main-content">
-        <TopHeader title={workspace.title} subtitle={workspace.subtitle} toggleSidebar={toggleSidebar} />
+        <TopHeader title={workspace.title} subtitle={workspace.subtitle} workspace={workspace} toggleSidebar={toggleSidebar} />
         <div className="page-content">
           <Outlet />
         </div>

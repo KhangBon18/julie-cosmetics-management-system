@@ -5,6 +5,8 @@ const { validateUserCreate, validateUserUpdate } = require('../middleware/valida
 
 router.use(protect);
 router.get('/', requirePermission('users.read'), userController.getAll);
+router.get('/:id/permissions', requirePermission('users.read'), userController.getPermissions);
+router.put('/:id/permissions', requirePermission('users.update'), userController.setPermissions);
 router.get('/:id', requirePermission('users.read'), userController.getById);
 router.post('/', requirePermission('users.create'), validateUserCreate, userController.create);
 router.put('/:id', requirePermission('users.update'), validateUserUpdate, userController.update);

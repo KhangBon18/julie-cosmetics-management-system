@@ -1,12 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiAlertTriangle, FiShield, FiCheck, FiUsers } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiAlertTriangle, FiShield, FiUsers } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import roleService from '../services/roleService';
-import { getPermissionModules, ACTION_LABELS } from '../config/moduleRegistry';
+import { getPermissionModules } from '../config/moduleRegistry';
 import usePermission from '../hooks/usePermission';
+import PermissionMatrix from '../components/PermissionMatrix';
 
-// ─── ACTION COLUMNS for the matrix ───
-const MATRIX_ACTIONS = ['read', 'create', 'update', 'delete'];
+const ROLE_LABELS = {
+  admin: 'Quản trị viên',
+  manager: 'Quản lý nhân sự',
+  sales: 'Nhân viên kinh doanh',
+  warehouse: 'Thủ kho',
+  staff_portal: 'Nhân viên cổng cá nhân',
+  staff: 'Nhân viên bán hàng (legacy)',
+};
+
+const getRoleDisplayName = (roleName) => ROLE_LABELS[String(roleName || '').trim().toLowerCase()] || roleName;
 
 // ─── Confirm Dialog ───
 function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
@@ -22,231 +31,6 @@ function ConfirmDialog({ open, title, message, onConfirm, onCancel }) {
           <button className="btn btn-danger" onClick={onConfirm}>Xóa</button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ─── Permission Matrix Component ───
-function PermissionMatrix({ allPermissions, selectedIds, onChange, lockSystemModules }) {
-  const modules = getPermissionModules();
-
-  // Build a lookup: module_key + action → permission_id
-  const permLookup = {};
-  for (const p of allPermissions) {
-    const key = `${p.module}.${p.action}`;
-    permLookup[key] = p.permission_id;
-  }
-
-  const selectedSet = new Set(selectedIds);
-
-  const isChecked = (moduleKey, action) => {
-    const pid = permLookup[`${moduleKey}.${action}`];
-    return pid ? selectedSet.has(pid) : false;
-  };
-
-  const toggle = (moduleKey, action) => {
-    const mod = modules.find(item => item.key === moduleKey);
-    if (lockSystemModules && mod?.systemOnly) return;
-
-    const pid = permLookup[`${moduleKey}.${action}`];
-    if (!pid) return;
-
-    const newSet = new Set(selectedSet);
-
-    if (newSet.has(pid)) {
-      // Unchecking
-      newSet.delete(pid);
-
-      // If unchecking "read", also uncheck create/update/delete/export
-      if (action === 'read') {
-        for (const a of ['create', 'update', 'delete', 'export']) {
-          const relPid = permLookup[`${moduleKey}.${a}`];
-          if (relPid) newSet.delete(relPid);
-        }
-      }
-    } else {
-      // Checking
-      newSet.add(pid);
-
-      // If checking create/update/delete/export, auto-check "read"
-      if (action !== 'read') {
-        const readPid = permLookup[`${moduleKey}.read`];
-        if (readPid) newSet.add(readPid);
-      }
-    }
-
-    onChange([...newSet]);
-  };
-
-  // Check-all for a column
-  const toggleColumn = (action) => {
-    const newSet = new Set(selectedSet);
-    const allChecked = modules.every(mod => {
-      if (lockSystemModules && mod.systemOnly) return true;
-      if (!mod.actions.includes(action)) return true;
-      const pid = permLookup[`${mod.key}.${action}`];
-      return pid ? newSet.has(pid) : true;
-    });
-
-    for (const mod of modules) {
-      if (lockSystemModules && mod.systemOnly) continue;
-      if (!mod.actions.includes(action)) continue;
-      const pid = permLookup[`${mod.key}.${action}`];
-      if (!pid) continue;
-
-      if (allChecked) {
-        // Uncheck all in this column
-        newSet.delete(pid);
-        // If unchecking "read", also uncheck CUD
-        if (action === 'read') {
-          for (const a of ['create', 'update', 'delete', 'export']) {
-            const relPid = permLookup[`${mod.key}.${a}`];
-            if (relPid) newSet.delete(relPid);
-          }
-        }
-      } else {
-        // Check all in this column
-        newSet.add(pid);
-        // If checking CUD, auto-check read
-        if (action !== 'read') {
-          const readPid = permLookup[`${mod.key}.read`];
-          if (readPid) newSet.add(readPid);
-        }
-      }
-    }
-
-    onChange([...newSet]);
-  };
-
-  // Check-all for a row
-  const toggleRow = (moduleKey) => {
-    const newSet = new Set(selectedSet);
-    const mod = modules.find(m => m.key === moduleKey);
-    if (!mod) return;
-    if (lockSystemModules && mod.systemOnly) return;
-
-    const allChecked = mod.actions.every(action => {
-      const pid = permLookup[`${moduleKey}.${action}`];
-      return pid ? newSet.has(pid) : true;
-    });
-
-    for (const action of mod.actions) {
-      const pid = permLookup[`${moduleKey}.${action}`];
-      if (!pid) continue;
-      if (allChecked) newSet.delete(pid);
-      else newSet.add(pid);
-    }
-
-    onChange([...newSet]);
-  };
-
-  // Group modules by section
-  const sectionMap = new Map();
-  for (const mod of modules) {
-    if (!sectionMap.has(mod.section)) sectionMap.set(mod.section, []);
-    sectionMap.get(mod.section).push(mod);
-  }
-
-  const isColumnAllChecked = (action) => {
-    return modules.every(mod => {
-      if (lockSystemModules && mod.systemOnly) return true;
-      if (!mod.actions.includes(action)) return true;
-      const pid = permLookup[`${mod.key}.${action}`];
-      return pid ? selectedSet.has(pid) : true;
-    });
-  };
-
-  const isRowAllChecked = (moduleKey) => {
-    const mod = modules.find(m => m.key === moduleKey);
-    if (!mod) return false;
-    return mod.actions.every(action => {
-      const pid = permLookup[`${moduleKey}.${action}`];
-      return pid ? selectedSet.has(pid) : true;
-    });
-  };
-
-  return (
-    <div className="perm-matrix-wrapper">
-      <table className="perm-matrix">
-        <thead>
-          <tr>
-            <th className="perm-matrix-module-header">Chức năng</th>
-            {MATRIX_ACTIONS.map(action => (
-              <th key={action} className="perm-matrix-action-header">
-                <label className="perm-matrix-col-toggle">
-                  <input
-                    type="checkbox"
-                    checked={isColumnAllChecked(action)}
-                    onChange={() => toggleColumn(action)}
-                  />
-                  <span>{ACTION_LABELS[action] || action}</span>
-                </label>
-              </th>
-            ))}
-            <th className="perm-matrix-action-header">
-              <span>Tất cả</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {[...sectionMap.entries()].map(([section, mods]) => (
-            <>{/* Section label row */}
-              <tr key={`section-${section}`} className="perm-matrix-section-row">
-                <td colSpan={MATRIX_ACTIONS.length + 2} className="perm-matrix-section-label">
-                  {section}
-                </td>
-              </tr>
-              {mods.map(mod => (
-                <tr
-                  key={mod.key}
-                  className="perm-matrix-row"
-                  style={lockSystemModules && mod.systemOnly ? { opacity: 0.55 } : undefined}
-                >
-                  <td className="perm-matrix-module-name">
-                    <mod.icon className="perm-matrix-module-icon" />
-                    {mod.name}
-                    {mod.systemOnly ? <span style={{ marginLeft: 8, fontSize: 11, color: '#b45309' }}>(Chỉ admin)</span> : null}
-                  </td>
-                  {MATRIX_ACTIONS.map(action => (
-                    <td key={action} className="perm-matrix-cell">
-                      {mod.actions.includes(action) ? (
-                        <label className="perm-checkbox-label">
-                          <input
-                            type="checkbox"
-                            className="perm-checkbox"
-                            checked={isChecked(mod.key, action)}
-                            disabled={lockSystemModules && mod.systemOnly}
-                            onChange={() => toggle(mod.key, action)}
-                          />
-                          <span className="perm-checkbox-custom">
-                            <FiCheck className="perm-checkbox-icon" />
-                          </span>
-                        </label>
-                      ) : (
-                        <span className="perm-matrix-na">—</span>
-                      )}
-                    </td>
-                  ))}
-                  <td className="perm-matrix-cell">
-                    <label className="perm-checkbox-label">
-                      <input
-                        type="checkbox"
-                        className="perm-checkbox"
-                        checked={isRowAllChecked(mod.key)}
-                        disabled={lockSystemModules && mod.systemOnly}
-                        onChange={() => toggleRow(mod.key)}
-                      />
-                      <span className="perm-checkbox-custom perm-checkbox-all">
-                        <FiCheck className="perm-checkbox-icon" />
-                      </span>
-                    </label>
-                  </td>
-                </tr>
-              ))}
-            </>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -354,9 +138,11 @@ export default function RolesPage() {
       };
       if (editing) {
         await roleService.update(editing.role_id, payload);
+        localStorage.setItem('rbac_permissions_version', String(Date.now()));
         toast.success('Cập nhật nhóm quyền thành công');
       } else {
         await roleService.create(payload);
+        localStorage.setItem('rbac_permissions_version', String(Date.now()));
         toast.success('Tạo nhóm quyền thành công');
       }
       setShowModal(false);
@@ -373,6 +159,7 @@ export default function RolesPage() {
     if (!deleteTarget) return;
     try {
       await roleService.delete(deleteTarget.role_id);
+      localStorage.setItem('rbac_permissions_version', String(Date.now()));
       toast.success('Xóa nhóm quyền thành công');
       loadData();
     } catch (err) {
@@ -388,6 +175,9 @@ export default function RolesPage() {
         <div>
           <h1>Nhóm quyền</h1>
           <p>Quản lý phân quyền theo vai trò</p>
+          <p style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+            Lưu ý: quyền động của nhân viên hiện tách thành <strong>`sales`</strong> cho khu kinh doanh và <strong>`staff_portal`</strong> cho cổng cá nhân. Sau khi lưu quyền, người dùng chỉ cần tải lại trang hoặc chuyển lại tab để sidebar tự đồng bộ.
+          </p>
         </div>
         {_canCreate && (
           <button className="btn btn-primary" onClick={openCreate} id="btn-create-role">
@@ -438,7 +228,10 @@ export default function RolesPage() {
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <FiShield style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                        <strong>{role.role_name}</strong>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <strong>{getRoleDisplayName(role.role_name)}</strong>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{role.role_name}</span>
+                        </div>
                       </div>
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{role.description || '—'}</td>
@@ -488,11 +281,12 @@ export default function RolesPage() {
         <div className="modal-overlay" onClick={() => !saving && setShowModal(false)} role="dialog" aria-modal="true" aria-label={editing ? 'Sửa nhóm quyền' : 'Thêm nhóm quyền'}>
           <div className="modal perm-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editing ? 'Sửa nhóm quyền' : 'Thêm nhóm quyền'}</h3>
+              <h3><FiShield style={{ color: 'var(--primary)', flexShrink: 0 }} /> {editing ? 'Sửa nhóm quyền' : 'Thêm nhóm quyền'}</h3>
               <button className="modal-close" onClick={() => !saving && setShowModal(false)} aria-label="Đóng" disabled={saving}>×</button>
             </div>
             <div className="modal-body">
               <form onSubmit={handleSave}>
+                <p className="form-section-label">Thông tin cơ bản</p>
                 <div className="form-row">
                   <div className="form-group">
                     <label htmlFor="role-name">Tên nhóm quyền *</label>
@@ -507,6 +301,11 @@ export default function RolesPage() {
                       disabled={editing?.is_system}
                       autoComplete="off"
                     />
+                    {editing?.is_system ? (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                        Tên kỹ thuật của role hệ thống được giữ cố định để tránh lệch RBAC và workspace.
+                      </div>
+                    ) : null}
                   </div>
                   <div className="form-group">
                     <label htmlFor="role-desc">Mô tả</label>
@@ -523,15 +322,16 @@ export default function RolesPage() {
                 </div>
 
                 {/* Permission Matrix */}
-                <div className="form-group">
-                  <label>Phân quyền theo module</label>
+                <div className="form-group" style={{ marginTop: 8 }}>
+                  <p className="form-section-label" style={{ marginBottom: 8 }}>Phân quyền theo module</p>
                   <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-                    Chọn các quyền truy cập cho nhóm này. Tick "Xem" để hiện module trên menu.
+                    Chọn các quyền truy cập cho nhóm này. Tick “Xem” để hiện module trên menu.
                   </p>
                   {lockSystemModules ? (
-                    <p style={{ fontSize: 12, color: '#b45309', marginBottom: 12 }}>
-                      Các module hệ thống (`Tài khoản`, `Nhóm quyền`, `Cấu hình`) được khóa riêng cho admin để tránh lộ sai khi cấp quyền linh động cho role khác.
-                    </p>
+                    <div className="role-lock-msg">
+                      <span style={{ fontSize: 16, flexShrink: 0 }}>🔒</span>
+                      <span>Các module hệ thống (<strong>Tài khoản</strong>, <strong>Nhóm quyền</strong>, <strong>Cấu hình</strong>) được khóa riêng cho admin để tránh lộ quyền sai khi cấp động cho role khác.</span>
+                    </div>
                   ) : null}
                   <PermissionMatrix
                     allPermissions={allPermissions}

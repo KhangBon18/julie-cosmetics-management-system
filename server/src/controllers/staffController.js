@@ -51,7 +51,8 @@ const staffController = {
       const result = await Salary.findAll({
         page: parseInt(page) || 1, limit: parseInt(limit) || 20,
         employee_id: req.user.employee_id,
-        month, year
+        month, year,
+        status: ['approved', 'paid', 'locked'] // Only show finalized salaries
       });
       res.json(result);
     } catch (error) { next(error); }
@@ -110,11 +111,14 @@ const staffController = {
         formula: 'Lương thực nhận = Tổng lương prorate theo từng giai đoạn chức vụ trong tháng + Thưởng − Khấu trừ',
         details: [
           'Ngày công chuẩn lấy từ cấu hình hệ thống (mặc định 22 ngày/tháng).',
+          'Nếu module chấm công đã triển khai và tháng đó có dữ liệu attendance, ngày công thực tế sẽ ưu tiên lấy từ dữ liệu chấm công.',
+          'Nếu chưa có dữ liệu attendance: hệ thống fallback về công thức hiện tại dựa trên ngày công chuẩn và nghỉ không lương đã duyệt.',
           'Nếu không đổi chức vụ trong tháng: lương được tính như công thức thông thường theo ngày công thực tế.',
           'Nếu đổi chức vụ giữa tháng: hệ thống chia tháng thành nhiều giai đoạn theo effective_date và tính riêng từng mức lương tại thời điểm đó.',
           'Nghỉ phép không lương (unpaid) đã duyệt sẽ bị trừ vào giai đoạn lương tương ứng.',
           'Nghỉ phép năm (annual) đã duyệt: không trừ lương.',
           'Đơn nghỉ việc đã duyệt sẽ chặn phát sinh bảng lương cho các kỳ sau ngày nghỉ chính thức.',
+          'Đi trễ/về sớm hiện được ghi chú tham khảo; hệ thống chưa tự động trừ tiền nếu chưa có cấu hình phạt riêng.',
           'Thưởng và khấu trừ do quản lý cập nhật khi chốt bảng lương.'
         ]
       });
@@ -133,7 +137,18 @@ const staffController = {
         employee_id: req.user.employee_id,
         status
       });
-      res.json(result);
+
+      const currentYear = new Date().getFullYear();
+      const { pool } = require('../config/db');
+      const [balanceRows] = await pool.query(
+        'SELECT annual_leave_entitled, annual_leave_used, annual_leave_remaining FROM employee_leave_balances WHERE employee_id = ? AND year = ?',
+        [req.user.employee_id, currentYear]
+      );
+
+      res.json({
+        ...result,
+        leave_balance: balanceRows[0] || { annual_leave_entitled: 12, annual_leave_used: 0, annual_leave_remaining: 12 }
+      });
     } catch (error) { next(error); }
   },
 

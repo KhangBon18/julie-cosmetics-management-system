@@ -13,6 +13,18 @@ INSERT INTO positions (position_name, base_salary, description) VALUES
 ('Thủ kho',              7500000, 'Quản lý nhập - xuất - tồn kho, lập phiếu nhập và kiểm soát số liệu hàng hóa.'),
 ('Kế toán',              9000000, 'Theo dõi tài chính, đối soát chứng từ và kiểm tra báo cáo doanh thu.');
 
+-- ── ATTENDANCE SHIFTS (seed mặc định cho module chấm công) ────
+INSERT INTO attendance_shifts (shift_code, shift_name, start_time, end_time, break_minutes, grace_minutes, standard_work_minutes, is_active)
+VALUES ('HC', 'Ca hành chính', '08:00:00', '17:00:00', 60, 10, 480, TRUE)
+ON DUPLICATE KEY UPDATE
+  shift_name = VALUES(shift_name),
+  start_time = VALUES(start_time),
+  end_time = VALUES(end_time),
+  break_minutes = VALUES(break_minutes),
+  grace_minutes = VALUES(grace_minutes),
+  standard_work_minutes = VALUES(standard_work_minutes),
+  is_active = VALUES(is_active);
+
 -- ── EMPLOYEES ─────────────────────────────────────────────────
 INSERT INTO employees (full_name, email, phone, address, gender, date_of_birth, hire_date, base_salary, status) VALUES
 ('Nguyễn Thị Julie',   'julie@juliecosmetics.vn',   '0901234567', '123 Nguyễn Huệ, Q1, TP.HCM',         'Nữ', '1990-05-15', '2022-01-01', 15000000, 'active'),
@@ -33,13 +45,14 @@ INSERT INTO employee_positions (employee_id, position_id, effective_date, end_da
 (6, 1, '2021-09-01', '2023-12-31', 14000000, 'Kết thúc hợp đồng lao động vào cuối năm 2023.');
 
 -- ── USERS ─────────────────────────────────────────────────────
--- Password hash cho 'admin123', 'manager123', 'staff123', 'warehouse123'
+-- Password hash cho 'admin123', 'manager123', 'staff123', 'sales123', 'warehouse123'
 -- Các hash được generate bởi bcryptjs (rounds=10) — ĐÃ VERIFY ĐÚNG
 INSERT INTO users (username, password_hash, role, employee_id, is_active) VALUES
 ('admin',        '$2a$10$rxik/AurZ4RtBxuwB6K2eOKxhuOzU1oT/qNqymIykEoSvPD3Wx2jC', 'admin',     NULL, TRUE),
 ('manager01',    '$2a$10$C1ZWe0OszlFZd7GUK2m1ae6bn9F4Ox7LA.R.YnHs3RLGrPsErnU3C', 'manager',   1,    TRUE),
 ('staff01',      '$2a$10$102u8BDnzPvddN.TErjNNe89gtGZGCaZqyUrh20XPNaTsQyVvhf62', 'staff',     2,    TRUE),
 ('staff02',      '$2a$10$XdTW7K.YPLrzY5H16hYaaO8HPLWUNxC5PWmZv4iviw6T4CoF71OE6', 'staff',     3,    TRUE),
+('sales01',      '$2a$10$AYOnKExz6y1i/nwfJMUrguL/FNyhorXpbOZag8smiEG82uXPCLgFa', 'staff',     NULL, TRUE),
 ('warehouse01',  '$2a$10$R99s632OA5DWlSdzJIckkOyJ3kWjbLUAmY9mymYCcqu.oz4WltdI2', 'warehouse', 4,    TRUE),
 ('staff03',      '$2a$10$jvO2ApKOX/5dUxPLT6YrLOAMwURCLCFmYJ3YfAJrpJAf694JQ7jXi', 'staff',     5,    TRUE);
 

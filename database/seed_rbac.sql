@@ -25,16 +25,19 @@ EXECUTE add_role_id_stmt;
 DEALLOCATE PREPARE add_role_id_stmt;
 
 -- ── SYSTEM ROLES ─────────────────────────────────────────────
-INSERT IGNORE INTO roles (role_name, description, is_system) VALUES
+INSERT INTO roles (role_name, description, is_system) VALUES
 ('admin',     'Quản trị viên hệ thống — toàn quyền', TRUE),
 ('manager',   'Quản lý — quản lý nhân sự, duyệt đơn, xem báo cáo', TRUE),
 ('staff_portal', 'Nhân viên tự phục vụ — hồ sơ cá nhân, nghỉ phép và bảng lương', TRUE),
 ('sales',     'Nhân viên kinh doanh — bán hàng nội bộ, chăm sóc khách hàng và xem báo cáo kinh doanh', TRUE),
 ('staff',     'Nhân viên bán hàng — tạo hóa đơn, quản lý khách hàng', TRUE),
-('warehouse', 'Thủ kho — quản lý nhập kho, kiểm kho', TRUE);
+('warehouse', 'Thủ kho — quản lý nhập kho, kiểm kho', TRUE)
+ON DUPLICATE KEY UPDATE
+  description = VALUES(description),
+  is_system = VALUES(is_system);
 
 -- ── CORE PERMISSIONS ─────────────────────────────────────────
-INSERT IGNORE INTO permissions (permission_name, module, action, description) VALUES
+INSERT INTO permissions (permission_name, module, action, description) VALUES
 ('employees.read',   'employees', 'read',   'Xem danh sách nhân viên'),
 ('employees.create', 'employees', 'create', 'Thêm nhân viên'),
 ('employees.update', 'employees', 'update', 'Sửa thông tin nhân viên'),
@@ -67,6 +70,22 @@ INSERT IGNORE INTO permissions (permission_name, module, action, description) VA
 ('leaves.read',      'leaves',    'read',   'Xem đơn nghỉ phép'),
 ('leaves.create',    'leaves',    'create', 'Tạo đơn nghỉ phép'),
 ('leaves.update',    'leaves',    'update', 'Duyệt đơn nghỉ phép'),
+('attendances.read', 'attendances','read',  'Xem chấm công'),
+('attendances.create','attendances','create','Tạo bản ghi chấm công'),
+('attendances.update','attendances','update','Sửa chấm công và duyệt điều chỉnh'),
+('attendances.delete','attendances','delete','Xóa bản ghi chấm công'),
+('attendances.export','attendances','export','Xuất dữ liệu chấm công'),
+('promotions.read',  'promotions', 'read',   'Xem chương trình khuyến mãi'),
+('promotions.create','promotions', 'create', 'Tạo chương trình khuyến mãi'),
+('promotions.update','promotions', 'update', 'Cập nhật chương trình khuyến mãi'),
+('promotions.delete','promotions', 'delete', 'Xóa chương trình khuyến mãi'),
+('payments.read',    'payments',   'read',   'Xem giao dịch thanh toán'),
+('payments.update',  'payments',   'update', 'Xác nhận hoặc hoàn tiền giao dịch'),
+('shipping.read',    'shipping',   'read',   'Xem đơn giao hàng'),
+('shipping.update',  'shipping',   'update', 'Cập nhật đơn giao hàng'),
+('returns.read',     'returns',    'read',   'Xem yêu cầu đổi trả'),
+('returns.create',   'returns',    'create', 'Tạo yêu cầu đổi trả'),
+('returns.update',   'returns',    'update', 'Duyệt và hoàn tất yêu cầu đổi trả'),
 ('salaries.read',    'salaries',  'read',   'Xem bảng lương'),
 ('salaries.create',  'salaries',  'create', 'Tạo bảng lương'),
 ('salaries.update',  'salaries',  'update', 'Sửa bảng lương'),
@@ -95,13 +114,23 @@ INSERT IGNORE INTO permissions (permission_name, module, action, description) VA
 ('roles.update',     'roles',     'update', 'Sửa nhóm quyền'),
 ('roles.delete',     'roles',     'delete', 'Xóa nhóm quyền'),
 ('settings.read',    'settings',  'read',   'Xem cấu hình'),
-('settings.update',  'settings',  'update', 'Sửa cấu hình');
+('settings.update',  'settings',  'update', 'Sửa cấu hình')
+ON DUPLICATE KEY UPDATE
+  module = VALUES(module),
+  action = VALUES(action),
+  description = VALUES(description);
 
 -- ── APP DATABASE USER ────────────────────────────────────────
-CREATE USER IF NOT EXISTS 'julie_app'@'%' IDENTIFIED BY 'julie_demo_123';
-ALTER USER 'julie_app'@'%' IDENTIFIED BY 'julie_demo_123';
+-- The MySQL container creates this account from DB_USER/DB_PASSWORD in docker-compose.
+-- Keep only the grant here so the SQL seed does not carry application credentials.
 GRANT ALL PRIVILEGES ON julie_cosmetics.* TO 'julie_app'@'%';
 FLUSH PRIVILEGES;
+
+-- Xóa quyền mặc định cũ của system roles trước khi gán lại để tránh stale grants.
+DELETE rp
+FROM role_permissions rp
+JOIN roles r ON r.role_id = rp.role_id
+WHERE r.role_name IN ('admin', 'manager', 'staff_portal', 'sales', 'staff', 'warehouse');
 
 -- ── DEFAULT ROLE ASSIGNMENTS ─────────────────────────────────
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
@@ -115,27 +144,38 @@ SELECT r.role_id, p.permission_id
 FROM roles r
 JOIN permissions p
 WHERE r.role_name = 'manager'
-  AND p.module NOT IN ('users', 'settings', 'roles');
-
-INSERT IGNORE INTO role_permissions (role_id, permission_id)
-SELECT r.role_id, p.permission_id
-FROM roles r
-JOIN permissions p
-WHERE r.role_name = 'staff_portal'
-  AND (
-    p.module = 'leaves' AND p.action IN ('read', 'create')
+  AND p.permission_name IN (
+    'employees.read', 'employees.create', 'employees.update', 'employees.delete', 'employees.export',
+    'positions.read', 'positions.create', 'positions.update', 'positions.delete',
+    'leaves.read', 'leaves.create', 'leaves.update',
+    'attendances.read', 'attendances.create', 'attendances.update', 'attendances.export',
+    'promotions.read', 'promotions.create', 'promotions.update', 'promotions.delete',
+    'payments.read', 'payments.update',
+    'shipping.read', 'shipping.update',
+    'returns.read', 'returns.update',
+    'salaries.read', 'salaries.create', 'salaries.update', 'salaries.delete', 'salaries.export',
+    'reports.read', 'reports.export'
   );
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.role_id, p.permission_id
 FROM roles r
 JOIN permissions p
+WHERE r.role_name = 'staff_portal'
+  AND p.permission_name IN ('leaves.read', 'leaves.create');
+
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM roles r
+JOIN permissions p
 WHERE r.role_name = 'staff'
-  AND (
-    (p.module = 'invoices' AND p.action IN ('read', 'create'))
-    OR (p.module = 'customers' AND p.action IN ('read', 'create', 'update'))
-    OR (p.module = 'products' AND p.action = 'read')
-    OR (p.module = 'leaves' AND p.action IN ('read', 'create'))
+  AND p.permission_name IN (
+    'invoices.read', 'invoices.create', 'invoices.export',
+    'customers.read', 'customers.create', 'customers.update', 'customers.export',
+    'products.read',
+    'shipping.read',
+    'returns.read', 'returns.create',
+    'leaves.read', 'leaves.create'
   );
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
@@ -143,11 +183,13 @@ SELECT r.role_id, p.permission_id
 FROM roles r
 JOIN permissions p
 WHERE r.role_name = 'sales'
-  AND (
-    (p.module = 'invoices' AND p.action IN ('read', 'create'))
-    OR (p.module = 'customers' AND p.action IN ('read', 'create', 'update'))
-    OR (p.module = 'products' AND p.action = 'read')
-    OR (p.module = 'reports' AND p.action = 'read')
+  AND p.permission_name IN (
+    'invoices.read', 'invoices.create', 'invoices.export',
+    'customers.read', 'customers.create', 'customers.update', 'customers.export',
+    'products.read',
+    'shipping.read',
+    'returns.read', 'returns.create',
+    'reports.read', 'reports.export'
   );
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
@@ -155,17 +197,37 @@ SELECT r.role_id, p.permission_id
 FROM roles r
 JOIN permissions p
 WHERE r.role_name = 'warehouse'
-  AND (
-    p.module = 'imports'
-    OR (p.module = 'products' AND p.action IN ('read', 'update'))
-    OR (p.module IN ('brands', 'categories', 'suppliers') AND p.action = 'read')
-    OR (p.module = 'reports' AND p.action = 'read')
-    OR (p.module = 'leaves' AND p.action IN ('read', 'create'))
+  AND p.permission_name IN (
+    'products.read', 'products.create', 'products.update', 'products.delete', 'products.export',
+    'brands.read', 'brands.create', 'brands.update', 'brands.delete',
+    'categories.read', 'categories.create', 'categories.update', 'categories.delete',
+    'suppliers.read', 'suppliers.create', 'suppliers.update', 'suppliers.delete',
+    'imports.read', 'imports.create', 'imports.delete',
+    'shipping.read', 'shipping.update',
+    'returns.read',
+    'reports.read', 'reports.export',
+    'leaves.read', 'leaves.create'
   );
 
--- ── SYNC LEGACY USERS -> role_id ─────────────────────────────
+-- ── BACKFILL LEGACY USERS -> role_id ─────────────────────────
+-- `role_id` là nguồn RBAC chính; chỉ backfill khi còn NULL.
+-- Legacy enum `staff` được tách thành:
+--   - staff_portal: tài khoản gắn employee_id (self-service)
+--   - sales: tài khoản staff không gắn employee_id (nghiệp vụ kinh doanh)
+UPDATE users u
+JOIN roles r_sales ON r_sales.role_name = 'sales'
+JOIN roles r_staff_portal ON r_staff_portal.role_name = 'staff_portal'
+SET u.role_id = CASE
+  WHEN u.employee_id IS NOT NULL THEN r_staff_portal.role_id
+  ELSE r_sales.role_id
+END
+WHERE u.deleted_at IS NULL
+  AND u.role = 'staff'
+  AND u.role_id IS NULL;
+
 UPDATE users u
 JOIN roles r ON r.role_name = u.role
 SET u.role_id = r.role_id
 WHERE u.deleted_at IS NULL
-  AND (u.role_id IS NULL OR u.role_id <> r.role_id);
+  AND u.role_id IS NULL
+  AND u.role IN ('admin', 'manager', 'warehouse');

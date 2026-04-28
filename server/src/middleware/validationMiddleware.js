@@ -1,4 +1,4 @@
-const { body, validationResult } = require('express-validator');
+const { body, param, query, validationResult } = require('express-validator');
 
 // Middleware chung: kiểm tra kết quả validation
 const handleValidation = (req, res, next) => {
@@ -174,6 +174,110 @@ const validateChangePassword = [
   handleValidation
 ];
 
+const attendanceStatuses = ['present', 'late', 'early_leave', 'late_and_early', 'absent', 'half_day', 'leave', 'holiday', 'pending', 'incomplete'];
+const adjustmentStatuses = ['pending', 'approved', 'rejected'];
+const dateTimeRegex = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/;
+
+const isValidDateTime = (value) => {
+  if (!value || typeof value !== 'string' || !dateTimeRegex.test(value.trim())) {
+    return false;
+  }
+  const normalized = value.trim().replace(' ', 'T');
+  return !Number.isNaN(new Date(normalized).getTime());
+};
+
+const ensureDateOrder = (startValue, endValue, errorMessage) => {
+  if (!startValue || !endValue) return true;
+  const start = new Date(String(startValue).trim().replace(' ', 'T'));
+  const end = new Date(String(endValue).trim().replace(' ', 'T'));
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    throw new Error(errorMessage);
+  }
+  return true;
+};
+
+const validateAttendanceListQuery = [
+  query('page').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('page phải là số nguyên dương'),
+  query('limit').optional({ values: 'falsy' }).isInt({ min: 1, max: 200 }).withMessage('limit phải từ 1 đến 200'),
+  query('employee_id').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('employee_id không hợp lệ'),
+  query('from_date').optional({ values: 'falsy' }).isDate().withMessage('from_date không hợp lệ'),
+  query('to_date').optional({ values: 'falsy' }).isDate().withMessage('to_date không hợp lệ'),
+  query('status').optional({ values: 'falsy' }).isIn([...attendanceStatuses, ...adjustmentStatuses]).withMessage('status không hợp lệ'),
+  query('to_date').custom((toDate, { req }) => {
+    if (!req.query.from_date || !toDate) return true;
+    if (new Date(toDate) < new Date(req.query.from_date)) {
+      throw new Error('to_date phải sau hoặc bằng from_date');
+    }
+    return true;
+  }),
+  handleValidation
+];
+
+const validateAttendanceManual = [
+  body('employee_id').isInt({ min: 1 }).withMessage('employee_id là bắt buộc'),
+  body('work_date').isDate().withMessage('work_date không hợp lệ'),
+  body('shift_id').optional({ values: 'falsy', nullable: true }).isInt({ min: 1 }).withMessage('shift_id không hợp lệ'),
+  body('status').optional({ nullable: true }).isIn(attendanceStatuses).withMessage('Trạng thái chấm công không hợp lệ'),
+  body('note').optional({ nullable: true }).isString().withMessage('Ghi chú không hợp lệ').isLength({ max: 5000 }).withMessage('Ghi chú tối đa 5000 ký tự'),
+  body('check_in_at').optional({ nullable: true }).custom((value) => {
+    if (!value) return true;
+    if (!isValidDateTime(value)) throw new Error('check_in_at không hợp lệ');
+    return true;
+  }),
+  body('check_out_at').optional({ nullable: true }).custom((value) => {
+    if (!value) return true;
+    if (!isValidDateTime(value)) throw new Error('check_out_at không hợp lệ');
+    return true;
+  }),
+  body().custom((value) => {
+    if (value.check_out_at && !value.check_in_at) {
+      throw new Error('Không thể nhập giờ ra khi chưa có giờ vào');
+    }
+    ensureDateOrder(value.check_in_at, value.check_out_at, 'Giờ ra phải sau giờ vào');
+    return true;
+  }),
+  handleValidation
+];
+
+const validateAttendanceCheckAction = [
+  body('note').optional({ nullable: true }).isString().withMessage('Ghi chú không hợp lệ').isLength({ max: 1000 }).withMessage('Ghi chú tối đa 1000 ký tự'),
+  handleValidation
+];
+
+const validateAttendanceAdjustment = [
+  body('work_date').isDate().withMessage('work_date không hợp lệ'),
+  body('requested_check_in_at').optional({ nullable: true }).custom((value) => {
+    if (!value) return true;
+    if (!isValidDateTime(value)) throw new Error('requested_check_in_at không hợp lệ');
+    return true;
+  }),
+  body('requested_check_out_at').optional({ nullable: true }).custom((value) => {
+    if (!value) return true;
+    if (!isValidDateTime(value)) throw new Error('requested_check_out_at không hợp lệ');
+    return true;
+  }),
+  body('reason').trim().notEmpty().withMessage('Lý do điều chỉnh là bắt buộc').isLength({ max: 5000 }).withMessage('Lý do tối đa 5000 ký tự'),
+  body().custom((value) => {
+    if (!value.requested_check_in_at && !value.requested_check_out_at) {
+      throw new Error('Phải nhập ít nhất giờ vào hoặc giờ ra cần điều chỉnh');
+    }
+    ensureDateOrder(value.requested_check_in_at, value.requested_check_out_at, 'Giờ ra đề nghị phải sau giờ vào đề nghị');
+    return true;
+  }),
+  handleValidation
+];
+
+const validateAttendanceAdjustmentReviewId = [
+  param('id').isInt({ min: 1 }).withMessage('ID yêu cầu điều chỉnh không hợp lệ'),
+  handleValidation
+];
+
+const validateAttendanceAdjustmentReject = [
+  param('id').isInt({ min: 1 }).withMessage('ID yêu cầu điều chỉnh không hợp lệ'),
+  body('reject_reason').trim().notEmpty().withMessage('Lý do từ chối là bắt buộc').isLength({ max: 5000 }).withMessage('Lý do từ chối tối đa 5000 ký tự'),
+  handleValidation
+];
+
 module.exports = {
   validateInvoice,
   validateImport,
@@ -190,5 +294,11 @@ module.exports = {
   validateLeaveReject,
   validateReturn,
   validateLogin,
-  validateChangePassword
+  validateChangePassword,
+  validateAttendanceListQuery,
+  validateAttendanceManual,
+  validateAttendanceCheckAction,
+  validateAttendanceAdjustment,
+  validateAttendanceAdjustmentReviewId,
+  validateAttendanceAdjustmentReject
 };

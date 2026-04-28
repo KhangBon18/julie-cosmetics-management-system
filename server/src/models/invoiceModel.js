@@ -45,7 +45,10 @@ const Invoice = {
       countParams.push(payment_method);
     }
 
-    if (status) {
+    if (status === 'pending') {
+      query += " AND i.status = 'confirmed' AND pt.status = 'pending'";
+      countQuery += " AND status = 'confirmed' AND EXISTS (SELECT 1 FROM payment_transactions p WHERE p.invoice_id = invoices.invoice_id AND p.status = 'pending')";
+    } else if (status) {
       query += ' AND i.status = ?';
       countQuery += ' AND status = ?';
       params.push(status);

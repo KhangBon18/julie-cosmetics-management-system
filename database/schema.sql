@@ -1,7 +1,7 @@
 -- ============================================================
 -- JulieCosmetics — Database Schema (Production-Ready)
 -- MySQL 8.0 | UTF8MB4 | Engine: InnoDB
--- Last updated: 2026-03-29 (post-migration 001–009)
+-- Last updated: 2026-04-26 (includes attendance baseline)
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS julie_cosmetics
@@ -60,6 +60,7 @@ CREATE TABLE users (
   username       VARCHAR(50)    NOT NULL UNIQUE,
   password_hash  VARCHAR(255)   NOT NULL,
   role           ENUM('admin','manager','staff','warehouse') NOT NULL DEFAULT 'staff',
+  role_id        INT            NULL COMMENT 'FK to roles table (RBAC)',
   employee_id    INT            NULL COMMENT 'NULL = tài khoản hệ thống không gắn NV',
   is_active      BOOLEAN        NOT NULL DEFAULT TRUE,
   last_login     TIMESTAMP      NULL,
@@ -67,6 +68,7 @@ CREATE TABLE users (
   updated_at     TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at     TIMESTAMP      NULL,
   FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
+  INDEX idx_users_role_id (role_id),
   INDEX idx_users_deleted (deleted_at)
 ) ENGINE=InnoDB COMMENT='Tài khoản đăng nhập hệ thống';
 
@@ -130,6 +132,82 @@ CREATE TABLE salary_bonus_adjustments (
   FOREIGN KEY (updated_by) REFERENCES users(user_id) ON DELETE SET NULL,
   INDEX idx_bonus_year_month (year, month)
 ) ENGINE=InnoDB COMMENT='Thiết lập thưởng theo kỳ lương';
+
+CREATE TABLE attendance_shifts (
+  shift_id               INT            AUTO_INCREMENT PRIMARY KEY,
+  shift_code             VARCHAR(30)    NOT NULL UNIQUE,
+  shift_name             VARCHAR(100)   NOT NULL,
+  start_time             TIME           NOT NULL,
+  end_time               TIME           NOT NULL,
+  break_minutes          INT            NOT NULL DEFAULT 60,
+  grace_minutes          INT            NOT NULL DEFAULT 10,
+  standard_work_minutes  INT            NOT NULL DEFAULT 480,
+  is_active              BOOLEAN        NOT NULL DEFAULT TRUE,
+  created_at             TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  updated_at             TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB COMMENT='Danh mục ca làm việc';
+
+CREATE TABLE employee_shift_assignments (
+  assignment_id   INT            AUTO_INCREMENT PRIMARY KEY,
+  employee_id     INT            NOT NULL,
+  shift_id        INT            NOT NULL,
+  effective_from  DATE           NOT NULL,
+  effective_to    DATE           NULL,
+  created_by      INT            NULL,
+  created_at      TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE RESTRICT,
+  FOREIGN KEY (shift_id) REFERENCES attendance_shifts(shift_id) ON DELETE RESTRICT,
+  FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_shift_assignment_employee_window (employee_id, effective_from, effective_to)
+) ENGINE=InnoDB COMMENT='Gán ca làm việc cho nhân viên theo hiệu lực ngày';
+
+CREATE TABLE attendance_records (
+  attendance_id         INT            AUTO_INCREMENT PRIMARY KEY,
+  employee_id           INT            NOT NULL,
+  work_date             DATE           NOT NULL,
+  shift_id              INT            NULL,
+  check_in_at           DATETIME       NULL,
+  check_out_at          DATETIME       NULL,
+  source                ENUM('self','manual','adjustment','system') NOT NULL DEFAULT 'self',
+  status                ENUM('present','late','early_leave','late_and_early','absent','half_day','leave','holiday','pending','incomplete') NOT NULL DEFAULT 'pending',
+  minutes_late          INT            NOT NULL DEFAULT 0,
+  minutes_early_leave   INT            NOT NULL DEFAULT 0,
+  work_minutes          INT            NOT NULL DEFAULT 0,
+  overtime_minutes      INT            NOT NULL DEFAULT 0,
+  note                  TEXT           NULL,
+  verified_by           INT            NULL,
+  verified_at           TIMESTAMP      NULL,
+  created_at            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_attendance_employee_date (employee_id, work_date),
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE RESTRICT,
+  FOREIGN KEY (shift_id) REFERENCES attendance_shifts(shift_id) ON DELETE SET NULL,
+  FOREIGN KEY (verified_by) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_attendance_work_date (work_date),
+  INDEX idx_attendance_employee_date (employee_id, work_date),
+  INDEX idx_attendance_status (status)
+) ENGINE=InnoDB COMMENT='Bản ghi chấm công theo nhân viên và ngày công';
+
+CREATE TABLE attendance_adjustment_requests (
+  request_id                INT            AUTO_INCREMENT PRIMARY KEY,
+  employee_id               INT            NOT NULL,
+  attendance_id             INT            NULL,
+  work_date                 DATE           NOT NULL,
+  requested_check_in_at     DATETIME       NULL,
+  requested_check_out_at    DATETIME       NULL,
+  reason                    TEXT           NOT NULL,
+  status                    ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  reviewed_by               INT            NULL,
+  reviewed_at               TIMESTAMP      NULL,
+  reject_reason             TEXT           NULL,
+  created_at                TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+  updated_at                TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE RESTRICT,
+  FOREIGN KEY (attendance_id) REFERENCES attendance_records(attendance_id) ON DELETE SET NULL,
+  FOREIGN KEY (reviewed_by) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_attendance_adjustment_employee_date_status (employee_id, work_date, status),
+  INDEX idx_attendance_adjustment_status_created (status, created_at)
+) ENGINE=InnoDB COMMENT='Yêu cầu điều chỉnh chấm công do nhân viên gửi';
 
 -- ── 2. NHÓM KHO & SẢN PHẨM ───────────────────────────────────
 
@@ -379,6 +457,22 @@ CREATE TABLE role_permissions (
   FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE CASCADE,
   FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Gán quyền cho vai trò (N:N)';
+
+CREATE TABLE user_permission_overrides (
+  user_id       INT NOT NULL,
+  permission_id INT NOT NULL,
+  effect        ENUM('grant','deny') NOT NULL,
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, permission_id),
+  INDEX idx_user_permission_overrides_effect (user_id, effect),
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (permission_id) REFERENCES permissions(permission_id) ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Quyền cấp/chặn riêng cho từng tài khoản';
+
+ALTER TABLE users
+  ADD CONSTRAINT fk_users_role_id
+  FOREIGN KEY (role_id) REFERENCES roles(role_id) ON DELETE SET NULL;
 
 -- ── 6. PRODUCT IMAGES & SKIN TYPES ────────────────────────────
 

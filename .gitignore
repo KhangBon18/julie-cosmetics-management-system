@@ -5,6 +5,8 @@ node_modules/
 .env
 server/.env
 client/.env
+server/.env.bak*
+*.env.bak*
 
 # Build
 client/dist/
@@ -40,3 +42,6 @@ server/uploads/*
 database/backups/
 docs/project-assignments/~
 docs/project-assignments/24.docx
+
+# Local TLS certs
+nginx/certs/

@@ -2,6 +2,8 @@ import api from './api';
 
 const authService = {
   login: (data) => api.post('/auth/login', data),
+  refresh: (data) => api.post('/auth/refresh', data),
+  logout: (data) => api.post('/auth/logout', data),
   getProfile: () => api.get('/auth/profile'),
   changePassword: (data) => api.put('/auth/change-password', data),
 

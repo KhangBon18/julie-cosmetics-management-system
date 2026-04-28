@@ -4,6 +4,7 @@ import { FiSearch, FiShoppingCart, FiChevronLeft, FiChevronRight, FiX } from 're
 import publicService from '../../services/publicService';
 import { CartContext } from '../../context/CartContext';
 import { toast } from 'react-toastify';
+import { getProductImage } from '../../utils/productImages';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 
@@ -226,31 +227,39 @@ export default function ShopPage() {
                 const lowStock = p.stock_quantity > 0 && p.stock_quantity <= 5;
                 const outOfStock = p.stock_quantity <= 0;
                 return (
-                  <div key={p.product_id} className="product-card">
-                    <div className="product-card-image">
-                      <img src={p.image_url} alt={p.product_name}
-                        onError={e => { e.target.src = 'https://via.placeholder.com/300x300.png?text=Julie'; }} />
-                      <div className="product-card-badges">
-                        {isNew && <span className="card-badge card-badge-new">Mới</span>}
-                        {lowStock && <span className="card-badge card-badge-low-stock">Sắp hết</span>}
-                        {outOfStock && <span className="card-badge card-badge-out">Hết hàng</span>}
-                      </div>
-                      {!outOfStock && (
-                        <div className="product-card-quick">
-                          <button className="btn-quick-add" onClick={e => handleAddCart(e, p)}>
-                            <FiShoppingCart size={14} /> Thêm vào giỏ
-                          </button>
+                  <div key={p.product_id} className="product-card product-card-v2">
+                    <Link to={`/shop/product/${p.product_id}`} className="product-card-image-link">
+                      <div className="product-card-image">
+                        <img
+                          src={getProductImage(p)}
+                          alt={p.product_name}
+                          loading="lazy"
+                          onError={e => { e.target.src = '/products/serum-1.jpg'; }}
+                        />
+                        <div className="product-card-badges">
+                          {isNew && <span className="card-badge card-badge-new">Mới</span>}
+                          {lowStock && <span className="card-badge card-badge-low-stock">Sắp hết</span>}
+                          {outOfStock && <span className="card-badge card-badge-out">Hết hàng</span>}
                         </div>
-                      )}
-                    </div>
+                        {!outOfStock && (
+                          <div className="product-card-quick">
+                            <button className="btn-quick-add" onClick={e => handleAddCart(e, p)}>
+                              <FiShoppingCart size={14} /> Thêm vào giỏ
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
                     <div className="product-card-body">
                       <div className="product-card-brand">{p.brand_name}</div>
                       <div className="product-card-title">
                         <Link to={`/shop/product/${p.product_id}`}>{p.product_name}</Link>
                       </div>
-                      {p.volume && <div style={{ fontSize: 11, color: 'var(--shop-text-muted)', marginBottom: 4 }}>{p.volume}</div>}
                       {p.avg_rating > 0 && <StarRating rating={Number(p.avg_rating)} count={p.review_count || 0} />}
-                      <div className="product-card-price">{fmt(p.sell_price)}đ</div>
+                      <div className="product-card-footer">
+                        <div className="product-card-price">{fmt(p.sell_price)}đ</div>
+                        {p.volume && <div className="product-card-volume">{p.volume}</div>}
+                      </div>
                     </div>
                   </div>
                 );

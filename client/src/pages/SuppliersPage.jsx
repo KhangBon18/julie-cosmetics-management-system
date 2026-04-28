@@ -29,10 +29,11 @@ export default function SuppliersPage() {
   });
   const limit = 10;
 
-  const { canCreate, canUpdate, canDelete, isAdmin } = usePermission();
+  const { canCreate, canUpdate, canDelete } = usePermission();
   const _canCreate = canCreate('suppliers');
   const _canUpdate = canUpdate('suppliers');
   const _canDelete = canDelete('suppliers');
+  const _canManageMappings = _canUpdate;
 
   useEffect(() => { loadSuppliers(); }, [page, search, statusFilter, sort]);
 
@@ -247,7 +248,7 @@ export default function SuppliersPage() {
                 <th>Email</th>
                 <th>Địa chỉ</th>
                 <th>Trạng thái</th>
-                {isAdmin ? <th>Danh mục nhập</th> : null}
+                {_canManageMappings ? <th>Danh mục nhập</th> : null}
                 {(_canUpdate || _canDelete) ? <th>Thao tác</th> : null}
               </tr>
             </thead>
@@ -260,7 +261,7 @@ export default function SuppliersPage() {
                   <td>{supplier.email || '—'}</td>
                   <td style={{ maxWidth: 240 }}>{supplier.address || '—'}</td>
                   <td><span className={`badge ${supplier.is_active ? 'badge-success' : 'badge-danger'}`}>{supplier.is_active ? 'Đang HĐ' : 'Ngừng'}</span></td>
-                  {isAdmin ? (
+                  {_canManageMappings ? (
                     <td>
                       <button className="btn btn-sm btn-outline" onClick={() => openMappingManager(supplier)}>
                         <FiPackage /> Quản lý
@@ -279,7 +280,7 @@ export default function SuppliersPage() {
               ))}
               {!suppliers.length ? (
                 <tr>
-                  <td colSpan={6 + (isAdmin ? 1 : 0) + ((_canUpdate || _canDelete) ? 1 : 0)} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+                  <td colSpan={6 + (_canManageMappings ? 1 : 0) + ((_canUpdate || _canDelete) ? 1 : 0)} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
                     Không có nhà cung cấp phù hợp
                   </td>
                 </tr>

@@ -14,6 +14,7 @@ const statusClass = { pending: 'badge-warning', approved: 'badge-success', rejec
 
 export default function MyLeavePage() {
   const [leaves, setLeaves] = useState([]);
+  const [leaveBalance, setLeaveBalance] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -30,6 +31,7 @@ export default function MyLeavePage() {
     try {
       const data = await staffService.getMyLeaves();
       setLeaves(data.leaves || []);
+      setLeaveBalance(data.leave_balance || null);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -74,9 +76,29 @@ export default function MyLeavePage() {
           <h1>Nghỉ phép & Nghỉ việc</h1>
           <p>{leaves.length} đơn đã gửi</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? '✕ Đóng' : '+ Tạo đơn mới'}
-        </button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          {leaveBalance && (
+            <div style={{ background: '#f8fafc', padding: '6px 16px', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Tổng phép</div>
+                <div style={{ fontWeight: 600 }}>{leaveBalance.annual_leave_entitled}</div>
+              </div>
+              <div style={{ width: 1, height: 24, background: '#cbd5e1' }} />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Đã dùng</div>
+                <div style={{ fontWeight: 600, color: '#ef4444' }}>{leaveBalance.annual_leave_used}</div>
+              </div>
+              <div style={{ width: 1, height: 24, background: '#cbd5e1' }} />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Còn lại</div>
+                <div style={{ fontWeight: 700, color: '#059669', fontSize: 16 }}>{leaveBalance.annual_leave_remaining}</div>
+              </div>
+            </div>
+          )}
+          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? '✕ Đóng' : '+ Tạo đơn mới'}
+          </button>
+        </div>
       </div>
 
       {/* Form nộp đơn */}

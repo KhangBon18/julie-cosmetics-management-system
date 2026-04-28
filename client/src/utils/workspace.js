@@ -13,21 +13,21 @@ const WORKSPACE_CONFIG = {
     title: 'Khu Quản lý Nhân sự',
     subtitle: 'Quản lý hồ sơ, nghỉ phép, lương thưởng và báo cáo nhân sự',
     defaultBasePath: '/hr',
-    homePath: '/hr/employees'
+    homePath: '/hr'
   },
   warehouse: {
     key: 'warehouse',
-    title: 'Khu Kho',
-    subtitle: 'Quản lý sản phẩm, nhập kho, nhà cung cấp và tồn kho',
+    title: 'Khu Quản lý Kho',
+    subtitle: 'Quản lý sản phẩm, nhà cung cấp, phiếu nhập và báo cáo tồn kho',
     defaultBasePath: '/warehouse',
-    homePath: '/warehouse/imports'
+    homePath: '/warehouse'
   },
   business: {
     key: 'business',
-    title: 'Khu Kinh doanh',
-    subtitle: 'Bán hàng, khách hàng, doanh thu và lợi nhuận',
+    title: 'Khu Kinh doanh Nội bộ',
+    subtitle: 'Lập hóa đơn, quản lý khách hàng, doanh thu, xuất hàng và lợi nhuận',
     defaultBasePath: '/business',
-    homePath: '/business/invoices'
+    homePath: '/business'
   },
   staff: {
     key: 'staff',
@@ -50,16 +50,70 @@ const ROLE_WORKSPACE_MAP = {
   staff_portal: 'staff'
 };
 
+const WORKSPACE_PERMISSION_PREFIXES = {
+  admin: ['users.', 'roles.', 'settings.'],
+  hr: ['employees.', 'positions.', 'leaves.', 'attendances.', 'salaries.'],
+  warehouse: ['products.', 'brands.', 'categories.', 'suppliers.', 'imports.'],
+  business: ['invoices.', 'customers.', 'reviews.'],
+  staff: []
+};
+
 export const normalizeUserRole = (user) => String(user?.role_name || user?.role || '')
   .trim()
   .toLowerCase();
 
-export const resolveWorkspaceKey = (user) => {
+const hasPermissionPrefix = (userPermissions = [], prefixes = []) => {
+  if (!Array.isArray(userPermissions) || !prefixes.length) return false;
+  return userPermissions.some(permission =>
+    prefixes.some(prefix => permission.startsWith(prefix))
+  );
+};
+
+export const getAccessibleWorkspaceKeys = (user) => {
+  const normalizedRole = normalizeUserRole(user);
+  const defaultWorkspaceKey = ROLE_WORKSPACE_MAP[normalizedRole] || 'staff';
+
+  if (defaultWorkspaceKey === 'admin') {
+    return Object.keys(WORKSPACE_CONFIG);
+  }
+
+  const accessibleWorkspaceKeys = new Set([defaultWorkspaceKey]);
+  const permissionList = Array.isArray(user?.permissions) ? user.permissions : [];
+
+  Object.entries(WORKSPACE_PERMISSION_PREFIXES).forEach(([workspaceKey, prefixes]) => {
+    if (workspaceKey === 'staff') return;
+    if (hasPermissionPrefix(permissionList, prefixes)) {
+      accessibleWorkspaceKeys.add(workspaceKey);
+    }
+  });
+
+  if (['manager', 'warehouse', 'staff', 'employee', 'staff_portal'].includes(normalizedRole)) {
+    accessibleWorkspaceKeys.add('staff');
+  }
+
+  return [...accessibleWorkspaceKeys];
+};
+
+export const isWorkspaceAccessible = (user, workspaceKey) => {
+  if (!workspaceKey) return false;
+  return getAccessibleWorkspaceKeys(user).includes(workspaceKey);
+};
+
+export const resolveWorkspaceKey = (user, pathname = '') => {
+  const currentBase = getWorkspaceBaseFromPath(pathname);
+  const currentWorkspaceKey = currentBase ? currentBase.slice(1) : null;
+
+  if (currentWorkspaceKey && isWorkspaceAccessible(user, currentWorkspaceKey)) {
+    return currentWorkspaceKey;
+  }
+
   const normalizedRole = normalizeUserRole(user);
   return ROLE_WORKSPACE_MAP[normalizedRole] || 'staff';
 };
 
-export const resolveWorkspaceMeta = (user) => WORKSPACE_CONFIG[resolveWorkspaceKey(user)] || WORKSPACE_CONFIG.staff;
+export const resolveWorkspaceMeta = (user, pathname = '') => (
+  WORKSPACE_CONFIG[resolveWorkspaceKey(user, pathname)] || WORKSPACE_CONFIG.staff
+);
 
 export const getWorkspaceBaseFromPath = (pathname = '') => (
   KNOWN_BASES.find(base => pathname === base || pathname.startsWith(`${base}/`)) || null
@@ -76,4 +130,4 @@ export const rebaseInternalPath = (path, basePath = '/admin') => {
   return path.replace(/^\/admin/, basePath);
 };
 
-export const getWorkspaceHomePath = (user) => resolveWorkspaceMeta(user).homePath;
+export const getWorkspaceHomePath = (user, pathname = '') => resolveWorkspaceMeta(user, pathname).homePath;
