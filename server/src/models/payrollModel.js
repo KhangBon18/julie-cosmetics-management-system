@@ -201,6 +201,10 @@ const PayrollModel = {
     return rows;
   },
 
+  findRecordsByPeriod: async (periodId) => {
+    return PayrollModel.findPayrollRecords(periodId);
+  },
+
   findPayrollRecordById: async (salaryId) => {
     const [rows] = await pool.query(
       `SELECT s.*, e.full_name AS employee_name

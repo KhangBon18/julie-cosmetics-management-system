@@ -261,7 +261,7 @@ const payrollController = {
       const period = await PayrollModel.findPayrollPeriodById(periodId);
       if (!period) return res.status(404).json({ message: 'Không tìm thấy kỳ lương' });
 
-      const records = await PayrollModel.findRecordsByPeriod(periodId);
+      const records = await PayrollModel.findPayrollRecords(periodId);
       const headers = [
         'Mã Lương', 'Nhân viên', 'Lương cơ bản', 'Ngày công chuẩn', 'Ngày công thực tế',
         'Nghỉ có lương', 'Nghỉ không lương', 'Vắng', 'Trễ (phút)', 'Về sớm (phút)',
