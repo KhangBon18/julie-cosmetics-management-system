@@ -65,10 +65,9 @@ services:
       dockerfile: Dockerfile
     container_name: julie_client
     ports:
-      - "${CLIENT_PORT:-5173}:5173"
+      - "${CLIENT_PORT:-5173}:80"
     environment:
       VITE_API_URL: /api
-      VITE_PROXY_TARGET: http://server:${PORT:-5001}
       VITE_APP_NAME: Julie Cosmetics
     depends_on:
       - server

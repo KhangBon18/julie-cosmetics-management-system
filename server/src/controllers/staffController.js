@@ -5,6 +5,38 @@ const SalaryBonus = require('../models/salaryBonusModel');
 const { pool } = require('../config/db');
 const { logAudit } = require('../utils/auditLogger');
 
+const finalizedSalaryStatuses = ['approved', 'paid', 'locked'];
+
+const salaryFormulaPayload = {
+  formula: 'Lương thực nhận = Tổng lương prorate theo từng giai đoạn chức vụ trong tháng + Thưởng − Khấu trừ',
+  details: [
+    'Ngày công chuẩn lấy từ cấu hình hệ thống (mặc định 22 ngày/tháng).',
+    'Nếu module chấm công đã triển khai và tháng đó có dữ liệu attendance, ngày công thực tế sẽ ưu tiên lấy từ dữ liệu chấm công.',
+    'Nếu chưa có dữ liệu attendance: hệ thống fallback về công thức hiện tại dựa trên ngày công chuẩn và nghỉ không lương đã duyệt.',
+    'Nếu không đổi chức vụ trong tháng: lương được tính như công thức thông thường theo ngày công thực tế.',
+    'Nếu đổi chức vụ giữa tháng: hệ thống chia tháng thành nhiều giai đoạn theo effective_date và tính riêng từng mức lương tại thời điểm đó.',
+    'Nghỉ phép không lương (unpaid) đã duyệt sẽ bị trừ vào giai đoạn lương tương ứng.',
+    'Nghỉ phép năm (annual) đã duyệt: không trừ lương.',
+    'Đơn nghỉ việc đã duyệt sẽ chặn phát sinh bảng lương cho các kỳ sau ngày nghỉ chính thức.',
+    'Đi trễ/về sớm được tính theo cấu hình phạt của hệ thống nếu đã bật.',
+    'Thưởng và khấu trừ do quản lý cập nhật khi chốt bảng lương.'
+  ]
+};
+
+const normalizePositiveInt = (value) => {
+  const numeric = Number(value);
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+};
+
+const parseCalculationDetails = (salary) => {
+  if (!salary || !salary.calculation_details || typeof salary.calculation_details !== 'string') return salary;
+  try {
+    return { ...salary, calculation_details: JSON.parse(salary.calculation_details) };
+  } catch {
+    return salary;
+  }
+};
+
 const staffController = {
   // GET /api/staff/profile — Lấy thông tin nhân viên gắn với user
   getProfile: async (req, res, next) => {
@@ -52,9 +84,99 @@ const staffController = {
         page: parseInt(page) || 1, limit: parseInt(limit) || 20,
         employee_id: req.user.employee_id,
         month, year,
-        status: ['approved', 'paid', 'locked'] // Only show finalized salaries
+        status: finalizedSalaryStatuses // Only show finalized salaries
       });
       res.json(result);
+    } catch (error) { next(error); }
+  },
+
+  // GET /api/staff/salary-slip/:month/:year — Print-friendly monthly salary data
+  getMonthlySalarySlip: async (req, res, next) => {
+    try {
+      if (!req.user.employee_id) {
+        return res.status(400).json({ message: 'Tài khoản không liên kết với nhân viên nào' });
+      }
+
+      const month = normalizePositiveInt(req.params.month);
+      const year = normalizePositiveInt(req.params.year);
+      if (!month || month < 1 || month > 12 || !year) {
+        return res.status(400).json({ message: 'Tháng/năm phiếu lương không hợp lệ' });
+      }
+
+      const [employee, result] = await Promise.all([
+        Employee.findById(req.user.employee_id),
+        Salary.findAll({
+          page: 1,
+          limit: 1,
+          employee_id: req.user.employee_id,
+          month,
+          year,
+          status: finalizedSalaryStatuses
+        })
+      ]);
+
+      const salary = result.salaries[0] ? parseCalculationDetails(result.salaries[0]) : null;
+      if (!salary) {
+        return res.status(404).json({ message: `Không tìm thấy phiếu lương đã chốt tháng ${month}/${year}` });
+      }
+
+      res.json({
+        employee,
+        salary,
+        formula: salaryFormulaPayload,
+        generated_at: new Date().toISOString()
+      });
+    } catch (error) { next(error); }
+  },
+
+  // GET /api/staff/salary-slip/annual/:year — Print-friendly annual salary data
+  getAnnualSalarySlip: async (req, res, next) => {
+    try {
+      if (!req.user.employee_id) {
+        return res.status(400).json({ message: 'Tài khoản không liên kết với nhân viên nào' });
+      }
+
+      const year = normalizePositiveInt(req.params.year);
+      if (!year) {
+        return res.status(400).json({ message: 'Năm bảng lương không hợp lệ' });
+      }
+
+      const [employee, result] = await Promise.all([
+        Employee.findById(req.user.employee_id),
+        Salary.findAll({
+          page: 1,
+          limit: 'all',
+          employee_id: req.user.employee_id,
+          year,
+          status: finalizedSalaryStatuses
+        })
+      ]);
+
+      const salaries = result.salaries.map(parseCalculationDetails);
+      const summary = salaries.reduce((acc, salary) => {
+        acc.total_gross += Number(salary.gross_salary || 0);
+        acc.total_bonus += Number(salary.bonus || 0);
+        acc.total_deductions += Number(salary.deductions || 0);
+        acc.total_net += Number(salary.net_salary || 0);
+        acc.total_work_days += Number(salary.work_days_actual || 0);
+        return acc;
+      }, {
+        salary_count: salaries.length,
+        total_gross: 0,
+        total_bonus: 0,
+        total_deductions: 0,
+        total_net: 0,
+        total_work_days: 0
+      });
+
+      res.json({
+        employee,
+        year,
+        salaries,
+        summary,
+        formula: salaryFormulaPayload,
+        generated_at: new Date().toISOString()
+      });
     } catch (error) { next(error); }
   },
 
@@ -107,21 +229,7 @@ const staffController = {
   // GET /api/staff/salary-formula — Xem cách tính lương
   getSalaryFormula: async (req, res, next) => {
     try {
-      res.json({
-        formula: 'Lương thực nhận = Tổng lương prorate theo từng giai đoạn chức vụ trong tháng + Thưởng − Khấu trừ',
-        details: [
-          'Ngày công chuẩn lấy từ cấu hình hệ thống (mặc định 22 ngày/tháng).',
-          'Nếu module chấm công đã triển khai và tháng đó có dữ liệu attendance, ngày công thực tế sẽ ưu tiên lấy từ dữ liệu chấm công.',
-          'Nếu chưa có dữ liệu attendance: hệ thống fallback về công thức hiện tại dựa trên ngày công chuẩn và nghỉ không lương đã duyệt.',
-          'Nếu không đổi chức vụ trong tháng: lương được tính như công thức thông thường theo ngày công thực tế.',
-          'Nếu đổi chức vụ giữa tháng: hệ thống chia tháng thành nhiều giai đoạn theo effective_date và tính riêng từng mức lương tại thời điểm đó.',
-          'Nghỉ phép không lương (unpaid) đã duyệt sẽ bị trừ vào giai đoạn lương tương ứng.',
-          'Nghỉ phép năm (annual) đã duyệt: không trừ lương.',
-          'Đơn nghỉ việc đã duyệt sẽ chặn phát sinh bảng lương cho các kỳ sau ngày nghỉ chính thức.',
-          'Đi trễ/về sớm hiện được ghi chú tham khảo; hệ thống chưa tự động trừ tiền nếu chưa có cấu hình phạt riêng.',
-          'Thưởng và khấu trừ do quản lý cập nhật khi chốt bảng lương.'
-        ]
-      });
+      res.json(salaryFormulaPayload);
     } catch (error) { next(error); }
   },
 

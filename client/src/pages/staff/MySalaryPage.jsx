@@ -3,6 +3,191 @@ import { toast } from 'react-toastify';
 import staffService from '../../services/staffService';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n || 0));
+const fmtMoney = (n) => `${fmt(n)}đ`;
+const generatedAtLabel = () => new Date().toLocaleString('vi-VN');
+
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const getEmployeeName = (profile, salary) => (
+  profile?.full_name || salary?.employee_name || 'Nhân viên Julie Cosmetics'
+);
+
+const getEmployeeCode = (profile, salary) => (
+  profile?.employee_code || profile?.employee_id || salary?.employee_id || salary?.salary_id || 'N/A'
+);
+
+const getPositionLabel = (profile) => (
+  profile?.position_name || profile?.current_position || profile?.department_name || profile?.department || 'Chưa cập nhật'
+);
+
+const parseDetails = (salary) => {
+  if (!salary?.calculation_details) return null;
+  if (typeof salary.calculation_details === 'object') return salary.calculation_details;
+  try { return JSON.parse(salary.calculation_details); } catch { return null; }
+};
+
+const openSalaryPrintWindow = (html, title) => {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    throw new Error('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup để tiếp tục.');
+  }
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body{font-family:Arial,'Helvetica Neue',sans-serif;color:#172033;margin:0;padding:28px;background:#fff}
+          h1{font-size:24px;text-align:center;margin:0 0 4px;color:#1d4ed8}
+          h2{font-size:18px;text-align:center;margin:0 0 22px;color:#334155;font-weight:600}
+          .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;margin-bottom:18px}
+          .meta div{border-bottom:1px solid #e5e7eb;padding:7px 0;font-size:13px}
+          .meta span{display:inline-block;min-width:130px;color:#64748b}
+          .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}
+          .box{border:1px solid #cbd5e1;border-radius:8px;padding:12px;text-align:center}
+          .box label{display:block;font-size:11px;color:#64748b;text-transform:uppercase;margin-bottom:4px}
+          .box strong{font-size:18px;color:#0f172a}
+          table{width:100%;border-collapse:collapse;margin-top:12px}
+          th,td{border:1px solid #cbd5e1;padding:8px 10px;font-size:12px;text-align:right}
+          th{background:#eef2ff;color:#1e293b;text-align:center}
+          td.left{text-align:left}
+          td.center{text-align:center}
+          .section{font-weight:700;margin-top:18px;color:#0f172a}
+          .note{font-size:12px;line-height:1.5;color:#475569;margin-top:12px}
+          .signatures{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:42px;text-align:center;font-size:13px}
+          .muted{color:#64748b}
+          @media print{body{padding:16mm}.no-print{display:none}}
+        </style>
+      </head>
+      <body>${html}</body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+};
+
+const renderFormulaHtml = (formula) => {
+  if (!formula) return '';
+  const details = (formula.details || []).map(item => `<li>${escapeHtml(item)}</li>`).join('');
+  return `
+    <div class="section">Công thức / ghi chú cách tính</div>
+    <div class="note"><strong>${escapeHtml(formula.formula || '')}</strong></div>
+    ${details ? `<ul class="note">${details}</ul>` : ''}
+  `;
+};
+
+const renderMonthlySalaryHtml = (salary, profile, formula) => {
+  const details = parseDetails(salary);
+  const gross = Number(salary.gross_salary || details?.summary?.gross_salary || 0);
+  const deductions = Number(salary.deductions || details?.summary?.total_deductions || 0);
+  const bonus = Number(salary.bonus || 0);
+  const net = Number(salary.net_salary || 0);
+  const employeeName = getEmployeeName(profile, salary);
+
+  return `
+    <h1>JULIE COSMETICS</h1>
+    <h2>Phiếu lương tháng ${escapeHtml(salary.month)}/${escapeHtml(salary.year)}</h2>
+    <div class="meta">
+      <div><span>Nhân viên:</span><strong>${escapeHtml(employeeName)}</strong></div>
+      <div><span>Mã nhân viên:</span><strong>${escapeHtml(getEmployeeCode(profile, salary))}</strong></div>
+      <div><span>Chức vụ/Bộ phận:</span><strong>${escapeHtml(getPositionLabel(profile))}</strong></div>
+      <div><span>Ngày in:</span><strong>${escapeHtml(generatedAtLabel())}</strong></div>
+      <div><span>Kỳ lương:</span><strong>Tháng ${escapeHtml(salary.month)}/${escapeHtml(salary.year)}</strong></div>
+      <div><span>Trạng thái:</span><strong>${escapeHtml(salary.status || 'N/A')}</strong></div>
+    </div>
+    <table>
+      <tbody>
+        <tr><th class="left">Khoản mục</th><th>Giá trị</th></tr>
+        <tr><td class="left">Lương cơ bản / lương hiệu lực</td><td>${fmtMoney(salary.base_salary || details?.base_rates?.effective_base_salary)}</td></tr>
+        <tr><td class="left">Ngày công thực tế / ngày công chuẩn</td><td>${fmt(salary.work_days_actual)} / ${fmt(salary.work_days_standard)}</td></tr>
+        <tr><td class="left">Nghỉ phép có lương</td><td>${fmt(salary.paid_leave_days)} ngày</td></tr>
+        <tr><td class="left">Nghỉ không lương</td><td>${fmt(salary.unpaid_leave_days)} ngày</td></tr>
+        <tr><td class="left">Vắng không phép</td><td>${fmt(salary.absent_days)} ngày</td></tr>
+        <tr><td class="left">Đi trễ / về sớm</td><td>${fmt(salary.total_late_minutes)} phút / ${fmt(salary.total_early_leave_minutes)} phút</td></tr>
+        <tr><td class="left">Tăng ca</td><td>${fmt(salary.total_overtime_minutes)} phút (${fmtMoney(salary.overtime_amount)})</td></tr>
+        <tr><td class="left">Phụ cấp</td><td>${fmtMoney(salary.allowance_amount)}</td></tr>
+        <tr><td class="left">Thưởng</td><td>${fmtMoney(bonus)}</td></tr>
+        <tr><td class="left">Khấu trừ / phạt / nghỉ không lương</td><td>${fmtMoney(deductions)}</td></tr>
+      </tbody>
+    </table>
+    <div class="summary">
+      <div class="box"><label>Gross</label><strong>${fmtMoney(gross)}</strong></div>
+      <div class="box"><label>Thưởng</label><strong>${fmtMoney(bonus)}</strong></div>
+      <div class="box"><label>Khấu trừ</label><strong>${fmtMoney(deductions)}</strong></div>
+      <div class="box"><label>Thực nhận</label><strong>${fmtMoney(net)}</strong></div>
+    </div>
+    ${salary.notes ? `<div class="note"><strong>Ghi chú:</strong> ${escapeHtml(salary.notes)}</div>` : ''}
+    ${renderFormulaHtml(formula)}
+    <div class="signatures">
+      <div><strong>Người lập bảng lương</strong><br/><span class="muted">(Ký và ghi rõ họ tên)</span></div>
+      <div><strong>Nhân viên xác nhận</strong><br/><span class="muted">(Ký và ghi rõ họ tên)</span></div>
+    </div>
+  `;
+};
+
+const renderAnnualSalaryHtml = (salaries, profile, formula, year) => {
+  const totalGross = salaries.reduce((sum, salary) => sum + Number(salary.gross_salary || 0), 0);
+  const totalBonus = salaries.reduce((sum, salary) => sum + Number(salary.bonus || 0), 0);
+  const totalDeductions = salaries.reduce((sum, salary) => sum + Number(salary.deductions || 0), 0);
+  const totalNet = salaries.reduce((sum, salary) => sum + Number(salary.net_salary || 0), 0);
+  const totalWorkDays = salaries.reduce((sum, salary) => sum + Number(salary.work_days_actual || 0), 0);
+
+  const rows = salaries.map(salary => `
+    <tr>
+      <td class="center">${escapeHtml(salary.month)}/${escapeHtml(salary.year)}</td>
+      <td>${fmt(salary.work_days_actual)}/${fmt(salary.work_days_standard)}</td>
+      <td>${fmt(salary.total_overtime_minutes)} phút</td>
+      <td>${fmtMoney(salary.base_salary)}</td>
+      <td>${fmtMoney(salary.gross_salary)}</td>
+      <td>${fmtMoney(salary.bonus)}</td>
+      <td>${fmtMoney(salary.deductions)}</td>
+      <td>${fmtMoney(salary.net_salary)}</td>
+      <td class="center">${escapeHtml(salary.status || '')}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <h1>JULIE COSMETICS</h1>
+    <h2>Bảng tổng hợp lương năm ${escapeHtml(year || 'tất cả')}</h2>
+    <div class="meta">
+      <div><span>Nhân viên:</span><strong>${escapeHtml(getEmployeeName(profile, salaries[0]))}</strong></div>
+      <div><span>Mã nhân viên:</span><strong>${escapeHtml(getEmployeeCode(profile, salaries[0]))}</strong></div>
+      <div><span>Chức vụ/Bộ phận:</span><strong>${escapeHtml(getPositionLabel(profile))}</strong></div>
+      <div><span>Ngày in:</span><strong>${escapeHtml(generatedAtLabel())}</strong></div>
+      <div><span>Số kỳ lương:</span><strong>${fmt(salaries.length)}</strong></div>
+      <div><span>Tổng ngày công:</span><strong>${fmt(totalWorkDays)}</strong></div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Kỳ</th><th>Ngày công</th><th>OT</th><th>Lương CB</th><th>Gross</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th><th>TT</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        <tr>
+          <th class="left" colspan="4">Tổng cộng</th>
+          <th>${fmtMoney(totalGross)}</th>
+          <th>${fmtMoney(totalBonus)}</th>
+          <th>${fmtMoney(totalDeductions)}</th>
+          <th>${fmtMoney(totalNet)}</th>
+          <th></th>
+        </tr>
+      </tbody>
+    </table>
+    ${renderFormulaHtml(formula)}
+    <div class="signatures">
+      <div><strong>Người lập bảng lương</strong><br/><span class="muted">(Ký và ghi rõ họ tên)</span></div>
+      <div><strong>Nhân viên xác nhận</strong><br/><span class="muted">(Ký và ghi rõ họ tên)</span></div>
+    </div>
+  `;
+};
 
 const STATUS_LABELS = {
   draft: { label: 'Nháp', color: '#64748b', bg: '#f1f5f9' },
@@ -19,6 +204,7 @@ const Badge = ({ status }) => {
 export default function MySalaryPage() {
   const [salaries, setSalaries] = useState([]);
   const [formula, setFormula] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [loading, setLoading] = useState(true);
   const [showFormula, setShowFormula] = useState(false);
@@ -29,9 +215,10 @@ export default function MySalaryPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [salaryData, formulaData] = await Promise.all([
+      const [salaryData, formulaData, profileData] = await Promise.all([
         staffService.getMySalaries({ year: year || undefined }),
-        staffService.getSalaryFormula()
+        staffService.getSalaryFormula(),
+        staffService.getProfile()
       ]);
       const sals = salaryData.salaries || [];
       sals.forEach(s => {
@@ -41,11 +228,41 @@ export default function MySalaryPage() {
       });
       setSalaries(sals);
       setFormula(formulaData);
+      setProfile(profileData?.employee || profileData || null);
     } catch (err) { toast.error(err.message); }
     finally { setLoading(false); }
   };
 
   const totalNet = salaries.reduce((s, r) => s + parseFloat(r.net_salary || 0), 0);
+  const totalBonus = salaries.reduce((s, r) => s + parseFloat(r.bonus || 0), 0);
+  const totalDeductions = salaries.reduce((s, r) => s + parseFloat(r.deductions || 0), 0);
+
+  const handlePrintMonthly = (salary) => {
+    try {
+      openSalaryPrintWindow(
+        renderMonthlySalaryHtml(salary, profile, formula),
+        `Phiếu lương T${salary.month}-${salary.year}`
+      );
+    } catch (err) {
+      toast.error(err.message || 'Không thể mở cửa sổ in bảng lương tháng.');
+    }
+  };
+
+  const handlePrintAnnual = () => {
+    if (!salaries.length) {
+      toast.info('Chưa có dữ liệu lương để in bảng tổng hợp năm.');
+      return;
+    }
+
+    try {
+      openSalaryPrintWindow(
+        renderAnnualSalaryHtml(salaries, profile, formula, year),
+        `Bảng lương năm ${year || 'tat-ca'}`
+      );
+    } catch (err) {
+      toast.error(err.message || 'Không thể mở cửa sổ in bảng lương năm.');
+    }
+  };
 
   if (loading) return <div className="loading-container"><div className="spinner" /></div>;
 
@@ -56,7 +273,10 @@ export default function MySalaryPage() {
           <h1>Bảng lương cá nhân</h1>
           <p>Xem phiếu lương và chi tiết tính toán</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-outline" onClick={handlePrintAnnual} disabled={!salaries.length}>
+            In bảng lương năm
+          </button>
           <button className="btn btn-outline" onClick={() => setShowFormula(!showFormula)}>
             📐 {showFormula ? 'Ẩn công thức' : 'Cách tính lương'}
           </button>
@@ -69,7 +289,7 @@ export default function MySalaryPage() {
           <div className="card-body">
             <div style={{ fontSize: 16, fontWeight: 700, color: '#6366f1', marginBottom: 12, fontFamily: 'monospace' }}>{formula.formula}</div>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {formula.details.map((d, i) => <li key={i} style={{ padding: '4px 0', color: '#475569' }}>{d}</li>)}
+              {(formula.details || []).map((d, i) => <li key={i} style={{ padding: '4px 0', color: '#475569' }}>{d}</li>)}
             </ul>
           </div>
         </div>
@@ -85,6 +305,12 @@ export default function MySalaryPage() {
             <span style={{ color: '#64748b', fontSize: 14 }}>
               Tổng thực nhận: <strong style={{ color: '#2563eb' }}>{fmt(totalNet)}đ</strong>
             </span>
+            <span style={{ color: '#64748b', fontSize: 14 }}>
+              Thưởng: <strong style={{ color: '#059669' }}>{fmt(totalBonus)}đ</strong>
+            </span>
+            <span style={{ color: '#64748b', fontSize: 14 }}>
+              Khấu trừ: <strong style={{ color: '#ef4444' }}>{fmt(totalDeductions)}đ</strong>
+            </span>
           </div>
         </div>
 
@@ -94,7 +320,7 @@ export default function MySalaryPage() {
               <tr>
                 <th>Tháng</th><th>Ngày công</th><th>NP có lương</th><th>NP k.lương</th>
                 <th>Trễ</th><th>OT</th><th>Lương CB</th><th>Gross</th>
-                <th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th><th>TT</th><th></th>
+                <th>Thưởng</th><th>Khấu trừ</th><th>Thực nhận</th><th>TT</th><th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -113,7 +339,10 @@ export default function MySalaryPage() {
                   <td style={{ fontWeight: 700, color: '#2563eb' }}>{fmt(s.net_salary)}đ</td>
                   <td><Badge status={s.status} /></td>
                   <td>
-                    <button className="btn btn-sm btn-outline" onClick={() => setDetailSalary(s)}>📋</button>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <button className="btn btn-sm btn-outline" onClick={() => setDetailSalary(s)}>Chi tiết</button>
+                      <button className="btn btn-sm btn-primary" onClick={() => handlePrintMonthly(s)}>In tháng</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -131,7 +360,10 @@ export default function MySalaryPage() {
                onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ margin: 0 }}>Phiếu lương T{detailSalary.month}/{detailSalary.year}</h2>
-              <button className="btn btn-sm btn-outline" onClick={() => setDetailSalary(null)}>✕</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-sm btn-primary" onClick={() => handlePrintMonthly(detailSalary)}>In phiếu tháng</button>
+                <button className="btn btn-sm btn-outline" onClick={() => setDetailSalary(null)}>✕</button>
+              </div>
             </div>
 
             {detailSalary.calculation_details ? (

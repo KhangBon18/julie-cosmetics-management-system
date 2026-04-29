@@ -1,28 +1,53 @@
 # Julie Cosmetics
 
-Hệ thống quản lý mỹ phẩm phục vụ đồ án HTTT doanh nghiệp, gồm:
+Hệ thống thông tin doanh nghiệp cho cửa hàng mỹ phẩm, phục vụ đồ án HTTTDN SGU. Codebase hiện tại gồm:
 
 - Storefront cho khách hàng
-- Admin dashboard cho bán hàng, kho, nhân sự, báo cáo
-- API Express + MySQL
-- Dữ liệu demo và tài khoản test sẵn sàng cho chạy thử
+- Dashboard nội bộ đa workspace cho `Admin / HR / Warehouse / Business / Staff Portal`
+- API Express + MySQL 8
+- Demo data, smoke scripts, Docker Compose, backup/restore
 
-## Stack thực tế
+## Stack và cổng chuẩn
 
-- Frontend: React + Vite + Axios + Recharts
+- Frontend: React 18 + Vite + Axios + Recharts
 - Backend: Node.js + Express
 - Database: MySQL 8
-- Runtime demo: local dev hoặc Docker Compose
+- Docker: `mysql`, `server`, `client`, `demo_seed`, `nginx`
 
-## Cổng chuẩn của dự án
+Ports mặc định:
 
-- Client: `http://localhost:5173`
-- Server API: `http://localhost:5001`
-- MySQL host port mặc định: `localhost:3307`
-- Frontend luôn gọi API qua `/api`
-- App DB user mặc định: `julie_app / julie_demo_123`
+- Frontend dev: `http://localhost:5173`
+- API trực tiếp: `http://localhost:5001`
+- HTTPS reverse proxy: `https://localhost`
+- MySQL host port: `localhost:3307`
 
-## Tài khoản test mặc định
+Health / compatibility endpoints:
+
+- `GET /health`
+- `GET /api/health`
+- `GET /api/attendance`
+- `GET /api/attendances`
+- `GET /api/reports/sales-summary`
+
+## Mapping theo phần II SGU
+
+Hệ thống đáp ứng phần II theo mô hình multi-workspace dashboard:
+
+| Khu vực | Route chính | Vai trò demo | Nội dung chấm chính |
+|---|---|---|---|
+| Admin | `/admin` | `admin` | user, role, settings, báo cáo toàn hệ thống |
+| HR | `/hr` | `manager01` | nhân sự, duyệt nghỉ, chấm công, tính lương, báo cáo HR |
+| Warehouse | `/warehouse` | `warehouse01` | sản phẩm, nhà cung cấp, phiếu nhập, báo cáo kho |
+| Business | `/business` | `sales01` | hóa đơn bán hàng, khách hàng, doanh thu, lợi nhuận |
+| Staff Portal | `/staff` | `staff01` | hồ sơ cá nhân, nghỉ phép, chấm công, bảng lương |
+
+Lưu ý học thuật:
+
+- Hệ thống **không** tách thành nhiều frontend app độc lập; đây là một dashboard nội bộ đa workspace.
+- Nghiệp vụ bán hàng dùng `invoices` làm thực thể trung tâm. Không tự thêm bảng `orders` vào báo cáo nếu muốn bám codebase.
+- “Phiếu xuất” của đề bài được thể hiện qua hóa đơn bán hàng + thống kê xuất hàng trong báo cáo kho.
+
+## Tài khoản demo
 
 - `admin / admin123`
 - `manager01 / manager123`
@@ -30,56 +55,9 @@ Hệ thống quản lý mỹ phẩm phục vụ đồ án HTTT doanh nghiệp, g
 - `sales01 / sales123`
 - `warehouse01 / warehouse123`
 
-### Vai trò dùng khi demo
-
-- `admin`: quản trị tài khoản, nhóm quyền, cấu hình, báo cáo toàn hệ thống
-- `manager01`: quản lý nhân sự, lương thưởng, duyệt nghỉ phép, báo cáo HR
-- `staff01`: dùng để demo cổng tự phục vụ nhân viên
-- `sales01`: dùng để demo khu kinh doanh nội bộ
-- `warehouse01`: dùng để demo kho, sản phẩm, nhà cung cấp, phiếu nhập
-
-### Demo fixtures được tự phục hồi trước giờ chấm
-
-`npm run demo:fixtures` sẽ đảm bảo lại các case demo dễ bị trôi sau khi test nhiều lần:
-
-- 1 hóa đơn `pending` để demo xác nhận / thất bại thanh toán
-- 1 đơn nghỉ phép `pending` để manager duyệt
-- 1 kỳ lương tháng hiện tại cho `staff01` kèm thưởng demo nếu DB đã có migration bonus
-- NCC `1/2` còn mapping riêng và 1 NCC fallback toàn catalog để demo backward compatibility nhập kho
-
-### Khôi phục nhanh tài khoản demo nếu DB bị drift
-
-Nếu đăng nhập báo sai mật khẩu dù đang dùng đúng tài khoản trong README, DB demo của bạn nhiều khả năng đã bị đổi hash từ các lần test trước. Khi đó chạy:
-
-```bash
-npm run demo:reset-users
-```
-
-Lệnh này sẽ:
-
-- reset lại 5 tài khoản demo về đúng mật khẩu công bố
-- reset thêm tài khoản `sales01` cho khu kinh doanh nội bộ
-- kích hoạt lại tài khoản nếu đang bị khóa
-- xóa lịch sử throttle đăng nhập cho 5 tài khoản demo
-- đồng bộ lại các quyền cốt lõi cần cho flow demo của admin / manager / staff / sales / warehouse
-
-Sau đó xác minh nhanh bằng:
-
-```bash
-npm run demo:smoke
-```
-
-## Flow khuyến nghị cho máy trắng
-
-Flow ổn định nhất để demo là:
-
-1. Dùng Docker để chạy MySQL đã tự init dữ liệu.
-2. Chạy server + client bằng local Node.js để dễ debug và chỉnh sửa.
-
 ## Chuẩn bị môi trường
 
-1. Cài Node.js 18+ và Docker Desktop.
-2. Tạo file env:
+1. Tạo env:
 
 ```bash
 cd "Julie Cosmetics"
@@ -88,233 +66,157 @@ cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-3. Cài dependencies:
+2. Cài dependencies:
 
 ```bash
 npm run install:all
 ```
 
-## Local run flow
+## Flow khuyến nghị để chạy demo
 
-1. Khởi động MySQL đã seed dữ liệu:
+### Cách nhanh nhất
 
 ```bash
 npm run db:up
-```
-
-2. Chạy client + server:
-
-```bash
+npm run demo:prepare
 npm run dev
 ```
 
-3. Smoke test backend nhanh:
+`npm run demo:prepare` hiện sẽ:
+
+- chạy migration qua `schema_migrations`
+- reset tài khoản demo về đúng credential công bố
+- dựng lại demo fixtures quan trọng
+- sửa text demo bị mojibake nếu phát hiện
+- smoke backend
+- smoke toàn bộ 5 vai chính
+
+### Chạy full Docker stack
+
+```bash
+docker compose up -d --build
+```
+
+Stack Docker sẽ mở:
+
+- `http://localhost:5173` cho Vite dev client
+- `http://localhost:5001` cho API trực tiếp
+- `https://localhost` qua `nginx`
+
+Reset volume nếu cần init lại từ đầu:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+## Migrate, seed và dữ liệu demo
+
+### Migration
+
+```bash
+npm run db:migrate
+cd server && npm run migrate:status
+```
+
+### Seed / phục hồi demo
+
+```bash
+npm run seed:demo
+npm run demo:reset-users
+npm run demo:fixtures
+npm run demo:fix-text
+```
+
+Ý nghĩa:
+
+- `seed:demo`: thêm giao dịch demo mở rộng
+- `demo:reset-users`: đồng bộ lại 5 tài khoản demo
+- `demo:fixtures`: đảm bảo đủ invoice pending, leave pending, payroll/bonus, supplier fallback
+- `demo:fix-text`: sửa text lỗi mã hóa trong DB cũ nếu có
+
+## Smoke / build / verify
 
 ```bash
 npm run smoke:server
+npm run demo:smoke
+cd client && npm run build
+docker compose config --quiet
 ```
 
-4. Mở:
+## Những gì nên demo để lấy điểm phần II
 
-- `http://localhost:5173`
-- Admin login: `http://localhost:5173/admin/login`
-- Nếu `5173` đang bận, Vite có thể tự chuyển sang `5174`; server đã cho phép local CORS cho `localhost/127.0.0.1`.
+### 1. CSDL
 
-### Lưu ý local flow
+- Chạy backup/restore scripts:
+  - [database/backup.sh](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/backup.sh)
+  - [database/restore.sh](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/restore.sh)
+- Nêu rõ DB đã có migration runner và dữ liệu demo cho HR, kho, bán hàng.
 
-- Sau khi pull patch setup mới, cần reset Docker volume 1 lần để chạy lại init scripts:
+### 2. Admin
 
-```bash
-npm run docker:reset
-```
+- Đăng nhập `admin`
+- Vào `Tài khoản`, `Nhóm quyền`, `Cấu hình`, `Báo cáo`
+- Từ `Nhà cung cấp`, mở phần mapping sản phẩm để trình bày kiểm soát NCC
 
-- `docker compose up -d mysql` sẽ tự chạy:
-  - [schema.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/schema.sql)
-  - [seed.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed.sql)
-  - [seed_rbac.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed_rbac.sql)
-  - [seed_settings.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed_settings.sql)
-- Sau khi DB sẵn sàng, nếu cần bổ sung thêm giao dịch demo thì chạy:
+### 3. Module nhân sự
 
-```bash
-npm run seed:demo
-```
+- `manager01` vào `/hr`
+- Demo:
+  - quản lý nhân viên
+  - thay đổi chức vụ
+  - duyệt nghỉ phép / nghỉ việc
+  - tính lương và thưởng
+  - in bảng lương tháng/năm
+- `staff01` vào `/staff`
+- Demo:
+  - hồ sơ cá nhân
+  - nộp đơn nghỉ
+  - xem chấm công
+  - xem/in bảng lương
 
-- Script `seed:demo` có kiểm tra dữ liệu sẵn có và sẽ bỏ qua nếu demo data đã tồn tại.
-- `seed:demo` và các script import dữ liệu sẽ đọc `DB_PORT` từ `.env`; cổng mặc định của Docker host là `3307`, không phải `3306`.
-- Local backend mặc định sẽ đọc thêm file `.env` ở thư mục gốc để đồng bộ `DB_PORT/DB_PASSWORD/CLIENT_URL` với Docker Compose.
-- Backend và script seed dùng app user `julie_app` thay vì `root`, để tránh lỗi TCP auth khi kết nối từ host vào MySQL Docker.
-- Nếu muốn reset toàn bộ DB để seed lại từ đầu:
+### 4. Module kho
 
-```bash
-npm run docker:reset
-npm run db:up
-npm run seed:demo
-```
+- `warehouse01` vào `/warehouse`
+- Demo:
+  - quản lý sản phẩm
+  - nhà cung cấp
+  - phiếu nhập
+  - báo cáo kho theo tháng / quý / năm
 
-- Nếu đang nâng cấp từ một DB cũ đã tạo trước patch mới nhất, hãy chạy thêm migration:
+### 5. Module kinh doanh
 
-```bash
-mysql -h 127.0.0.1 -P 3307 -u julie_app -p julie_cosmetics < database/migrations/031_fix_invoice_crm_status_accounting.sql
-mysql -h 127.0.0.1 -P 3307 -u julie_app -p julie_cosmetics < database/migrations/032_create_salary_bonus_adjustments.sql
-mysql -h 127.0.0.1 -P 3307 -u julie_app -p julie_cosmetics < database/migrations/033_add_supplier_products_mapping.sql
-```
-
-## Docker run flow
-
-Chạy toàn bộ stack bằng Docker:
-
-```bash
-npm run docker:up
-```
-
-Compose sẽ chạy:
-
-- `mysql`: tạo schema + seed base + RBAC + settings
-- `server`: API tại cổng `5001`
-- `client`: Vite dev server tại cổng `5173`
-- `demo_seed`: tự bơm thêm hóa đơn / phiếu nhập / review nếu DB chưa có
-
-Dừng stack:
-
-```bash
-npm run docker:down
-```
-
-Reset volume để chạy lại từ đầu:
-
-```bash
-npm run docker:reset
-```
-
-## Tính nhất quán API
-
-- Client env mặc định dùng `VITE_API_URL=/api`
-- Vite proxy dùng `VITE_PROXY_TARGET`
-- Local dev proxy tới `http://localhost:5001`
-- Docker client proxy tới `http://server:5001`
-- Vì vậy browser luôn gọi cùng một dạng URL là `/api/...`
-
-## Seed/demo data
-
-### Base demo data
-
-Được nạp tự động từ SQL init:
-
-- Nhân sự, chức vụ, user, khách hàng
-- Sản phẩm, nhà cung cấp, nhập kho, hóa đơn cơ bản
-- Role, permission, role_permission, sync `role_id`
-- Settings nghiệp vụ
-
-### Extra demo transactions
-
-[server/seed-demo.js](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/server/seed-demo.js) thêm:
-
-- Import receipts bổ sung
-- Invoices bổ sung
-- Reviews bổ sung
-- Cập nhật lại thống kê CRM theo các hóa đơn đã thanh toán
-
-## Tập seed không nằm trong flow mặc định
-
-[seed_catalog.sql](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/seed_catalog.sql) là tập catalog mở rộng, không dùng trong flow demo mặc định vì nó xóa và nạp lại dữ liệu sản phẩm/giao dịch để phục vụ kịch bản dữ liệu khác.
+- `sales01` vào `/business`
+- Demo:
+  - lập hóa đơn bán hàng
+  - quản lý khách hàng
+  - case hóa đơn chờ thanh toán
+  - báo cáo doanh thu, lợi nhuận, xuất hàng
 
 ## Backup / restore
 
-- Backup: [backup.sh](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/backup.sh)
-- Restore: [restore.sh](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/database/restore.sh)
+Ví dụ backup:
+
+```bash
+bash database/backup.sh
+```
 
 Ví dụ restore:
 
 ```bash
 cd database
-./restore.sh backup_20260417_093000.sql.gz
+./restore.sh backup_20260427_011000.sql.gz
 ```
 
-Hoặc bỏ qua bước hỏi lại:
+## Tài liệu hỗ trợ chấm bài
 
-```bash
-cd database
-FORCE=1 ./restore.sh backup_20260417_093000.sql.gz
-```
+- Rubric mapping: [REPORT_PACK/01_RUBRIC_MAPPING.md](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/REPORT_PACK/01_RUBRIC_MAPPING.md)
+- Demo checklist: [docs/demo-qa-checklist.md](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/docs/demo-qa-checklist.md)
+- Assignment source of truth: [docs/project-assignments/SGU - 2025_2026 - HK2 - DO AN HTTTDN.docx](/Users/heisenbon/Documents/Workspace%20Code/HTTTDN/Julie%20Cosmetics/docs/project-assignments/SGU%20-%202025_2026%20-%20HK2%20-%20DO%20AN%20HTTTDN.docx)
 
-`restore.sh` hiện đã đọc cùng env với local/docker flow, dùng `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`, và có fallback sang container `julie_mysql` nếu máy chưa cài `mysql` client.
+## Ghi chú trung thực khi viết báo cáo
 
-## Báo cáo để demo/chấm
-
-Tại [ReportsPage](</Users/heisenbon/Documents/Workspace Code/HTTTDN/Julie Cosmetics/client/src/pages/ReportsPage.jsx>):
-
-- Tab `💰 Lợi nhuận`: có nút `🖨️ In báo cáo lợi nhuận`
-- Tab `📦 Kho hàng`: có nút `🖨️ In báo cáo kho` và `🖨️ In báo cáo xuất hàng`
-- Bản in dùng cửa sổ print riêng, tối ưu cho trình duyệt, giữ phần tổng hợp + bảng số liệu để hạn chế lỗi layout khi demo
-- Trước khi demo, nhớ cho phép **popup / pop-up windows** cho `localhost`
-
-Checklist demo tay chi tiết: [docs/demo-qa-checklist.md](</Users/heisenbon/Documents/Workspace Code/HTTTDN/Julie Cosmetics/docs/demo-qa-checklist.md>)
-
-## Smoke checklist trước khi đi chấm
-
-1. Chạy:
-
-```bash
-npm run db:up
-npm run seed:demo
-npm run demo:reset-users
-npm run demo:fixtures
-npm run smoke:server
-npm run demo:smoke
-npm run dev
-```
-
-2. Kiểm tra nhanh từng role:
-
-- `admin / admin123`
-  - vào `/admin`
-  - thấy menu `Tài khoản`, `Nhóm quyền`, `Cấu hình`
-- `manager01 / manager123`
-  - vào `/hr/employees`
-  - mở `/hr/salaries`, tạo thưởng kỳ lương, tính lương, in bảng lương
-- `staff01 / staff123`
-  - vào `/staff`
-  - chỉ demo hồ sơ / nghỉ phép / bảng lương cá nhân
-  - không thấy khu bán hàng nội bộ
-  - mở `Bảng lương cá nhân`, thấy thưởng/lý do thưởng nếu có
-- `sales01 / sales123`
-  - vào `/business/invoices`
-  - thao tác hóa đơn / khách hàng / báo cáo kinh doanh
-  - không thấy `Hồ sơ của tôi`, `Nghỉ phép`, `Bảng lương`
-- `warehouse01 / warehouse123`
-  - vào `/warehouse/imports`
-  - mở tab `📦 Kho hàng`, in `Báo cáo kho`
-
-3. Kiểm tra flow báo cáo bắt buộc:
-
-- `Kho theo tháng/năm`: tab `📦 Kho hàng`, đổi `Theo tháng` hoặc `Theo năm`, bấm `🖨️ In báo cáo kho`
-- `Xuất hàng theo tháng/quý/năm`: tab `📦 Kho hàng`, đổi kỳ, bấm `🖨️ In báo cáo xuất hàng`
-- `Lợi nhuận theo tháng/quý/năm`: tab `💰 Lợi nhuận`, đổi kỳ, bấm `🖨️ In báo cáo lợi nhuận`
-- `Nhân sự`: tab `👥 Nhân sự`, kiểm tra biểu đồ lương + thưởng theo tháng và bảng lương có lý do thưởng
-
-## Checklist chạy demo nhanh
-
-1. `cp .env.example .env && cp server/.env.example server/.env && cp client/.env.example client/.env`
-2. `npm run install:all`
-3. `npm run db:up`
-4. `npm run seed:demo`
-5. `npm run demo:reset-users`
-6. `npm run smoke:server`
-7. `npm run demo:smoke`
-8. `npm run demo:fixtures`
-9. `npm run dev`
-10. Đăng nhập `admin / admin123`
-
-### Lệnh smoke ngắn nhất trước giờ chấm
-
-```bash
-npm run demo:prepare
-```
-
-Lệnh này sẽ:
-
-- reset tài khoản demo
-- dựng lại các demo fixtures quan trọng (pending invoice, pending leave, bonus kỳ hiện tại, NCC fallback)
-- kiểm tra health check backend
-- đăng nhập `admin`, `manager01`, `staff01`, `sales01`, `warehouse01`
-- kiểm tra endpoint chính của user/role, nhân sự, kho, bán hàng, báo cáo
+- “Admin tách biệt” trong phạm vi đồ án được đáp ứng theo mô hình workspace tách vai, không phải nhiều app độc lập.
+- Các tab báo cáo hiện dùng tên nghiệp vụ thực tế của repo: `Doanh thu`, `Lợi nhuận`, `Kho hàng`, `Nhân sự`.
+- Nếu cần nói “báo cáo sản phẩm theo tháng/năm”, nên map vào báo cáo kho và xuất hàng hiện có, không bịa thêm module riêng.
+- Nếu cần nói “phiếu xuất”, nên trình bày qua `Hóa đơn bán hàng` + `thống kê xuất hàng`.
