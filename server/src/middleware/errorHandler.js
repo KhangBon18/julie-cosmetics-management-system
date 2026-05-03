@@ -1,6 +1,19 @@
 const errorHandler = (err, req, res, next) => {
-  console.error('❌ Error:', err.message);
-  console.error(err.stack);
+  const statusCode = err.status
+    || (err.code === 'ER_DUP_ENTRY' ? 400 : null)
+    || (err.code === 'ER_NO_REFERENCED_ROW_2' ? 400 : null)
+    || (err.name === 'JsonWebTokenError' ? 401 : null)
+    || (err.name === 'TokenExpiredError' ? 401 : null)
+    || (err.code === 'LIMIT_FILE_SIZE' ? 400 : null)
+    || (err.code === 'LIMIT_UNEXPECTED_FILE' ? 400 : null)
+    || 500;
+
+  if (statusCode >= 500) {
+    console.error('❌ Error:', err.message);
+    console.error(err.stack);
+  } else {
+    console.warn(`⚠️ ${statusCode}: ${err.message}`);
+  }
 
   // MySQL duplicate entry error
   if (err.code === 'ER_DUP_ENTRY') {
@@ -35,7 +48,7 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Default error
-  res.status(err.status || 500).json({
+  res.status(statusCode).json({
     message: err.message || 'Lỗi máy chủ nội bộ'
   });
 };

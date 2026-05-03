@@ -2,9 +2,11 @@ const router = require('express').Router();
 const productController = require('../controllers/productController');
 const { protect, requirePermission } = require('../middleware/authMiddleware');
 const { validateProduct } = require('../middleware/validationMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
 router.get('/', protect, requirePermission('products.read'), productController.getAll);
 router.get('/low-stock', protect, requirePermission('products.read'), productController.getLowStock);
+router.post('/upload-image', protect, requirePermission('products.create', 'products.update'), upload.productImage.single('image'), productController.uploadImage);
 router.get('/:id', protect, requirePermission('products.read'), productController.getById);
 router.post('/', protect, requirePermission('products.create'), validateProduct, productController.create);
 router.put('/:id', protect, requirePermission('products.update'), validateProduct, productController.update);

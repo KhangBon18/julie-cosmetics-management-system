@@ -39,7 +39,7 @@ INSERT INTO employee_shift_assignments (employee_id, shift_id, effective_from, e
 SELECT u.employee_id, s.shift_id, '2026-03-01', '2026-05-31', 1
 FROM users u
 JOIN attendance_shifts s ON s.shift_code = 'HC'
-WHERE u.username IN ('manager01', 'staff01', 'warehouse01')
+WHERE u.username IN ('manager01', 'staff01', 'sales01', 'warehouse01')
   AND u.employee_id IS NOT NULL
   AND NOT EXISTS (
     SELECT 1
@@ -64,7 +64,7 @@ WITH RECURSIVE calendar AS (
 demo_employees AS (
   SELECT u.employee_id, u.username
   FROM users u
-  WHERE u.username IN ('manager01', 'staff01', 'warehouse01')
+  WHERE u.username IN ('manager01', 'staff01', 'sales01', 'warehouse01')
     AND u.employee_id IS NOT NULL
 ),
 shift AS (
@@ -153,7 +153,7 @@ WITH demo_employees AS (
   SELECT u.employee_id, e.full_name, e.base_salary
   FROM users u
   JOIN employees e ON e.employee_id = u.employee_id
-  WHERE u.username IN ('manager01', 'staff01', 'warehouse01')
+  WHERE u.username IN ('manager01', 'staff01', 'sales01', 'warehouse01')
     AND u.employee_id IS NOT NULL
 ),
 attendance_summary AS (

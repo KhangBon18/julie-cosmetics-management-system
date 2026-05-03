@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiAlertTriangle, FiImage, FiUpload, FiX } from 'react-icons/fi';
 import { productService, brandService, categoryService } from '../services/dataService';
 import { downloadCSV } from '../services/exportService';
 import { toast } from 'react-toastify';
 import usePermission from '../hooks/usePermission';
+import { getProductImage } from '../utils/productImages';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n);
 const sanitizePriceInput = (value) => value.replace(/[^\d]/g, '');
@@ -45,6 +46,7 @@ export default function ProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const limit = 10;
   
@@ -82,8 +84,35 @@ export default function ProductsPage() {
     } catch (err) { toast.error(err.message); }
   };
 
-  const openCreate = () => { setEditing(null); setForm({ product_name: '', brand_id: '', category_id: '', sell_price: '', skin_type: '', volume: '', description: '', is_active: 1 }); setShowModal(true); };
+  const openCreate = () => { setEditing(null); setForm({ product_name: '', brand_id: '', category_id: '', sell_price: '', skin_type: '', volume: '', description: '', image_url: '', is_active: 1 }); setShowModal(true); };
   const openEdit = (p) => { setEditing(p); setForm({ ...p }); setShowModal(true); };
+
+  const handleImageFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Chỉ chấp nhận file ảnh');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ảnh tối đa 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const result = await productService.uploadImage(file);
+      setForm(prev => ({ ...prev, image_url: result.image_url }));
+      toast.success('Đã upload ảnh sản phẩm');
+    } catch (err) {
+      toast.error(err.message || 'Upload ảnh thất bại');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -211,7 +240,19 @@ export default function ProductsPage() {
             <tbody>
               {products.map(p => (
                 <tr key={p.product_id}>
-                  <td><div style={{ fontWeight: 600 }}>{p.product_name}</div><div style={{ fontSize: 12, color: '#94a3b8' }}>{p.volume} {p.skin_type ? `· ${p.skin_type}` : ''}</div></td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 240 }}>
+                      <img
+                        src={getProductImage(p)}
+                        alt={p.product_name}
+                        style={{ width: 42, height: 42, borderRadius: 8, objectFit: 'cover', border: '1px solid #e2e8f0', background: '#f8fafc', flex: '0 0 auto' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{p.product_name}</div>
+                        <div style={{ fontSize: 12, color: '#94a3b8' }}>{p.volume} {p.skin_type ? `· ${p.skin_type}` : ''}</div>
+                      </div>
+                    </div>
+                  </td>
                   <td>{p.brand_name}</td>
                   <td>{p.category_name}</td>
                   <td>{fmt(p.import_price)}đ</td>
@@ -283,6 +324,63 @@ export default function ProductsPage() {
                     <option value="1">Đang kinh doanh</option>
                     <option value="0">Ngừng kinh doanh</option>
                   </select>
+                </div>
+                <div className="form-group">
+                  <label>Ảnh chính</label>
+                  <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ width: 112, height: 112, borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {form.image_url || form.category_id || form.product_name ? (
+                        <img
+                          src={getProductImage({
+                            ...form,
+                            product_id: editing?.product_id || 0,
+                            category_id: Number(form.category_id) || undefined
+                          })}
+                          alt={form.product_name || 'Ảnh sản phẩm'}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <FiImage size={28} color="#94a3b8" />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 220 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <input
+                          id="prd-image-upload"
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                          onChange={handleImageFileChange}
+                          disabled={uploadingImage}
+                          style={{ display: 'none' }}
+                        />
+                        <label
+                          htmlFor="prd-image-upload"
+                          className="btn btn-outline"
+                          style={{ fontSize: 13, cursor: uploadingImage ? 'not-allowed' : 'pointer', opacity: uploadingImage ? 0.7 : 1 }}
+                          aria-disabled={uploadingImage}
+                        >
+                          <FiUpload /> {uploadingImage ? 'Đang upload...' : 'Chọn ảnh'}
+                        </label>
+                        {form.image_url ? (
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: 13 }}
+                            onClick={() => setForm(prev => ({ ...prev, image_url: '' }))}
+                          >
+                            <FiX /> Xóa ảnh
+                          </button>
+                        ) : null}
+                      </div>
+                      <input
+                        className="form-control"
+                        value={form.image_url || ''}
+                        onChange={e => setForm({ ...form, image_url: e.target.value })}
+                        placeholder="/uploads/products/..."
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="form-group"><label htmlFor="prd-skin">Loại da</label><input id="prd-skin" className="form-control" placeholder="VD: Da dầu, Mọi loại da…" value={form.skin_type || ''} onChange={e => setForm({...form, skin_type: e.target.value})} autoComplete="off" /></div>
                 <div className="form-group"><label htmlFor="prd-desc">Mô tả</label><textarea id="prd-desc" className="form-control" rows={3} value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})} /></div>

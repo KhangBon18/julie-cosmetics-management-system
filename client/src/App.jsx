@@ -62,10 +62,10 @@ const renderInternalWorkspaceRoutes = () => (
   <>
     <Route index element={<HomePage />} />
 
-    <Route path="profile" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']}><MyProfilePage /></P>} />
-    <Route path="my-leaves" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']}><MyLeavePage /></P>} />
-    <Route path="my-attendance" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']} workspaceKeys={['hr', 'warehouse', 'business', 'staff']}><MyAttendancePage /></P>} />
-    <Route path="my-salary" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'employee', 'staff_portal']}><MySalaryPage /></P>} />
+    <Route path="profile" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal']}><MyProfilePage /></P>} />
+    <Route path="my-leaves" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal']}><MyLeavePage /></P>} />
+    <Route path="my-attendance" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal']} workspaceKeys={['hr', 'warehouse', 'business', 'staff']}><MyAttendancePage /></P>} />
+    <Route path="my-salary" element={<P allowedRoles={['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal']}><MySalaryPage /></P>} />
 
     <Route path="products" element={<P perm="products.read"><ProductsPage /></P>} />
     <Route path="invoices" element={<P perm="invoices.read"><InvoicesPage /></P>} />

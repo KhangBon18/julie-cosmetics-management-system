@@ -3,6 +3,7 @@ const {
   getSystemRoleDescription,
   getDefaultPermissionNamesForRole
 } = require('../config/defaultRolePermissions');
+const { MODULES, ACTION_LABELS } = require('../config/moduleRegistry');
 
 const ensureRoleIdColumn = async (connection) => {
   const [columns] = await connection.query(
@@ -34,6 +35,33 @@ const ensureSystemRoles = async (connection) => {
   }
 };
 
+const ensureRegistryPermissions = async (connection) => {
+  const permissions = [];
+
+  for (const mod of MODULES) {
+    for (const action of mod.actions || []) {
+      permissions.push([
+        `${mod.key}.${action}`,
+        mod.key,
+        action,
+        `${ACTION_LABELS[action] || action} ${mod.name}`,
+      ]);
+    }
+  }
+
+  if (!permissions.length) return;
+
+  await connection.query(
+    `INSERT INTO permissions (permission_name, module, action, description)
+     VALUES ?
+     ON DUPLICATE KEY UPDATE
+       module = VALUES(module),
+       action = VALUES(action),
+       description = VALUES(description)`,
+    [permissions]
+  );
+};
+
 const getRoleIdsByName = async (connection) => {
   const [rows] = await connection.query(
     'SELECT role_id, role_name FROM roles WHERE role_name IN (?)',
@@ -51,6 +79,7 @@ const syncSystemRolePermissions = async (connection, options = {}) => {
 
   await ensureRoleIdColumn(connection);
   await ensureSystemRoles(connection);
+  await ensureRegistryPermissions(connection);
 
   const [permissions] = await connection.query(
     'SELECT permission_id, permission_name FROM permissions ORDER BY permission_name'
@@ -98,5 +127,6 @@ const syncSystemRolePermissions = async (connection, options = {}) => {
 module.exports = {
   ensureRoleIdColumn,
   ensureSystemRoles,
+  ensureRegistryPermissions,
   syncSystemRolePermissions
 };

@@ -40,7 +40,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
   {
@@ -53,7 +53,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
   {
@@ -66,7 +66,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
   {
@@ -79,7 +79,7 @@ const MODULES = [
     showInSidebar: true,
     actions: [],
     isPublic: true,
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
   },
 

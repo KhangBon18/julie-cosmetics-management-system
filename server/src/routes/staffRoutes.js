@@ -12,7 +12,7 @@ const {
 
 // Tất cả routes đều cần đăng nhập
 router.use(protect);
-router.use(roleCheckResolved('manager', 'staff', 'warehouse', 'employee', 'staff_portal'));
+router.use(roleCheckResolved('manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'));
 
 router.get('/dashboard', staffController.getDashboard);
 router.get('/profile', staffController.getProfile);

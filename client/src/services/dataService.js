@@ -100,7 +100,16 @@ export const reviewService = {
   ...createService('/reviews'),
   toggleVisibility: (id, isVisible) => api.put(`/reviews/${id}/visibility`, { is_visible: isVisible })
 };
-export const productService = createService('/products');
+export const productService = {
+  ...createService('/products'),
+  uploadImage: (file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.post('/products/upload-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  }
+};
 export const userService = {
   ...createService('/users'),
   getPermissions: (id) => api.get(`/users/${id}/permissions`),

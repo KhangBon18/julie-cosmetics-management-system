@@ -44,6 +44,39 @@ const productController = {
     } catch (error) { next(error); }
   },
 
+  // POST /api/products/upload-image
+  uploadImage: async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'Vui lòng chọn file ảnh sản phẩm' });
+      }
+
+      const imageUrl = `/uploads/products/${req.file.filename}`;
+      await logAudit({
+        userId: req.user.user_id,
+        action: 'CREATE',
+        entityType: 'product_image_upload',
+        newValues: {
+          image_url: imageUrl,
+          original_name: req.file.originalname,
+          mime_type: req.file.mimetype,
+          size: req.file.size,
+        },
+        req,
+      });
+
+      res.status(201).json({
+        message: 'Upload ảnh sản phẩm thành công',
+        image_url: imageUrl,
+        file: {
+          original_name: req.file.originalname,
+          mime_type: req.file.mimetype,
+          size: req.file.size,
+        },
+      });
+    } catch (error) { next(error); }
+  },
+
   // PUT /api/products/:id
   update: async (req, res, next) => {
     try {

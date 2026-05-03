@@ -24,6 +24,8 @@ const { calculateAllSalaries, calculateSalary } = require('../src/utils/salaryCa
 const DEMO_PENDING_INVOICE_NOTE = '[DEMO] Hóa đơn chờ xác nhận thanh toán';
 const DEMO_PENDING_LEAVE_REASON = '[DEMO] Nghỉ phép chờ duyệt để trình bày giữa kỳ';
 const DEMO_BONUS_REASON = '[DEMO] Thưởng KPI giữa kỳ';
+const DEMO_ATTENDANCE_PERIOD_NOTE = '[DEMO] Kỳ công hiện tại khóa sẵn để kiểm thử guard backend';
+const SMOKE_LOCK_ATTENDANCE_NOTE = '[SMOKE] locked attendance write must be blocked';
 const FALLBACK_SUPPLIER_NAME = 'Nhà cung cấp fallback demo';
 
 const toDateOnly = (value) => {
@@ -46,6 +48,131 @@ async function hasTable(tableName) {
   );
 
   return Number(rows[0]?.total || 0) > 0;
+}
+
+async function cleanupSmokeAttendanceArtifacts() {
+  if (!(await hasTable('attendance_records'))) {
+    return;
+  }
+
+  const [result] = await pool.query(
+    `DELETE FROM attendance_records
+     WHERE source = 'self'
+       AND note = ?`,
+    [SMOKE_LOCK_ATTENDANCE_NOTE]
+  );
+
+  if (Number(result.affectedRows || 0) > 0) {
+    console.log(`✅ Đã dọn ${result.affectedRows} bản ghi chấm công smoke bị tạo dở.`);
+  }
+}
+
+async function ensureCurrentAttendancePeriodLockedFixture() {
+  if (!(await hasTable('attendance_periods'))) {
+    console.log('⚠️  Bỏ qua attendance period fixture vì DB chưa có bảng attendance_periods (migration 039).');
+    return;
+  }
+
+  const [[currentPeriod]] = await pool.query(
+    `SELECT
+       MONTH(CURDATE()) AS month,
+       YEAR(CURDATE()) AS year,
+       DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL DAYOFMONTH(CURDATE()) - 1 DAY), '%Y-%m-%d') AS start_date,
+       DATE_FORMAT(LAST_DAY(CURDATE()), '%Y-%m-%d') AS end_date`
+  );
+
+  const [[adminUser]] = await pool.query(
+    `SELECT user_id
+     FROM users
+     WHERE username = 'admin' AND deleted_at IS NULL
+     LIMIT 1`
+  );
+
+  await pool.query(
+    `INSERT INTO attendance_periods (month, year, start_date, end_date, status, locked_by, locked_at, note)
+     VALUES (?, ?, ?, ?, 'locked', ?, NOW(), ?)
+     ON DUPLICATE KEY UPDATE
+       start_date = VALUES(start_date),
+       end_date = VALUES(end_date),
+       status = 'locked',
+       locked_by = COALESCE(attendance_periods.locked_by, VALUES(locked_by)),
+       locked_at = COALESCE(attendance_periods.locked_at, NOW()),
+       note = COALESCE(attendance_periods.note, VALUES(note))`,
+    [
+      currentPeriod.month,
+      currentPeriod.year,
+      currentPeriod.start_date,
+      currentPeriod.end_date,
+      adminUser?.user_id || null,
+      DEMO_ATTENDANCE_PERIOD_NOTE,
+    ]
+  );
+
+  console.log(`✅ Đã khóa kỳ công demo hiện tại ${currentPeriod.month}/${currentPeriod.year}.`);
+}
+
+async function syncFinancialHeaderTotals() {
+  const [importResult] = await pool.query(
+    `UPDATE import_receipts ir
+     JOIN (
+       SELECT receipt_id, SUM(quantity * unit_price) AS line_total
+       FROM import_receipt_items
+       GROUP BY receipt_id
+     ) totals ON totals.receipt_id = ir.receipt_id
+     SET ir.total_amount = totals.line_total
+     WHERE ABS(COALESCE(ir.total_amount, 0) - totals.line_total) > 0.009`
+  );
+
+  const [settingsRows] = await pool.query(
+    `SELECT setting_value
+     FROM settings
+     WHERE setting_key = 'crm.points_per_10000'
+     LIMIT 1`
+  );
+  const pointsPerBase = Number(settingsRows[0]?.setting_value || 1) > 0
+    ? Number(settingsRows[0].setting_value)
+    : 1;
+
+  const invoiceTotalSql = `
+    GREATEST(
+      0,
+      totals.line_subtotal - ROUND(totals.line_subtotal * COALESCE(i.discount_percent, 0) / 100)
+    )
+  `;
+  const pointsSql = `
+    CASE
+      WHEN i.customer_id IS NULL OR i.status IN ('cancelled', 'refunded') THEN 0
+      ELSE FLOOR(${invoiceTotalSql} / 10000) * ?
+    END
+  `;
+
+  const [invoiceResult] = await pool.query(
+    `UPDATE invoices i
+     JOIN (
+       SELECT invoice_id, SUM(subtotal) AS line_subtotal
+       FROM invoice_items
+       GROUP BY invoice_id
+     ) totals ON totals.invoice_id = i.invoice_id
+     SET i.subtotal = totals.line_subtotal,
+         i.discount_amount = ROUND(totals.line_subtotal * COALESCE(i.discount_percent, 0) / 100),
+         i.final_total = ${invoiceTotalSql},
+         i.points_earned = ${pointsSql}
+     WHERE ABS(COALESCE(i.subtotal, 0) - totals.line_subtotal) > 0.009
+        OR ABS(COALESCE(i.discount_amount, 0) - ROUND(totals.line_subtotal * COALESCE(i.discount_percent, 0) / 100)) > 0.009
+        OR ABS(COALESCE(i.final_total, 0) - ${invoiceTotalSql}) > 0.009
+        OR COALESCE(i.points_earned, 0) <> ${pointsSql}`,
+    [pointsPerBase, pointsPerBase]
+  );
+
+  const [paymentResult] = await pool.query(
+    `UPDATE payment_transactions pt
+     JOIN invoices i ON i.invoice_id = pt.invoice_id
+     SET pt.amount = i.final_total
+     WHERE pt.status IN ('pending', 'confirmed')
+       AND ABS(COALESCE(pt.amount, 0) - COALESCE(i.final_total, 0)) > 0.009`
+  );
+
+  console.log(`✅ Đồng bộ tổng tiền demo: ${importResult.affectedRows} phiếu nhập, ${invoiceResult.affectedRows} hóa đơn, ${paymentResult.affectedRows} giao dịch thanh toán.`);
 }
 
 async function ensureSupplierFallbackFixture() {
@@ -301,9 +428,12 @@ async function main() {
     console.log('🎯 Ensuring demo fixtures...\n');
 
     await ensureSupplierFallbackFixture();
+    await cleanupSmokeAttendanceArtifacts();
+    await ensureCurrentAttendancePeriodLockedFixture();
     await ensurePendingLeaveFixture();
     await ensureCurrentPayrollFixture();
     await ensurePendingInvoiceFixture();
+    await syncFinancialHeaderTotals();
 
     console.log('\n✅ Demo fixtures are ready.');
   } catch (error) {

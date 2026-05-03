@@ -90,6 +90,7 @@ INSERT INTO permissions (permission_name, module, action, description) VALUES
 ('salaries.create',  'salaries',  'create', 'Tạo bảng lương'),
 ('salaries.update',  'salaries',  'update', 'Sửa bảng lương'),
 ('salaries.delete',  'salaries',  'delete', 'Xóa bảng lương'),
+('salaries.export',  'salaries',  'export', 'Xuất bảng lương'),
 ('brands.read',      'brands',    'read',   'Xem thương hiệu'),
 ('brands.create',    'brands',    'create', 'Thêm thương hiệu'),
 ('brands.update',    'brands',    'update', 'Sửa thương hiệu'),
@@ -212,8 +213,8 @@ WHERE r.role_name = 'warehouse'
 -- ── BACKFILL LEGACY USERS -> role_id ─────────────────────────
 -- `role_id` là nguồn RBAC chính; chỉ backfill khi còn NULL.
 -- Legacy enum `staff` được tách thành:
---   - staff_portal: tài khoản gắn employee_id (self-service)
---   - sales: tài khoản staff không gắn employee_id (nghiệp vụ kinh doanh)
+--   - staff_portal: tài khoản nhân viên thuần tự phục vụ
+--   - sales: tài khoản kinh doanh; có thể vẫn gắn employee_id để dùng self-service cá nhân
 UPDATE users u
 JOIN roles r_sales ON r_sales.role_name = 'sales'
 JOIN roles r_staff_portal ON r_staff_portal.role_name = 'staff_portal'
@@ -224,6 +225,12 @@ END
 WHERE u.deleted_at IS NULL
   AND u.role = 'staff'
   AND u.role_id IS NULL;
+
+UPDATE users u
+JOIN roles r_sales ON r_sales.role_name = 'sales'
+SET u.role_id = r_sales.role_id
+WHERE u.deleted_at IS NULL
+  AND u.username = 'sales01';
 
 UPDATE users u
 JOIN roles r ON r.role_name = u.role

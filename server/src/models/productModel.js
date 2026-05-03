@@ -81,6 +81,7 @@ const Product = {
     let countQuery = `SELECT COUNT(*) as total FROM products p
                       ${supplierJoin}
                       LEFT JOIN categories c ON p.category_id = c.category_id
+                      LEFT JOIN brands b ON p.brand_id = b.brand_id
                       WHERE p.deleted_at IS NULL`;
     const params = [];
     const countParams = [];
@@ -122,9 +123,9 @@ const Product = {
       const searchTerms = cleanSearch.split(/\s+/).map(term => `+${term}*`).join(' ');
 
       query += ' AND (MATCH(p.product_name, p.description) AGAINST(? IN BOOLEAN MODE) OR b.brand_name LIKE ?)';
-      countQuery += ' AND (MATCH(p.product_name, p.description) AGAINST(? IN BOOLEAN MODE))';
+      countQuery += ' AND (MATCH(p.product_name, p.description) AGAINST(? IN BOOLEAN MODE) OR b.brand_name LIKE ?)';
       params.push(searchTerms, `%${cleanSearch}%`);
-      countParams.push(searchTerms);
+      countParams.push(searchTerms, `%${cleanSearch}%`);
     }
 
     if (normalizedPriceRange.min !== undefined) {

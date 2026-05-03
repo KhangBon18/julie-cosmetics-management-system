@@ -81,8 +81,7 @@ export default function CheckoutPage() {
   
   const discountAmount = Math.round(cartTotal * discountPct / 100);
   const totalAfterDiscount = cartTotal - discountAmount;
-  const shipping = totalAfterDiscount >= 500000 ? 0 : 30000;
-  const total = totalAfterDiscount + shipping;
+  const total = totalAfterDiscount;
 
   const validate = () => {
     const e = {};
@@ -259,9 +258,7 @@ export default function CheckoutPage() {
               </div>
               <div className="cart-summary-row">
                 <span>Vận chuyển</span>
-                <span style={{ color: shipping === 0 ? 'var(--shop-success)' : 'inherit' }}>
-                  {shipping === 0 ? 'Miễn phí' : `${fmt(shipping)}đ`}
-                </span>
+                <span style={{ color: 'var(--shop-success)' }}>Miễn phí</span>
               </div>
               {discountAmount > 0 && customerUser && (
                 <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--shop-bg-light)', borderRadius: 6, border: '1px solid var(--shop-border-light)' }}>
