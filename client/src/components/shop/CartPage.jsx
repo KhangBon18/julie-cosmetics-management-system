@@ -109,19 +109,12 @@ export default function CartPage() {
           </div>
           <div className="cart-summary-row">
             <span>Vận chuyển</span>
-            <span style={{ color: cartTotal >= 500000 ? 'var(--shop-success)' : 'inherit' }}>
-              {cartTotal >= 500000 ? 'Miễn phí' : '30.000đ'}
-            </span>
+            <span style={{ color: 'var(--shop-success)' }}>Miễn phí</span>
           </div>
           <div className="cart-summary-row cart-summary-total">
             <span>Tổng cộng</span>
-            <span>{fmt(cartTotal + (cartTotal >= 500000 ? 0 : 30000))}đ</span>
+            <span>{fmt(cartTotal)}đ</span>
           </div>
-          {cartTotal < 500000 && (
-            <p style={{ fontSize: 12, color: 'var(--shop-primary)', marginTop: 8 }}>
-              Mua thêm {fmt(500000 - cartTotal)}đ để được miễn phí vận chuyển!
-            </p>
-          )}
           <Link to="/shop/checkout" className="btn-checkout">
             Thanh toán <FiArrowRight />
           </Link>

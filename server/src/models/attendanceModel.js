@@ -250,6 +250,62 @@ const getApprovedLeaveForEmployeeDate = async (employeeId, workDate, executor = 
   return rows[0] || null;
 };
 
+const getLockedAttendancePeriodForDate = async (workDate, executor = pool) => {
+  const normalizedDate = normalizeDateInput(workDate);
+  if (!normalizedDate) {
+    throw Object.assign(new Error('Ngày công không hợp lệ'), { status: 400 });
+  }
+
+  const [year, month] = normalizedDate.split('-').map(Number);
+
+  try {
+    const [rows] = await executor.query(
+      `SELECT period_id,
+              month,
+              year,
+              status,
+              DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+              DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date
+       FROM attendance_periods
+       WHERE ((start_date <= ? AND end_date >= ?) OR (month = ? AND year = ?))
+         AND status = 'locked'
+       ORDER BY period_id DESC
+       LIMIT 1`,
+      [normalizedDate, normalizedDate, month, year]
+    );
+
+    return rows[0] || null;
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return null;
+    }
+    throw error;
+  }
+};
+
+const assertAttendancePeriodsWritable = async (workDates, executor = pool) => {
+  const uniqueDates = [...new Set(
+    (Array.isArray(workDates) ? workDates : [workDates])
+      .map(normalizeDateInput)
+      .filter(Boolean)
+  )];
+
+  for (const workDate of uniqueDates) {
+    const lockedPeriod = await getLockedAttendancePeriodForDate(workDate, executor);
+    if (lockedPeriod) {
+      throw Object.assign(
+        new Error(`Kỳ công ${lockedPeriod.month}/${lockedPeriod.year} đã chốt, không thể thay đổi chấm công ngày ${workDate}`),
+        {
+          status: 409,
+          code: 'ATTENDANCE_PERIOD_LOCKED',
+          period: lockedPeriod,
+          work_date: workDate,
+        }
+      );
+    }
+  }
+};
+
 const Attendance = {
   hasAttendanceTable: async (executor = pool) => {
     if (executor === pool && _attendanceTableReady !== null) return _attendanceTableReady;
@@ -267,6 +323,10 @@ const Attendance = {
   getCurrentDbMoment,
 
   getApprovedLeaveForEmployeeDate,
+
+  getLockedAttendancePeriodForDate,
+
+  assertAttendancePeriodsWritable,
 
   getDefaultShift: async (executor = pool) => {
     const [rows] = await executor.query(
@@ -454,6 +514,7 @@ const Attendance = {
       }
 
       const currentMoment = await getCurrentDbMoment(connection);
+      await assertAttendancePeriodsWritable(currentMoment.work_date, connection);
       const existing = await Attendance.findByEmployeeAndDate(normalizedEmployeeId, currentMoment.work_date, connection, true);
 
       if (existing?.check_in_at) {
@@ -550,6 +611,7 @@ const Attendance = {
       }
 
       const currentMoment = await getCurrentDbMoment(connection);
+      await assertAttendancePeriodsWritable(currentMoment.work_date, connection);
       const existing = await Attendance.findByEmployeeAndDate(normalizedEmployeeId, currentMoment.work_date, connection, true);
 
       if (!existing?.check_in_at) {
@@ -648,6 +710,13 @@ const Attendance = {
       if (attendanceId && !existingById) {
         throw Object.assign(new Error('Không tìm thấy bản ghi chấm công cần cập nhật'), { status: 404 });
       }
+
+      await assertAttendancePeriodsWritable(
+        existingById?.work_date && existingById.work_date !== workDate
+          ? [existingById.work_date, workDate]
+          : workDate,
+        connection
+      );
 
       const existingByDate = await Attendance.findByEmployeeAndDate(employeeId, workDate, connection, true);
       if (existingByDate && existingById && existingByDate.attendance_id !== existingById.attendance_id) {
@@ -765,8 +834,27 @@ const Attendance = {
   },
 
   delete: async (attendanceId) => {
-    const [result] = await pool.query('DELETE FROM attendance_records WHERE attendance_id = ?', [attendanceId]);
-    return result.affectedRows;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const current = await Attendance.findById(attendanceId, connection, true);
+      if (!current) {
+        await connection.commit();
+        return 0;
+      }
+
+      await assertAttendancePeriodsWritable(current.work_date, connection);
+      const [result] = await connection.query('DELETE FROM attendance_records WHERE attendance_id = ?', [attendanceId]);
+
+      await connection.commit();
+      return result.affectedRows;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 
   getSummary: async (filters = {}) => {
@@ -893,6 +981,7 @@ const Attendance = {
       await connection.beginTransaction();
 
       await ensureEmployeeExists(connection, normalizedEmployeeId);
+      await assertAttendancePeriodsWritable(workDate, connection);
       const currentAttendance = await Attendance.findByEmployeeAndDate(normalizedEmployeeId, workDate, connection, true);
 
       const [pendingRows] = await connection.query(
@@ -998,6 +1087,8 @@ const Attendance = {
       if (request.status !== 'pending') {
         throw Object.assign(new Error('Chỉ có thể duyệt yêu cầu đang chờ xử lý'), { status: 409 });
       }
+
+      await assertAttendancePeriodsWritable(request.work_date, connection);
 
       const existing = request.attendance_id
         ? await Attendance.findById(request.attendance_id, connection, true)
@@ -1111,7 +1202,7 @@ const Attendance = {
       await connection.beginTransaction();
 
       const [requestRows] = await connection.query(
-        `SELECT request_id, status
+        `SELECT request_id, status, DATE_FORMAT(work_date, '%Y-%m-%d') AS work_date
          FROM attendance_adjustment_requests
          WHERE request_id = ?
          LIMIT 1
@@ -1125,6 +1216,8 @@ const Attendance = {
       if (requestRows[0].status !== 'pending') {
         throw Object.assign(new Error('Chỉ có thể từ chối yêu cầu đang chờ xử lý'), { status: 409 });
       }
+
+      await assertAttendancePeriodsWritable(requestRows[0].work_date, connection);
 
       await connection.query(
         `UPDATE attendance_adjustment_requests

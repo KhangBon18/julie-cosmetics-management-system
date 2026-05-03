@@ -51,8 +51,8 @@ INSERT INTO users (username, password_hash, role, employee_id, is_active) VALUES
 ('admin',        '$2a$10$rxik/AurZ4RtBxuwB6K2eOKxhuOzU1oT/qNqymIykEoSvPD3Wx2jC', 'admin',     NULL, TRUE),
 ('manager01',    '$2a$10$C1ZWe0OszlFZd7GUK2m1ae6bn9F4Ox7LA.R.YnHs3RLGrPsErnU3C', 'manager',   1,    TRUE),
 ('staff01',      '$2a$10$102u8BDnzPvddN.TErjNNe89gtGZGCaZqyUrh20XPNaTsQyVvhf62', 'staff',     2,    TRUE),
-('staff02',      '$2a$10$XdTW7K.YPLrzY5H16hYaaO8HPLWUNxC5PWmZv4iviw6T4CoF71OE6', 'staff',     3,    TRUE),
-('sales01',      '$2a$10$AYOnKExz6y1i/nwfJMUrguL/FNyhorXpbOZag8smiEG82uXPCLgFa', 'staff',     NULL, TRUE),
+('staff02',      '$2a$10$XdTW7K.YPLrzY5H16hYaaO8HPLWUNxC5PWmZv4iviw6T4CoF71OE6', 'staff',     NULL, FALSE),
+('sales01',      '$2a$10$AYOnKExz6y1i/nwfJMUrguL/FNyhorXpbOZag8smiEG82uXPCLgFa', 'staff',     3,    TRUE),
 ('warehouse01',  '$2a$10$R99s632OA5DWlSdzJIckkOyJ3kWjbLUAmY9mymYCcqu.oz4WltdI2', 'warehouse', 4,    TRUE),
 ('staff03',      '$2a$10$jvO2ApKOX/5dUxPLT6YrLOAMwURCLCFmYJ3YfAJrpJAf694JQ7jXi', 'staff',     5,    TRUE);
 
@@ -130,9 +130,9 @@ INSERT INTO customers (full_name, phone, email, address, gender, date_of_birth, 
 
 -- ── IMPORT RECEIPTS ───────────────────────────────────────────
 INSERT INTO import_receipts (supplier_id, created_by, total_amount, note, created_at) VALUES
-(2, 5, 4850000,  'Nhập hàng định kỳ từ nhà cung cấp Hàn Quốc - kỳ tháng 3/2026.', '2026-03-01 09:00:00'),
-(1, 5, 2750000,  'Nhập hàng định kỳ từ nhà cung cấp Châu Âu - kỳ tháng 3/2026.',   '2026-03-10 10:30:00'),
-(3, 5, 3600000,  'Nhập bổ sung nhóm hàng trang điểm - kỳ tháng 3/2026.',            '2026-03-20 14:00:00');
+(2, 5, 5400000,  'Nhập hàng định kỳ từ nhà cung cấp Hàn Quốc - kỳ tháng 3/2026.', '2026-03-01 09:00:00'),
+(1, 5, 3300000,  'Nhập hàng định kỳ từ nhà cung cấp Châu Âu - kỳ tháng 3/2026.',   '2026-03-10 10:30:00'),
+(3, 5, 4050000,  'Nhập bổ sung nhóm hàng trang điểm - kỳ tháng 3/2026.',            '2026-03-20 14:00:00');
 
 INSERT INTO import_receipt_items (receipt_id, product_id, quantity, unit_price) VALUES
 (1, 3,  20, 85000),   -- Toner Innisfree
@@ -146,14 +146,14 @@ INSERT INTO import_receipt_items (receipt_id, product_id, quantity, unit_price) 
 
 -- ── INVOICES (demo giao dịch) ─────────────────────────────────
 INSERT INTO invoices (customer_id, created_by, subtotal, discount_percent, discount_amount, final_total, points_earned, payment_method, created_at) VALUES
-(1, 2, 690000,  5, 34500,  655500,  65, 'cash',     '2026-03-05 10:15:00'),  -- KH Vàng giảm 5%
-(2, 2, 324000,  0, 0,       324000,  32, 'card',     '2026-03-06 14:30:00'),
-(6, 3, 890000,  5, 44500,  845500,  84, 'transfer', '2026-03-07 11:00:00'),  -- KH Vàng giảm 5%
-(3, 2, 465000,  0, 0,       465000,  46, 'cash',     '2026-03-10 09:45:00'),
-(NULL,2,230000, 0, 0,       230000,   0, 'cash',     '2026-03-12 16:00:00'), -- Khách vãng lai
+(1, 2, 718000,  5, 35900,  682100,  68, 'cash',     '2026-03-05 10:15:00'),  -- KH Vàng giảm 5%
+(2, 2, 284000,  0, 0,       284000,  28, 'card',     '2026-03-06 14:30:00'),
+(6, 3, 904000,  5, 45200,  858800,  85, 'transfer', '2026-03-07 11:00:00'),  -- KH Vàng giảm 5%
+(3, 2, 469000,  0, 0,       469000,  46, 'cash',     '2026-03-10 09:45:00'),
+(NULL,2,234000, 0, 0,       234000,   0, 'cash',     '2026-03-12 16:00:00'), -- Khách vãng lai
 (4, 3, 519000,  0, 0,       519000,  51, 'cash',     '2026-03-15 13:20:00'),
-(1, 2, 1175000, 5, 58750, 1116250, 111, 'card',     '2026-03-18 10:00:00'), -- KH Vàng
-(5, 3, 294000,  0, 0,       294000,  29, 'cash',     '2026-03-20 15:45:00');
+(1, 2, 1155000, 5, 57750, 1097250, 109, 'card',     '2026-03-18 10:00:00'), -- KH Vàng
+(5, 3, 274000,  0, 0,       274000,  27, 'cash',     '2026-03-20 15:45:00');
 
 INSERT INTO invoice_items (invoice_id, product_id, quantity, unit_price, subtotal) VALUES
 (1, 2, 1, 160000, 160000),  -- Serum Retinol

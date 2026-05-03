@@ -36,7 +36,7 @@ const MODULES = [
     actions: [],
     isPublic: true,
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
   },
   {
     key: 'my_leaves',
@@ -49,7 +49,7 @@ const MODULES = [
     actions: [],
     isPublic: true,
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
   },
   {
     key: 'my_salary',
@@ -62,7 +62,7 @@ const MODULES = [
     actions: [],
     isPublic: true,
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
   },
   {
     key: 'my_attendance',
@@ -75,7 +75,7 @@ const MODULES = [
     actions: [],
     isPublic: true,
     workspaceKeys: ['hr', 'warehouse', 'business', 'staff'],
-    allowedRoles: ['manager', 'staff', 'warehouse', 'employee', 'staff_portal'],
+    allowedRoles: ['manager', 'staff', 'warehouse', 'sales', 'employee', 'staff_portal'],
   },
 
   // ─── Bán hàng ───

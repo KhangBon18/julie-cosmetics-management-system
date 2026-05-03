@@ -87,7 +87,7 @@ export const getAccessibleWorkspaceKeys = (user) => {
     }
   });
 
-  if (['manager', 'warehouse', 'staff', 'employee', 'staff_portal'].includes(normalizedRole)) {
+  if (['manager', 'warehouse', 'staff', 'sales', 'employee', 'staff_portal'].includes(normalizedRole)) {
     accessibleWorkspaceKeys.add('staff');
   }
 

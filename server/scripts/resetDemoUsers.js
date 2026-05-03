@@ -27,7 +27,7 @@ const DEMO_ACCOUNTS = [
   { username: 'admin', password: 'admin123', role_name: 'admin', legacy_role: 'admin', employee_id: null },
   { username: 'manager01', password: 'manager123', role_name: 'manager', legacy_role: 'manager', employee_id: 1 },
   { username: 'staff01', password: 'staff123', role_name: 'staff_portal', legacy_role: 'staff', employee_id: 2 },
-  { username: 'sales01', password: 'sales123', role_name: 'sales', legacy_role: 'staff', employee_id: null },
+  { username: 'sales01', password: 'sales123', role_name: 'sales', legacy_role: 'staff', employee_id: 3 },
   { username: 'warehouse01', password: 'warehouse123', role_name: 'warehouse', legacy_role: 'warehouse', employee_id: 4 }
 ];
 
